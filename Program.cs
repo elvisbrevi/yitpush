@@ -18,6 +18,7 @@ class Program
     // Process command line arguments
     bool requireConfirmation = args.Contains("--confirm");
     bool showHelp = args.Contains("--help");
+    bool detailed = args.Contains("--detailed");
     
     if (showHelp)
     {
@@ -25,10 +26,12 @@ class Program
         Console.WriteLine();
         Console.WriteLine("Options:");
         Console.WriteLine("  --confirm    Ask for confirmation before committing");
+        Console.WriteLine("  --detailed   Generate detailed commit with body (title + paragraphs + bullet points)");
         Console.WriteLine("  --help       Show this help message");
         Console.WriteLine();
         Console.WriteLine("By default, YitPush will automatically commit and push without confirmation.");
         Console.WriteLine("Use --confirm if you want to review the commit message before proceeding.");
+        Console.WriteLine("Use --detailed for detailed commit messages with full explanations.");
         Console.WriteLine();
         return 0;
     }
@@ -73,8 +76,8 @@ class Program
             Console.WriteLine($"Found changes ({diff.Length} characters)\n");
 
             // Get commit message from DeepSeek
-            Console.WriteLine("🤖 Generating commit message with DeepSeek Reasoning...");
-            var commitMessage = await GenerateCommitMessage(apiKey, diff);
+            Console.WriteLine($"🤖 Generating commit message with DeepSeek Reasoning...{(detailed ? " (detailed mode)" : "")}");
+            var commitMessage = await GenerateCommitMessage(apiKey, diff, detailed);
 
             if (string.IsNullOrWhiteSpace(commitMessage))
             {
@@ -286,7 +289,7 @@ class Program
         }
     }
 
-    private static async Task<string> GenerateCommitMessage(string apiKey, string diff)
+    private static async Task<string> GenerateCommitMessage(string apiKey, string diff, bool detailed = false)
     {
         const int maxRetries = 3;
         const int baseDelayMs = 1000;
@@ -301,7 +304,39 @@ class Program
                 };
                 httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
 
-                var prompt = $@"You are a git commit message expert. Based on the following git diff, generate a concise, clear, and descriptive commit message following conventional commits format.
+                string prompt;
+                if (detailed)
+                {
+                    prompt = $@"You are a git commit message expert. Based on the following git diff, generate a detailed conventional commit with title and body.
+
+FORMAT REQUIREMENTS:
+1. TITLE LINE (required):
+   - Start with conventional commit type: feat, fix, docs, style, refactor, test, chore
+   - Use imperative mood: 'add' not 'added' or 'adds'
+   - Max 50 characters for the subject line
+   - Example: 'feat: add user authentication with JWT'
+
+2. BODY (required for detailed mode):
+   - Add one blank line after title
+   - Include 1-2 descriptive paragraphs explaining the changes
+   - Add bullet points for key changes (use '-' or '*')
+   - Mention important files modified or added
+   - Keep lines under 72 characters for git compatibility
+   - Focus on the 'why' not just the 'what'
+
+3. STYLE:
+   - Write in clear, professional English
+   - Use present tense for changes
+   - Be specific about technical implementation
+
+Git diff:
+{diff}
+
+Generate the complete commit message (title + body):";
+                }
+                else
+                {
+                    prompt = $@"You are a git commit message expert. Based on the following git diff, generate a concise, clear, and descriptive commit message following conventional commits format.
 
 The commit message should:
 - Start with a type (feat, fix, docs, style, refactor, test, chore)
@@ -314,6 +349,7 @@ Git diff:
 {diff}
 
 Generate only the commit message:";
+                }
 
                 var requestBody = new
                 {
