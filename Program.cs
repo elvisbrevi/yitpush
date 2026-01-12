@@ -297,7 +297,7 @@ class Program
             {
                 using var httpClient = new HttpClient
                 {
-                    Timeout = TimeSpan.FromSeconds(60) // Set 60 second timeout
+                    Timeout = TimeSpan.FromSeconds(120) // Increased timeout for reasoning models
                 };
                 httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
 
@@ -322,7 +322,7 @@ Generate only the commit message:";
                     {
                         new { role = "user", content = prompt }
                     },
-                    max_tokens = 1000
+                    max_tokens = 8000  // Increased for reasoning models to complete both reasoning and final answer
                 };
 
                 var jsonContent = JsonSerializer.Serialize(requestBody);
