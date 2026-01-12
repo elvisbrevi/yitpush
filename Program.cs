@@ -262,12 +262,20 @@ class Program
 
     private static async Task<string> GenerateCommitMessage(string apiKey, string diff)
     {
-        try
-        {
-            using var httpClient = new HttpClient();
-            httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+        const int maxRetries = 3;
+        const int baseDelayMs = 1000;
 
-            var prompt = $@"You are a git commit message expert. Based on the following git diff, generate a concise, clear, and descriptive commit message following conventional commits format.
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                using var httpClient = new HttpClient
+                {
+                    Timeout = TimeSpan.FromSeconds(60) // Set 60 second timeout
+                };
+                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+
+                var prompt = $@"You are a git commit message expert. Based on the following git diff, generate a concise, clear, and descriptive commit message following conventional commits format.
 
 The commit message should:
 - Start with a type (feat, fix, docs, style, refactor, test, chore)
@@ -281,50 +289,109 @@ Git diff:
 
 Generate only the commit message:";
 
-            var requestBody = new
-            {
-                model = DeepSeekModel,
-                messages = new[]
+                var requestBody = new
                 {
-                    new { role = "user", content = prompt }
-                },
-                max_tokens = 1000
-            };
+                    model = DeepSeekModel,
+                    messages = new[]
+                    {
+                        new { role = "user", content = prompt }
+                    },
+                    max_tokens = 1000
+                };
 
-            var jsonContent = JsonSerializer.Serialize(requestBody);
-            var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                var jsonContent = JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
 
-            var response = await httpClient.PostAsync(DeepSeekApiUrl, content);
+                var response = await httpClient.PostAsync(DeepSeekApiUrl, content);
 
-            if (!response.IsSuccessStatusCode)
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"API Error (attempt {attempt}/{maxRetries}): {response.StatusCode}");
+                    Console.WriteLine($"Response: {errorContent}");
+
+                    // If it's a rate limit or server error, retry
+                    if (attempt < maxRetries && ((int)response.StatusCode == 429 || (int)response.StatusCode >= 500))
+                    {
+                        var delay = baseDelayMs * (int)Math.Pow(2, attempt - 1);
+                        Console.WriteLine($"Retrying in {delay}ms...");
+                        await Task.Delay(delay);
+                        continue;
+                    }
+
+                    return string.Empty;
+                }
+
+                var responseJson = await response.Content.ReadAsStringAsync();
+                var apiResponse = JsonSerializer.Deserialize<DeepSeekResponse>(responseJson);
+
+                if (apiResponse?.Choices == null || apiResponse.Choices.Length == 0)
+                {
+                    Console.WriteLine($"No response from API (attempt {attempt}/{maxRetries})");
+
+                    if (attempt < maxRetries)
+                    {
+                        var delay = baseDelayMs * (int)Math.Pow(2, attempt - 1);
+                        Console.WriteLine($"Retrying in {delay}ms...");
+                        await Task.Delay(delay);
+                        continue;
+                    }
+
+                    return string.Empty;
+                }
+
+                var message = apiResponse.Choices[0].Message?.Content?.Trim() ?? string.Empty;
+
+                // Clean up the message (remove quotes if present)
+                message = message.Trim('"', '\'', ' ', '\n', '\r');
+
+                return message;
+            }
+            catch (TaskCanceledException ex)
             {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                Console.WriteLine($"API Error: {response.StatusCode}");
-                Console.WriteLine($"Response: {errorContent}");
+                Console.WriteLine($"Request timeout (attempt {attempt}/{maxRetries}): {ex.Message}");
+
+                if (attempt < maxRetries)
+                {
+                    var delay = baseDelayMs * (int)Math.Pow(2, attempt - 1);
+                    Console.WriteLine($"Retrying in {delay}ms...");
+                    await Task.Delay(delay);
+                    continue;
+                }
+
                 return string.Empty;
             }
-
-            var responseJson = await response.Content.ReadAsStringAsync();
-            var apiResponse = JsonSerializer.Deserialize<DeepSeekResponse>(responseJson);
-
-            if (apiResponse?.Choices == null || apiResponse.Choices.Length == 0)
+            catch (HttpRequestException ex)
             {
-                Console.WriteLine("No response from API");
+                Console.WriteLine($"Network error (attempt {attempt}/{maxRetries}): {ex.Message}");
+
+                if (attempt < maxRetries)
+                {
+                    var delay = baseDelayMs * (int)Math.Pow(2, attempt - 1);
+                    Console.WriteLine($"Retrying in {delay}ms...");
+                    await Task.Delay(delay);
+                    continue;
+                }
+
                 return string.Empty;
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error calling DeepSeek API (attempt {attempt}/{maxRetries}): {ex.Message}");
 
-            var message = apiResponse.Choices[0].Message?.Content?.Trim() ?? string.Empty;
+                if (attempt < maxRetries)
+                {
+                    var delay = baseDelayMs * (int)Math.Pow(2, attempt - 1);
+                    Console.WriteLine($"Retrying in {delay}ms...");
+                    await Task.Delay(delay);
+                    continue;
+                }
 
-            // Clean up the message (remove quotes if present)
-            message = message.Trim('"', '\'', ' ', '\n', '\r');
-
-            return message;
+                return string.Empty;
+            }
         }
-        catch (Exception ex)
-        {
-            Console.WriteLine($"Error calling DeepSeek API: {ex.Message}");
-            return string.Empty;
-        }
+
+        return string.Empty;
     }
 
     private static async Task<bool> ExecuteGitCommand(string arguments)
