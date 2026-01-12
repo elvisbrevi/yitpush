@@ -1,26 +1,24 @@
 # YitPush - Quick Start Guide
 
-## What is YitPush?
+Get up and running with YitPush in under 2 minutes.
 
-YitPush is an AI-powered git commit tool that automates your entire commit workflow. Just run one command and let DeepSeek AI analyze your changes, generate a meaningful commit message, and push everything for you.
+## 1. Install the Tool
 
-## Quick Installation
+### Option A: Install from NuGet (Recommended)
 
-### 1. Install the Tool
-
-**Linux/macOS:**
 ```bash
-cd YitPush
-./install.sh
+dotnet tool install --global YitPush
 ```
 
-**Windows:**
-```powershell
-cd YitPush
-.\install.ps1
+### Option B: Run from Source
+
+```bash
+git clone https://github.com/elvisbrevi/yitpush.git
+cd yitpush
+dotnet run --project YitPush/YitPush.csproj
 ```
 
-### 2. Set Your API Key
+## 2. Set Your API Key
 
 Get your DeepSeek API key from https://platform.deepseek.com/
 
@@ -30,14 +28,16 @@ export DEEPSEEK_API_KEY='your-api-key-here'
 echo 'export DEEPSEEK_API_KEY="your-api-key-here"' >> ~/.bashrc
 ```
 
-**Windows (PowerShell as Admin):**
+**Windows (PowerShell):**
 ```powershell
+$env:DEEPSEEK_API_KEY='your-api-key-here'
 [System.Environment]::SetEnvironmentVariable('DEEPSEEK_API_KEY', 'your-api-key-here', 'User')
 ```
 
-### 3. Use It!
+## 3. Use It!
 
 Navigate to any git repository and run:
+
 ```bash
 yitpush
 ```
@@ -45,21 +45,10 @@ yitpush
 That's it! YitPush will:
 - ✅ Analyze your changes
 - ✅ Generate a smart commit message
-- ✅ Ask for your confirmation
-- ✅ Commit and push everything
+- ✅ Automatically commit and push (use `--confirm` to review first)
+- ✅ Show success confirmation
 
-## Alternative: Run Without Installing
-
-If you prefer not to install the tool globally:
-
-```bash
-cd YitPush
-dotnet run
-```
-
-This works like `npx` - you can run it directly without installation.
-
-## Example Usage
+## Example
 
 ```
 $ yitpush
@@ -73,7 +62,7 @@ Found changes (1234 characters)
 📝 Generated commit message:
    "feat: add user authentication with JWT tokens"
 
-Do you want to proceed with this commit? (y/n): y
+⏩ Proceeding automatically (use --confirm to review)...
 
 ⚙️  Executing git commands...
    git add .
@@ -98,4 +87,4 @@ Do you want to proceed with this commit? (y/n): y
 
 ## More Information
 
-See the full [README.md](YitPush/README.md) for detailed documentation.
+See the full [README.md](README.md) for detailed documentation.

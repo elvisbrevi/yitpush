@@ -1,129 +1,111 @@
-# YitPush
+# 🚀 YitPush - AI-Powered Git Commit Tool
 
-**AI-Powered Git Commit Tool using DeepSeek Reasoning**
-
-Automate your git workflow with AI. YitPush analyzes your code changes using DeepSeek's reasoning model and handles the entire commit-push process with one command.
+**Automate your entire git workflow with one command.**  
+YitPush uses DeepSeek's reasoning AI to analyze your changes, generate meaningful commit messages, and push everything automatically.
 
 ```bash
 # Just run this
 yitpush
 
-# Or without installation
-dotnet run
+# Or with confirmation
+yitpush --confirm
 ```
 
-## Why YitPush?
+## ✨ Why YitPush?
 
-- **One Command**: Replace `git add . && git commit -m "..." && git push` with just `yitpush`
-- **Smart Commits**: DeepSeek AI generates meaningful commit messages following conventional commits format
-- **Safe**: Always asks for confirmation before committing
-- **Fast**: Powered by DeepSeek's latest reasoning model
-- **Easy**: Works like `npx` - can run without installation using `dotnet run`
+- **🤖 AI-Powered**: Uses DeepSeek's reasoning model to generate contextual, conventional commit messages
+- **⚡ One-Command Workflow**: Replaces `git add . && git commit -m "..." && git push` with a single command
+- **🚀 Fast & Efficient**: Automatically proceeds without confirmation (use `--confirm` to review)
+- **🔒 Safe & Reliable**: Full git diff analysis and error handling
+- **🌍 Works Everywhere**: Install as a global .NET tool or run directly from source
 
-## Quick Start
+## 📦 Installation
 
-### Installation from NuGet (Recommended)
+### Recommended: Install from NuGet (Global Tool)
 
 ```bash
-# Install globally from NuGet.org
 dotnet tool install --global YitPush
 ```
 
-### Or Install from Source
+### Alternative: Run from Source
 
 ```bash
-cd YitPush
-./install.sh        # Linux/macOS
-# or
-.\install.ps1       # Windows
-```
+# Clone the repository
+git clone https://github.com/elvisbrevi/yitpush.git
+cd yitpush
 
-### Or Run Without Installing
-
-**Opción más fácil (desde la raíz):**
-```bash
-./run.sh        # Linux/macOS
-# o
-.\run.ps1       # Windows
-```
-
-**Otras opciones:**
-```bash
-# Desde el directorio YitPush
-cd YitPush && dotnet run
-
-# Con dotnet run desde la raíz
+# Build and run directly
 dotnet run --project YitPush/YitPush.csproj
 ```
 
-### Setup API Key
-
-Get your DeepSeek API key from https://platform.deepseek.com/
+### Uninstall
 
 ```bash
-# Linux/macOS
-export DEEPSEEK_API_KEY='your-api-key-here'
-echo 'export DEEPSEEK_API_KEY="your-key"' >> ~/.bashrc
-
-# Windows PowerShell
-[System.Environment]::SetEnvironmentVariable('DEEPSEEK_API_KEY', 'your-key', 'User')
+dotnet tool uninstall --global YitPush
 ```
 
-### Use It!
+## 🔧 Configuration
+
+### 1. Get Your DeepSeek API Key
+
+1. Sign up at [DeepSeek Platform](https://platform.deepseek.com/)
+2. Navigate to API Keys section
+3. Create a new API key
+
+### 2. Set Environment Variable
+
+**Linux/macOS (bash/zsh):**
+```bash
+export DEEPSEEK_API_KEY='your-api-key-here'
+# Make permanent
+echo 'export DEEPSEEK_API_KEY="your-api-key-here"' >> ~/.bashrc
+```
+
+**Windows (PowerShell):**
+```powershell
+$env:DEEPSEEK_API_KEY='your-api-key-here'
+# Make permanent (run as Admin)
+[System.Environment]::SetEnvironmentVariable('DEEPSEEK_API_KEY', 'your-api-key-here', 'User')
+```
+
+## 🎯 Usage
+
+### Basic Usage
+
+Navigate to any git repository and run:
 
 ```bash
 yitpush
 ```
 
-See [QUICKSTART.md](QUICKSTART.md) for detailed instructions.
+YitPush will:
+1. 📊 Analyze your git changes (staged, unstaged, and untracked files)
+2. 🤖 Generate a commit message using DeepSeek AI
+3. ⚙️ Automatically execute `git add .`, `git commit`, and `git push`
+4. ✅ Show success confirmation
 
-## Features
+### Command Line Options
 
-- ✅ Analyzes git diff automatically
-- ✅ Generates conventional commit messages with AI
-- ✅ Executes git add, commit, and push in one go
-- ✅ User confirmation before committing
-- ✅ Beautiful CLI with colors and emojis
-- ✅ Works as global tool or with `dotnet run`
-- ✅ Built with .NET 10
+| Option | Description |
+|--------|-------------|
+| `--confirm` | Ask for confirmation before committing (default: automatic) |
+| `--help`    | Show help message |
 
-## Documentation
+**Examples:**
+```bash
+# Automatic commit and push (default)
+yitpush
 
-- [Quick Start Guide](QUICKSTART.md) - Get up and running in 2 minutes
-- [Full Documentation](YitPush/README.md) - Complete guide with all features
-- [DeepSeek Reasoning Model](https://api-docs.deepseek.com/guides/reasoning_model) - About the AI model
+# Review commit message before proceeding
+yitpush --confirm
 
-## Project Structure
-
-```
-yitpush/
-├── YitPush/              # Main project
-│   ├── Program.cs        # Application logic
-│   ├── YitPush.csproj    # Project configuration
-│   ├── README.md         # Detailed documentation
-│   ├── install.sh        # Linux/macOS installation
-│   └── install.ps1       # Windows installation
-├── QUICKSTART.md         # Quick start guide
-└── README.md            # This file
+# Show help
+yitpush --help
 ```
 
-## Requirements
+## 📝 Example Workflow
 
-- .NET 10.0 or later
-- Git
-- DeepSeek API key
-
-## How It Works
-
-1. Runs `git diff` to analyze your changes
-2. Sends the diff to DeepSeek Reasoning API
-3. AI generates a commit message using chain-of-thought reasoning
-4. Shows you the message and asks for confirmation
-5. Executes `git add .`, `git commit`, and `git push`
-
-## Example
-
-```
+```bash
 $ yitpush
 🚀 YitPush - AI-Powered Git Commit Tool
 
@@ -135,7 +117,7 @@ Found changes (1234 characters)
 📝 Generated commit message:
    "feat: add user authentication with JWT tokens"
 
-Do you want to proceed with this commit? (y/n): y
+⏩ Proceeding automatically (use --confirm to review)...
 
 ⚙️  Executing git commands...
    git add .
@@ -145,24 +127,74 @@ Do you want to proceed with this commit? (y/n): y
 ✅ Successfully committed and pushed changes!
 ```
 
-## Uninstall
+## 🛠️ Advanced
+
+### Running Without Installation
+
+You can use YitPush without installing it globally:
 
 ```bash
-dotnet tool uninstall -g YitPush
+# From the project root
+dotnet run --project YitPush/YitPush.csproj
+
+# Or navigate to the project directory
+cd YitPush && dotnet run
 ```
 
-## License
+### How It Works
 
-MIT
+1. **Git Diff Analysis**: Collects staged, unstaged, and untracked file changes
+2. **AI Processing**: Sends diff to DeepSeek Reasoning API with optimized prompt
+3. **Commit Generation**: Returns a concise, conventional commit message
+4. **Git Execution**: Runs `git add .`, `git commit -m "..."`, and `git push`
+5. **Error Handling**: Provides clear error messages for common issues
 
-## Author
+## 📚 Documentation
 
-Elvis Brevi
+- **[Quick Start Guide](QUICKSTART.md)** – Get up and running in 2 minutes
+- **[Publishing Guide](PUBLISH.md)** – How to publish new versions to NuGet
+- **[DeepSeek API Docs](https://api-docs.deepseek.com/)** – About the AI model
 
-## Contributing
+## ❓ Troubleshooting
 
-Contributions welcome! Feel free to open issues or submit pull requests.
+| Problem | Solution |
+|---------|----------|
+| `❌ Error: DEEPSEEK_API_KEY environment variable not found` | Set the environment variable as shown above |
+| `❌ Error: Not a git repository` | Run the command from inside a git repository |
+| `❌ Error: git push failed` | Check remote configuration and credentials |
+| `❌ Error: Failed to generate commit message` | Verify API key and internet connection |
 
-## About DeepSeek
+## 🏗️ Project Structure
 
-YitPush uses the `deepseek-reasoner` model, which employs chain-of-thought reasoning to generate high-quality, contextual commit messages. Learn more at the [DeepSeek API Documentation](https://api-docs.deepseek.com/).
+```
+yitpush/
+├── YitPush/                 # Main project
+│   ├── Program.cs           # Application logic
+│   └── YitPush.csproj       # Project configuration
+├── README.md                # This file
+├── QUICKSTART.md            # Quick start guide
+├── PUBLISH.md               # Concise publishing guide
+└── LICENSE                  # MIT License
+```
+
+## 📄 License
+
+MIT License – see [LICENSE](LICENSE) file.
+
+## 👨‍💻 Author
+
+**Elvis Brevi** – [GitHub](https://github.com/elvisbrevi)
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+1. Fork the repository
+2. Create your feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## ⭐ Support
+
+If you find YitPush useful, please consider giving it a star on GitHub!

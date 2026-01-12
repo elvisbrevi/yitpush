@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Linq;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -12,9 +13,27 @@ class Program
 
     static async Task<int> Main(string[] args)
     {
-        Console.WriteLine("🚀 YitPush - AI-Powered Git Commit Tool\n");
+    Console.WriteLine("🚀 YitPush - AI-Powered Git Commit Tool\n");
 
-        try
+    // Process command line arguments
+    bool requireConfirmation = args.Contains("--confirm");
+    bool showHelp = args.Contains("--help");
+    
+    if (showHelp)
+    {
+        Console.WriteLine("Usage: yitpush [options]");
+        Console.WriteLine();
+        Console.WriteLine("Options:");
+        Console.WriteLine("  --confirm    Ask for confirmation before committing");
+        Console.WriteLine("  --help       Show this help message");
+        Console.WriteLine();
+        Console.WriteLine("By default, YitPush will automatically commit and push without confirmation.");
+        Console.WriteLine("Use --confirm if you want to review the commit message before proceeding.");
+        Console.WriteLine();
+        return 0;
+    }
+
+    try
         {
             // Get API key from environment variable
             var apiKey = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
@@ -71,14 +90,21 @@ class Program
             Console.ResetColor();
             Console.WriteLine();
 
-            // Confirm with user
-            Console.Write("Do you want to proceed with this commit? (y/n): ");
-            var response = Console.ReadLine()?.Trim().ToLower();
-
-            if (response != "y" && response != "yes")
+            // Confirm with user if --confirm flag is set
+            if (requireConfirmation)
             {
-                Console.WriteLine("\n❌ Commit cancelled.");
-                return 0;
+                Console.Write("Do you want to proceed with this commit? (y/n): ");
+                var response = Console.ReadLine()?.Trim().ToLower();
+
+                if (response != "y" && response != "yes")
+                {
+                    Console.WriteLine("\n❌ Commit cancelled.");
+                    return 0;
+                }
+            }
+            else
+            {
+                Console.WriteLine("⏩ Proceeding automatically (use --confirm to review)...");
             }
 
             // Execute git commands
