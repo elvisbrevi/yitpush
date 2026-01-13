@@ -14,6 +14,7 @@ yitpush --confirm
 ## ✨ Why YitPush?
 
 - **🤖 AI-Powered**: Uses DeepSeek's reasoning model to generate contextual, conventional commit messages
+- **📋 Detailed Commits**: Generate comprehensive commit messages with body and bullet points using `--detailed` flag
 - **⚡ One-Command Workflow**: Replaces `git add . && git commit -m "..." && git push` with a single command
 - **🚀 Fast & Efficient**: Automatically proceeds without confirmation (use `--confirm` to review)
 - **🔒 Safe & Reliable**: Full git diff analysis and error handling
@@ -84,11 +85,14 @@ YitPush will:
 3. ⚙️ Automatically execute `git add .`, `git commit`, and `git push`
 4. ✅ Show success confirmation
 
+Use the `--detailed` flag to generate a commit message with body including explanations and bullet points.
+
 ### Command Line Options
 
 | Option | Description |
 |--------|-------------|
 | `--confirm` | Ask for confirmation before committing (default: automatic) |
+| `--detailed` | Generate detailed commit with body (title + paragraphs + bullet points) |
 | `--help`    | Show help message |
 
 **Examples:**
@@ -99,9 +103,28 @@ yitpush
 # Review commit message before proceeding
 yitpush --confirm
 
+# Generate detailed commit message with body
+yitpush --detailed
+
+# Combine flags: detailed commit with confirmation
+yitpush --detailed --confirm
+
 # Show help
 yitpush --help
 ```
+
+### Detailed Mode
+
+When using the `--detailed` flag, YitPush generates comprehensive commit messages with:
+
+- **Title line**: Conventional commit type with concise subject (max 50 characters)
+- **Body paragraphs**: 1-2 paragraphs explaining the changes and rationale
+- **Bullet points**: Key changes listed with clear formatting
+- **File mentions**: Important files modified or added are highlighted
+- **Git compatibility**: All lines wrapped at 72 characters for optimal git log display
+
+This is ideal for complex changes that require detailed documentation or team communication.
+
 
 ## 📝 Example Workflow
 
