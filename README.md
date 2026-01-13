@@ -14,11 +14,12 @@ yitpush --confirm
 ## ✨ Why YitPush?
 
 - **🤖 AI-Powered**: Uses DeepSeek's reasoning model to generate contextual, conventional commit messages
+- **🌐 Multi-Language Support**: Generate commit messages in multiple languages with `--language` flag (English, Spanish, French, etc.)
 - **📋 Detailed Commits**: Generate comprehensive commit messages with body and bullet points using `--detailed` flag
 - **⚡ One-Command Workflow**: Replaces `git add . && git commit -m "..." && git push` with a single command
 - **🚀 Fast & Efficient**: Automatically proceeds without confirmation (use `--confirm` to review)
 - **🔒 Safe & Reliable**: Full git diff analysis and error handling
-- **🌍 Works Everywhere**: Install as a global .NET tool or run directly from source
+- **🌍 Cross-Platform Compatibility**: Install as a global .NET tool or run directly from source, with full Unicode/emoji support for Windows PowerShell, macOS Terminal, and Linux
 
 ## 📦 Installation
 
@@ -93,6 +94,7 @@ Use the `--detailed` flag to generate a commit message with body including expla
 |--------|-------------|
 | `--confirm` | Ask for confirmation before committing (default: automatic) |
 | `--detailed` | Generate detailed commit with body (title + paragraphs + bullet points) |
+| `--language` | Set output language for commit message (e.g., 'english', 'spanish', 'french') |
 | `--help`    | Show help message |
 
 **Examples:**
@@ -106,8 +108,17 @@ yitpush --confirm
 # Generate detailed commit message with body
 yitpush --detailed
 
-# Combine flags: detailed commit with confirmation
-yitpush --detailed --confirm
+# Generate commit message in Spanish
+yitpush --language spanish
+
+# Generate detailed commit message in French with confirmation
+yitpush --language fr --detailed --confirm
+
+# Use short flag for language
+yitpush --lang es
+
+# Combine all options: Spanish, detailed, with confirmation
+yitpush --language spanish --detailed --confirm
 
 # Show help
 yitpush --help
@@ -125,6 +136,28 @@ When using the `--detailed` flag, YitPush generates comprehensive commit message
 
 This is ideal for complex changes that require detailed documentation or team communication.
 
+### Multi-language Support
+
+YitPush now supports generating commit messages in multiple languages using the `--language` or `--lang` flag:
+
+- **Supported languages**: English (default), Spanish, French, German, Italian, Portuguese, and more
+- **Flexible syntax**: Use `--language spanish`, `--lang es`, `--language=fr`, or `--lang=it`
+- **Combines with other flags**: Works with `--detailed` and `--confirm` flags
+- **AI-powered translations**: DeepSeek AI generates culturally appropriate commit messages in the target language
+
+**Examples:**
+```bash
+# Generate commit in Spanish
+yitpush --language spanish
+
+# Detailed commit in French with confirmation
+yitpush --language fr --detailed --confirm
+
+# Simple commit in Italian
+yitpush --lang it
+```
+
+The language flag instructs the AI model to generate commit messages following conventional commit format but in the specified language, maintaining all formatting and style requirements.
 
 ## 📝 Example Workflow
 

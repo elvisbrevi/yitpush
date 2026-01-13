@@ -13,12 +13,42 @@ class Program
 
     static async Task<int> Main(string[] args)
     {
+        // Configure console encoding for Unicode support (especially Windows PowerShell)
+        try
+        {
+            Console.OutputEncoding = Encoding.UTF8;
+            Console.InputEncoding = Encoding.UTF8;
+        }
+        catch
+        {
+            // Ignore encoding errors - console may not support UTF-8
+        }
+
     Console.WriteLine("🚀 YitPush - AI-Powered Git Commit Tool\n");
 
     // Process command line arguments
     bool requireConfirmation = args.Contains("--confirm");
     bool showHelp = args.Contains("--help");
     bool detailed = args.Contains("--detailed");
+    string language = "english"; // default language
+    
+    // Parse language flag (supports --language es, --lang es, --language=es, --lang=es)
+    for (int i = 0; i < args.Length; i++)
+    {
+        if (args[i] == "--language" || args[i] == "--lang")
+        {
+            if (i + 1 < args.Length && !args[i + 1].StartsWith("--"))
+            {
+                language = args[i + 1];
+            }
+            break;
+        }
+        else if (args[i].StartsWith("--language=") || args[i].StartsWith("--lang="))
+        {
+            language = args[i].Split('=', 2)[1];
+            break;
+        }
+    }
     
     if (showHelp)
     {
@@ -27,11 +57,13 @@ class Program
         Console.WriteLine("Options:");
         Console.WriteLine("  --confirm    Ask for confirmation before committing");
         Console.WriteLine("  --detailed   Generate detailed commit with body (title + paragraphs + bullet points)");
+        Console.WriteLine("  --language   Set output language for commit message (e.g., 'english', 'spanish', 'french')");
         Console.WriteLine("  --help       Show this help message");
         Console.WriteLine();
         Console.WriteLine("By default, YitPush will automatically commit and push without confirmation.");
         Console.WriteLine("Use --confirm if you want to review the commit message before proceeding.");
         Console.WriteLine("Use --detailed for detailed commit messages with full explanations.");
+        Console.WriteLine("Use --language to specify the output language (default: english).");
         Console.WriteLine();
         return 0;
     }
@@ -77,7 +109,7 @@ class Program
 
             // Get commit message from DeepSeek
             Console.WriteLine($"🤖 Generating commit message with DeepSeek Reasoning...{(detailed ? " (detailed mode)" : "")}");
-            var commitMessage = await GenerateCommitMessage(apiKey, diff, detailed);
+            var commitMessage = await GenerateCommitMessage(apiKey, diff, detailed, language);
 
             if (string.IsNullOrWhiteSpace(commitMessage))
             {
@@ -289,10 +321,11 @@ class Program
         }
     }
 
-    private static async Task<string> GenerateCommitMessage(string apiKey, string diff, bool detailed = false)
+    private static async Task<string> GenerateCommitMessage(string apiKey, string diff, bool detailed = false, string language = "english")
     {
         const int maxRetries = 3;
         const int baseDelayMs = 1000;
+
 
         for (int attempt = 1; attempt <= maxRetries; attempt++)
         {
@@ -308,6 +341,8 @@ class Program
                 if (detailed)
                 {
                     prompt = $@"You are a git commit message expert. Based on the following git diff, generate a detailed conventional commit with title and body.
+
+LANGUAGE: Write the commit message in {language}.
 
 FORMAT REQUIREMENTS:
 1. TITLE LINE (required):
@@ -325,7 +360,7 @@ FORMAT REQUIREMENTS:
    - Focus on the 'why' not just the 'what'
 
 3. STYLE:
-   - Write in clear, professional English
+    - Write in clear, professional {language}
    - Use present tense for changes
    - Be specific about technical implementation
 
@@ -337,6 +372,8 @@ Generate the complete commit message (title + body):";
                 else
                 {
                     prompt = $@"You are a git commit message expert. Based on the following git diff, generate a concise, clear, and descriptive commit message following conventional commits format.
+
+LANGUAGE: Write the commit message in {language}.
 
 The commit message should:
 - Start with a type (feat, fix, docs, style, refactor, test, chore)

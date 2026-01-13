@@ -44,7 +44,7 @@ yitpush
 
 That's it! YitPush will:
 - ✅ Analyze your changes
-- ✅ Generate a smart commit message
+- ✅ Generate a smart commit message (supports multiple languages with --language flag)
 - ✅ Automatically commit and push (use `--confirm` to review first)
 - ✅ Show success confirmation
 
