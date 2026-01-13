@@ -12,7 +12,7 @@
 
     <!-- Package Metadata -->
     <PackageId>YitPush</PackageId>
-    <Version>1.0.4</Version>
+    <Version>1.0.5</Version>
     <Authors>Elvis Brevi</Authors>
     <Description>AI-powered git commit automation tool. Analyzes code changes with DeepSeek
       Reasoning AI and generates meaningful commit messages. Run 'yitpush' to automatically stage,
@@ -35,7 +35,8 @@
 
     <!-- Additional Metadata -->
     <Copyright>Copyright (c) 2026 Elvis Brevi</Copyright>
-    <PackageReleaseNotes>Fix: Increase max_tokens to 8000 and timeout to 120s for deepseek-reasoner model to complete reasoning and generate final response</PackageReleaseNotes>
+    <PackageReleaseNotes>Fix: Increase max_tokens to 8000 and timeout to 120s for deepseek-reasoner
+      model to complete reasoning and generate final response</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
