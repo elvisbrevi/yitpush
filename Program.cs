@@ -166,13 +166,8 @@ class Program
             }
 
             // git push
-            Console.WriteLine("   git push");
-            if (!await ExecuteGitCommand("push"))
+            if (!await ExecuteGitPush(requireConfirmation))
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("❌ Error: git push failed.");
-                Console.ResetColor();
-                Console.WriteLine("\nNote: You may need to set up a remote branch or check your credentials.");
                 return 1;
             }
 
@@ -491,6 +486,129 @@ Generate only the commit message:";
         }
 
         return string.Empty;
+    }
+
+    private static async Task<string?> GetCurrentBranch()
+    {
+        try
+        {
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "git",
+                    Arguments = "branch --show-current",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+
+            process.Start();
+            var output = await process.StandardOutput.ReadToEndAsync();
+            await process.StandardError.ReadToEndAsync(); // discard
+            await process.WaitForExitAsync();
+
+            if (process.ExitCode == 0)
+            {
+                return output.Trim();
+            }
+            else
+            {
+                return null;
+            }
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static async Task<bool> ExecuteGitPush(bool requireConfirmation)
+    {
+        // First try regular push
+        Console.WriteLine("   git push");
+        var process = new Process
+        {
+            StartInfo = new ProcessStartInfo
+            {
+                FileName = "git",
+                Arguments = "push",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
+            }
+        };
+
+        process.Start();
+        var output = await process.StandardOutput.ReadToEndAsync();
+        var error = await process.StandardError.ReadToEndAsync();
+        await process.WaitForExitAsync();
+
+        if (process.ExitCode == 0)
+        {
+            return true;
+        }
+
+        // Check if error indicates no upstream branch
+        if (!string.IsNullOrEmpty(error) && (error.Contains("no upstream branch") || error.Contains("has no upstream branch")))
+        {
+            // In automatic mode, set upstream automatically
+            if (!requireConfirmation)
+            {
+                var currentBranch = await GetCurrentBranch();
+                if (currentBranch != null)
+                {
+                    Console.WriteLine($"   git push --set-upstream origin {currentBranch}");
+                    var upstreamProcess = new Process
+                    {
+                        StartInfo = new ProcessStartInfo
+                        {
+                            FileName = "git",
+                            Arguments = $"push --set-upstream origin {currentBranch}",
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            UseShellExecute = false,
+                            CreateNoWindow = true
+                        }
+                    };
+
+                    upstreamProcess.Start();
+                    await upstreamProcess.StandardOutput.ReadToEndAsync();
+                    var upstreamError = await upstreamProcess.StandardError.ReadToEndAsync();
+                    await upstreamProcess.WaitForExitAsync();
+
+                    if (upstreamProcess.ExitCode == 0)
+                    {
+                        return true;
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Git error: {upstreamError}");
+                        return false;
+                    }
+                }
+            }
+            else
+            {
+                // In confirmation mode, just show the error
+                if (!string.IsNullOrEmpty(error))
+                {
+                    Console.WriteLine($"Git error: {error}");
+                }
+                Console.WriteLine("\nNote: The current branch has no upstream branch.");
+                Console.WriteLine("      You can set it with: git push --set-upstream origin <branch-name>");
+                return false;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(error))
+        {
+            Console.WriteLine($"Git error: {error}");
+        }
+        return false;
     }
 
     private static async Task<bool> ExecuteGitCommand(string arguments)
