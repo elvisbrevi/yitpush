@@ -593,14 +593,62 @@ Generate only the commit message:";
             }
             else
             {
-                // In confirmation mode, just show the error
+                // In confirmation mode, ask user if they want to set upstream
                 if (!string.IsNullOrEmpty(error))
                 {
                     Console.WriteLine($"Git error: {error}");
                 }
-                Console.WriteLine("\nNote: The current branch has no upstream branch.");
-                Console.WriteLine("      You can set it with: git push --set-upstream origin <branch-name>");
-                return false;
+                
+                var currentBranch = await GetCurrentBranch();
+                if (currentBranch != null)
+                {
+                    Console.WriteLine($"\nThe current branch '{currentBranch}' has no upstream branch.");
+                    Console.Write($"Do you want to push and set upstream to origin/{currentBranch}? (y/n): ");
+                    var response = Console.ReadLine()?.Trim().ToLower();
+
+                    if (response == "y" || response == "yes")
+                    {
+                        Console.WriteLine($"   git push --set-upstream origin {currentBranch}");
+                        var upstreamProcess = new Process
+                        {
+                            StartInfo = new ProcessStartInfo
+                            {
+                                FileName = "git",
+                                Arguments = $"push --set-upstream origin {currentBranch}",
+                                RedirectStandardOutput = true,
+                                RedirectStandardError = true,
+                                UseShellExecute = false,
+                                CreateNoWindow = true
+                            }
+                        };
+
+                        upstreamProcess.Start();
+                        await upstreamProcess.StandardOutput.ReadToEndAsync();
+                        var upstreamError = await upstreamProcess.StandardError.ReadToEndAsync();
+                        await upstreamProcess.WaitForExitAsync();
+
+                        if (upstreamProcess.ExitCode == 0)
+                        {
+                            return true;
+                        }
+                        else
+                        {
+                            Console.WriteLine($"Git error: {upstreamError}");
+                            return false;
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine("Push cancelled.");
+                        return false;
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("\nNote: The current branch has no upstream branch.");
+                    Console.WriteLine("      You can set it with: git push --set-upstream origin <branch-name>");
+                    return false;
+                }
             }
         }
 
