@@ -96,73 +96,103 @@ class Program
             Console.WriteLine("📊 Analyzing git changes...");
             var diff = await GetGitDiff();
 
-            if (string.IsNullOrWhiteSpace(diff))
+            bool hasChanges = !string.IsNullOrWhiteSpace(diff);
+            
+            if (hasChanges)
+            {
+                Console.WriteLine($"Found changes ({diff.Length} characters)\n");
+            }
+            else
             {
                 Console.ForegroundColor = ConsoleColor.Yellow;
                 Console.WriteLine("⚠️  No changes detected in the repository.");
                 Console.ResetColor();
-                Console.WriteLine("\nTip: Make some changes and try again.");
-                return 0;
+                Console.WriteLine("\nWill attempt to push existing commits...\n");
             }
 
-            Console.WriteLine($"Found changes ({diff.Length} characters)\n");
-
-            // Get commit message from DeepSeek
-            Console.WriteLine($"🤖 Generating commit message with DeepSeek Reasoning...{(detailed ? " (detailed mode)" : "")}");
-            var commitMessage = await GenerateCommitMessage(apiKey, diff, detailed, language);
-
-            if (string.IsNullOrWhiteSpace(commitMessage))
+            string? commitMessage = null;
+            
+            if (hasChanges)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("❌ Error: Failed to generate commit message.");
-                Console.ResetColor();
-                return 1;
-            }
+                // Get commit message from DeepSeek
+                Console.WriteLine($"🤖 Generating commit message with DeepSeek Reasoning...{(detailed ? " (detailed mode)" : "")}");
+                commitMessage = await GenerateCommitMessage(apiKey, diff, detailed, language);
 
-            Console.WriteLine("\n📝 Generated commit message:");
-            Console.ForegroundColor = ConsoleColor.Cyan;
-            Console.WriteLine($"   \"{commitMessage}\"");
-            Console.ResetColor();
-            Console.WriteLine();
-
-            // Confirm with user if --confirm flag is set
-            if (requireConfirmation)
-            {
-                Console.Write("Do you want to proceed with this commit? (y/n): ");
-                var response = Console.ReadLine()?.Trim().ToLower();
-
-                if (response != "y" && response != "yes")
+                if (string.IsNullOrWhiteSpace(commitMessage))
                 {
-                    Console.WriteLine("\n❌ Commit cancelled.");
-                    return 0;
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("❌ Error: Failed to generate commit message.");
+                    Console.ResetColor();
+                    return 1;
+                }
+
+                Console.WriteLine("\n📝 Generated commit message:");
+                Console.ForegroundColor = ConsoleColor.Cyan;
+                Console.WriteLine($"   \"{commitMessage}\"");
+                Console.ResetColor();
+                Console.WriteLine();
+
+                // Confirm with user if --confirm flag is set
+                if (requireConfirmation)
+                {
+                    Console.Write("Do you want to proceed with this commit? (y/n): ");
+                    var response = Console.ReadLine()?.Trim().ToLower();
+
+                    if (response != "y" && response != "yes")
+                    {
+                        Console.WriteLine("\n❌ Commit cancelled.");
+                        return 0;
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("⏩ Proceeding automatically (use --confirm to review)...");
                 }
             }
             else
             {
-                Console.WriteLine("⏩ Proceeding automatically (use --confirm to review)...");
+                // No changes, just push - confirm if in confirmation mode
+                if (requireConfirmation)
+                {
+                    Console.Write("No changes to commit. Do you want to push existing commits? (y/n): ");
+                    var response = Console.ReadLine()?.Trim().ToLower();
+
+                    if (response != "y" && response != "yes")
+                    {
+                        Console.WriteLine("\n❌ Push cancelled.");
+                        return 0;
+                    }
+                }
+                else
+                {
+                    Console.WriteLine("⏩ No changes to commit, proceeding with push...");
+                }
             }
 
             // Execute git commands
             Console.WriteLine("\n⚙️  Executing git commands...");
 
-            // git add .
-            Console.WriteLine("   git add .");
-            if (!await ExecuteGitCommand("add ."))
+            if (hasChanges)
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("❌ Error: git add failed.");
-                Console.ResetColor();
-                return 1;
-            }
+                // git add .
+                Console.WriteLine("   git add .");
+                if (!await ExecuteGitCommand("add ."))
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("❌ Error: git add failed.");
+                    Console.ResetColor();
+                    return 1;
+                }
 
-            // git commit
-            Console.WriteLine($"   git commit -m \"{commitMessage}\"");
-            if (!await ExecuteGitCommand($"commit -m \"{commitMessage}\""))
-            {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("❌ Error: git commit failed.");
-                Console.ResetColor();
-                return 1;
+                // git commit
+                Console.WriteLine($"   git commit -m \"{commitMessage}\"");
+                if (!await ExecuteGitCommand($"commit -m \"{commitMessage}\""))
+                {
+                    Console.ForegroundColor = ConsoleColor.Red;
+                    Console.WriteLine("❌ Error: git commit failed.");
+                    Console.ResetColor();
+                    return 1;
+                }
             }
 
             // git push
@@ -172,7 +202,14 @@ class Program
             }
 
             Console.ForegroundColor = ConsoleColor.Green;
-            Console.WriteLine("\n✅ Successfully committed and pushed changes!");
+            if (hasChanges)
+            {
+                Console.WriteLine("\n✅ Successfully committed and pushed changes!");
+            }
+            else
+            {
+                Console.WriteLine("\n✅ Successfully pushed changes!");
+            }
             Console.ResetColor();
 
             return 0;
