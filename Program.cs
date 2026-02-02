@@ -357,7 +357,15 @@ class Program
     {
         const int maxRetries = 3;
         const int baseDelayMs = 1000;
+        const int deepseekMaxContextTokens = 131072;
+        const int maxCompletionTokens = 8000;
+        const int reservedTokens = maxCompletionTokens + 5000;
+        const int maxPromptTokens = deepseekMaxContextTokens - reservedTokens;
+        const int averageCharsPerToken = 4;
+        const int maxPromptChars = maxPromptTokens * averageCharsPerToken;
 
+
+        diff = TruncateDiff(diff, maxPromptChars);
 
         for (int attempt = 1; attempt <= maxRetries; attempt++)
         {
@@ -523,6 +531,23 @@ Generate only the commit message:";
         }
 
         return string.Empty;
+    }
+
+    private static string TruncateDiff(string diff, int maxChars)
+    {
+        if (string.IsNullOrEmpty(diff) || diff.Length <= maxChars)
+        {
+            return diff;
+        }
+
+        Console.WriteLine($"\n⚠️  Diff is too large ({diff.Length} chars). Truncating to {maxChars} chars...");
+
+        int keepBeginning = maxChars / 2;
+        int keepEnd = maxChars - keepBeginning;
+        string beginning = diff.Substring(0, keepBeginning);
+        string end = diff.Substring(diff.Length - keepEnd);
+
+        return $"{beginning}\n\n...[TRUNCATED - {diff.Length - maxChars} characters omitted]...\n\n{end}";
     }
 
     private static async Task<string?> GetCurrentBranch()
