@@ -32,6 +32,7 @@ class Program
     bool showHelp = args.Contains("--help");
     bool detailed = args.Contains("--detailed");
     bool createAzureRepo = args.Contains("--new-repo-azure");
+    bool prDescription = args.Contains("--pr-description");
     string language = "english"; // default language
     
     // Parse language flag (supports --language es, --lang es, --language=es, --lang=es)
@@ -61,12 +62,14 @@ class Program
         Console.WriteLine("  --detailed        Generate detailed commit with body (title + paragraphs + bullet points)");
         Console.WriteLine("  --language        Set output language for commit message (e.g., 'english', 'spanish', 'french')");
         Console.WriteLine("  --new-repo-azure  Create a new Azure DevOps repository interactively");
+        Console.WriteLine("  --pr-description  Generate a PR description markdown file by comparing two branches");
         Console.WriteLine("  --help            Show this help message");
         Console.WriteLine();
         Console.WriteLine("By default, YitPush will automatically commit and push without confirmation.");
         Console.WriteLine("Use --confirm if you want to review the commit message before proceeding.");
         Console.WriteLine("Use --detailed for detailed commit messages with full explanations.");
         Console.WriteLine("Use --language to specify the output language (default: english).");
+        Console.WriteLine("Use --pr-description to generate a PR description (combinable with --lang and --detailed).");
         Console.WriteLine();
         return 0;
     }
@@ -81,6 +84,12 @@ class Program
                 Console.ResetColor();
                 Console.WriteLine("\nPlease run this command from within a git repository.");
                 return 1;
+            }
+
+            // PR description mode - separate flow
+            if (prDescription)
+            {
+                return await GeneratePrDescription(detailed, language);
             }
 
             // Create Azure DevOps repository if requested
@@ -774,6 +783,334 @@ Generate only the commit message:";
             return false;
         }
     }
+    private static async Task<List<string>> GetGitBranches()
+    {
+        var branches = new List<string>();
+        try
+        {
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "git",
+                    Arguments = "branch -a --format=%(refname:short)",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+
+            process.Start();
+            var output = await process.StandardOutput.ReadToEndAsync();
+            await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+
+            if (process.ExitCode == 0 && !string.IsNullOrWhiteSpace(output))
+            {
+                foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                {
+                    if (!string.IsNullOrWhiteSpace(line))
+                    {
+                        branches.Add(line);
+                    }
+                }
+            }
+        }
+        catch { }
+
+        return branches;
+    }
+
+    private static async Task<string> GetBranchDiff(string fromBranch, string toBranch)
+    {
+        try
+        {
+            var process = new Process
+            {
+                StartInfo = new ProcessStartInfo
+                {
+                    FileName = "git",
+                    Arguments = $"diff {toBranch}...{fromBranch}",
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,
+                    UseShellExecute = false,
+                    CreateNoWindow = true
+                }
+            };
+
+            process.Start();
+            var output = await process.StandardOutput.ReadToEndAsync();
+            await process.StandardError.ReadToEndAsync();
+            await process.WaitForExitAsync();
+
+            return process.ExitCode == 0 ? output : string.Empty;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Error getting branch diff: {ex.Message}");
+            return string.Empty;
+        }
+    }
+
+    private static async Task<string> GeneratePrDescriptionContent(string apiKey, string diff, bool detailed, string language)
+    {
+        const int maxRetries = 3;
+        const int baseDelayMs = 1000;
+        const int deepseekMaxContextTokens = 131072;
+        const int maxCompletionTokens = 8000;
+        const int reservedTokens = maxCompletionTokens + 5000;
+        const int maxPromptTokens = deepseekMaxContextTokens - reservedTokens;
+        const int averageCharsPerToken = 4;
+        const int maxPromptChars = maxPromptTokens * averageCharsPerToken;
+
+        diff = TruncateDiff(diff, maxPromptChars);
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                using var httpClient = new HttpClient
+                {
+                    Timeout = TimeSpan.FromSeconds(120)
+                };
+                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+
+                string prompt;
+                if (detailed)
+                {
+                    prompt = $@"You are a pull request description expert. Based on the following git diff between two branches, generate a detailed pull request description in Markdown format.
+
+LANGUAGE: Write the description in {language}.
+
+FORMAT REQUIREMENTS:
+1. TITLE: A concise PR title (conventional commit style)
+2. SUMMARY: A clear paragraph explaining the overall purpose of the changes
+3. CHANGES: A detailed bullet list of all changes grouped by category (features, fixes, refactoring, etc.)
+4. FILES CHANGED: List the key files modified and what was changed in each
+5. TESTING: Suggestions for testing the changes
+6. NOTES: Any additional notes, breaking changes, or migration steps if applicable
+
+STYLE:
+- Write in clear, professional {language}
+- Use proper Markdown formatting (headers, lists, code blocks)
+- Be thorough and cover all changes in the diff
+- Highlight breaking changes if any
+
+Git diff:
+{diff}
+
+Generate the complete pull request description in Markdown:";
+                }
+                else
+                {
+                    prompt = $@"You are a pull request description expert. Based on the following git diff between two branches, generate a concise pull request description in Markdown format.
+
+LANGUAGE: Write the description in {language}.
+
+FORMAT REQUIREMENTS:
+1. TITLE: A concise PR title (conventional commit style)
+2. SUMMARY: A brief paragraph explaining the purpose of the changes
+3. CHANGES: A bullet list of the key changes
+
+STYLE:
+- Write in clear, professional {language}
+- Use proper Markdown formatting (headers, lists)
+- Be concise but cover the important changes
+- Just return the Markdown content, nothing else
+
+Git diff:
+{diff}
+
+Generate the pull request description in Markdown:";
+                }
+
+                var requestBody = new
+                {
+                    model = DeepSeekModel,
+                    messages = new[]
+                    {
+                        new { role = "user", content = prompt }
+                    },
+                    max_tokens = 8000
+                };
+
+                var jsonContent = JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+
+                var response = await httpClient.PostAsync(DeepSeekApiUrl, content);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"API Error (attempt {attempt}/{maxRetries}): {response.StatusCode}");
+                    Console.WriteLine($"Response: {errorContent}");
+
+                    if (attempt < maxRetries && ((int)response.StatusCode == 429 || (int)response.StatusCode >= 500))
+                    {
+                        var delay = baseDelayMs * (int)Math.Pow(2, attempt - 1);
+                        Console.WriteLine($"Retrying in {delay}ms...");
+                        await Task.Delay(delay);
+                        continue;
+                    }
+
+                    return string.Empty;
+                }
+
+                var responseJson = await response.Content.ReadAsStringAsync();
+                var apiResponse = JsonSerializer.Deserialize<DeepSeekResponse>(responseJson);
+
+                if (apiResponse?.Choices == null || apiResponse.Choices.Length == 0)
+                {
+                    Console.WriteLine($"No response from API (attempt {attempt}/{maxRetries})");
+
+                    if (attempt < maxRetries)
+                    {
+                        var delay = baseDelayMs * (int)Math.Pow(2, attempt - 1);
+                        Console.WriteLine($"Retrying in {delay}ms...");
+                        await Task.Delay(delay);
+                        continue;
+                    }
+
+                    return string.Empty;
+                }
+
+                var message = apiResponse.Choices[0].Message?.Content?.Trim() ?? string.Empty;
+                message = message.Trim('"', '\'', ' ', '\n', '\r');
+
+                return message;
+            }
+            catch (TaskCanceledException ex)
+            {
+                Console.WriteLine($"Request timeout (attempt {attempt}/{maxRetries}): {ex.Message}");
+
+                if (attempt < maxRetries)
+                {
+                    var delay = baseDelayMs * (int)Math.Pow(2, attempt - 1);
+                    Console.WriteLine($"Retrying in {delay}ms...");
+                    await Task.Delay(delay);
+                    continue;
+                }
+
+                return string.Empty;
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.WriteLine($"Network error (attempt {attempt}/{maxRetries}): {ex.Message}");
+
+                if (attempt < maxRetries)
+                {
+                    var delay = baseDelayMs * (int)Math.Pow(2, attempt - 1);
+                    Console.WriteLine($"Retrying in {delay}ms...");
+                    await Task.Delay(delay);
+                    continue;
+                }
+
+                return string.Empty;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error calling DeepSeek API (attempt {attempt}/{maxRetries}): {ex.Message}");
+
+                if (attempt < maxRetries)
+                {
+                    var delay = baseDelayMs * (int)Math.Pow(2, attempt - 1);
+                    Console.WriteLine($"Retrying in {delay}ms...");
+                    await Task.Delay(delay);
+                    continue;
+                }
+
+                return string.Empty;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static async Task<int> GeneratePrDescription(bool detailed, string language)
+    {
+        AnsiConsole.MarkupLine("[bold blue]📋 PR Description Generator[/]\n");
+
+        // Get API key
+        var apiKey = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
+        if (string.IsNullOrWhiteSpace(apiKey))
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine("❌ Error: DEEPSEEK_API_KEY environment variable not found.");
+            Console.ResetColor();
+            Console.WriteLine("\nPlease set your DeepSeek API key:");
+            Console.WriteLine("  export DEEPSEEK_API_KEY='your-api-key-here'");
+            return 1;
+        }
+
+        // Get branches
+        AnsiConsole.MarkupLine("🔍 Fetching branches...");
+        var branches = await GetGitBranches();
+
+        if (branches.Count < 2)
+        {
+            AnsiConsole.MarkupLine("[red]❌ Need at least 2 branches to compare.[/]");
+            return 1;
+        }
+
+        // Select source branch (from - the branch with changes)
+        var fromBranch = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("📋 Select [green]source[/] branch (branch with changes):")
+                .PageSize(15)
+                .HighlightStyle(new Style(Color.Cyan1))
+                .AddChoices(branches));
+
+        AnsiConsole.MarkupLine($"\n[green]✅ Source branch:[/] {fromBranch}");
+
+        // Select target branch (to - the branch to merge into)
+        var targetBranches = branches.Where(b => b != fromBranch).ToList();
+        var toBranch = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("📋 Select [green]target[/] branch (branch to merge into):")
+                .PageSize(15)
+                .HighlightStyle(new Style(Color.Cyan1))
+                .AddChoices(targetBranches));
+
+        AnsiConsole.MarkupLine($"\n[green]✅ Target branch:[/] {toBranch}");
+
+        // Get diff between branches
+        AnsiConsole.MarkupLine($"\n📊 Analyzing differences between [cyan]{fromBranch}[/] and [cyan]{toBranch}[/]...");
+        var diff = await GetBranchDiff(fromBranch, toBranch);
+
+        if (string.IsNullOrWhiteSpace(diff))
+        {
+            AnsiConsole.MarkupLine("[yellow]⚠️  No differences found between the selected branches.[/]");
+            return 0;
+        }
+
+        AnsiConsole.MarkupLine($"Found differences ({diff.Length} characters)\n");
+
+        // Generate PR description
+        AnsiConsole.MarkupLine($"🤖 Generating PR description with DeepSeek Reasoning...{(detailed ? " (detailed mode)" : "")}");
+        var description = await GeneratePrDescriptionContent(apiKey, diff, detailed, language);
+
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            AnsiConsole.MarkupLine("[red]❌ Error: Failed to generate PR description.[/]");
+            return 1;
+        }
+
+        // Save to markdown file
+        var fileName = $"pr-description-{fromBranch.Replace("/", "-")}-to-{toBranch.Replace("/", "-")}.md";
+        await File.WriteAllTextAsync(fileName, description);
+
+        AnsiConsole.MarkupLine($"\n[green]✅ PR description saved to:[/] {fileName}");
+        AnsiConsole.MarkupLine($"\n[dim]Preview:[/]");
+        AnsiConsole.WriteLine();
+        AnsiConsole.Write(new Panel(description)
+            .Header("PR Description")
+            .BorderColor(Color.Cyan1)
+            .Padding(1, 0));
+
+        return 0;
+    }
+
     private static async Task<string?> CreateAzureDevOpsRepo()
     {
         AnsiConsole.MarkupLine("[bold blue]☁️  Azure DevOps - Create New Repository[/]\n");
