@@ -33,6 +33,7 @@ class Program
     bool detailed = args.Contains("--detailed");
     bool createAzureRepo = args.Contains("--new-repo-azure");
     bool prDescription = args.Contains("--pr-description");
+    bool save = args.Contains("--save");
     string language = "english"; // default language
     
     // Parse language flag (supports --language es, --lang es, --language=es, --lang=es)
@@ -62,14 +63,16 @@ class Program
         Console.WriteLine("  --detailed        Generate detailed commit with body (title + paragraphs + bullet points)");
         Console.WriteLine("  --language        Set output language for commit message (e.g., 'english', 'spanish', 'french')");
         Console.WriteLine("  --new-repo-azure  Create a new Azure DevOps repository interactively");
-        Console.WriteLine("  --pr-description  Generate a PR description markdown file by comparing two branches");
+        Console.WriteLine("  --pr-description  Generate a PR description by comparing two branches");
+        Console.WriteLine("  --save            Save the output to a markdown file");
         Console.WriteLine("  --help            Show this help message");
         Console.WriteLine();
         Console.WriteLine("By default, YitPush will automatically commit and push without confirmation.");
         Console.WriteLine("Use --confirm if you want to review the commit message before proceeding.");
         Console.WriteLine("Use --detailed for detailed commit messages with full explanations.");
         Console.WriteLine("Use --language to specify the output language (default: english).");
-        Console.WriteLine("Use --pr-description to generate a PR description (combinable with --lang and --detailed).");
+        Console.WriteLine("Use --pr-description to generate a PR description (combinable with --lang, --detailed and --save).");
+        Console.WriteLine("Use --save to save the output to a markdown file (works with default and --pr-description modes).");
         Console.WriteLine();
         return 0;
     }
@@ -89,7 +92,7 @@ class Program
             // PR description mode - separate flow
             if (prDescription)
             {
-                return await GeneratePrDescription(detailed, language);
+                return await GeneratePrDescription(detailed, language, save);
             }
 
             // Create Azure DevOps repository if requested
@@ -151,10 +154,18 @@ class Program
                 }
 
                 Console.WriteLine("\n📝 Generated commit message:");
-                Console.ForegroundColor = ConsoleColor.Cyan;
-                Console.WriteLine($"   \"{commitMessage}\"");
-                Console.ResetColor();
+                AnsiConsole.Write(new Panel(commitMessage)
+                    .Header("Commit Message")
+                    .BorderColor(Color.Cyan1)
+                    .Padding(1, 0));
                 Console.WriteLine();
+
+                if (save)
+                {
+                    var fileName = $"commit-message-{DateTime.Now:yyyyMMdd-HHmmss}.md";
+                    await File.WriteAllTextAsync(fileName, commitMessage);
+                    AnsiConsole.MarkupLine($"[green]✅ Commit message saved to:[/] {fileName}\n");
+                }
 
                 // Confirm with user if --confirm flag is set
                 if (requireConfirmation)
@@ -1027,7 +1038,7 @@ Generate the pull request description in Markdown:";
         return string.Empty;
     }
 
-    private static async Task<int> GeneratePrDescription(bool detailed, string language)
+    private static async Task<int> GeneratePrDescription(bool detailed, string language, bool save)
     {
         AnsiConsole.MarkupLine("[bold blue]📋 PR Description Generator[/]\n");
 
@@ -1096,17 +1107,18 @@ Generate the pull request description in Markdown:";
             return 1;
         }
 
-        // Save to markdown file
-        var fileName = $"pr-description-{fromBranch.Replace("/", "-")}-to-{toBranch.Replace("/", "-")}.md";
-        await File.WriteAllTextAsync(fileName, description);
-
-        AnsiConsole.MarkupLine($"\n[green]✅ PR description saved to:[/] {fileName}");
-        AnsiConsole.MarkupLine($"\n[dim]Preview:[/]");
         AnsiConsole.WriteLine();
         AnsiConsole.Write(new Panel(description)
             .Header("PR Description")
             .BorderColor(Color.Cyan1)
             .Padding(1, 0));
+
+        if (save)
+        {
+            var fileName = $"pr-description-{fromBranch.Replace("/", "-")}-to-{toBranch.Replace("/", "-")}.md";
+            await File.WriteAllTextAsync(fileName, description);
+            AnsiConsole.MarkupLine($"\n[green]✅ PR description saved to:[/] {fileName}");
+        }
 
         return 0;
     }
