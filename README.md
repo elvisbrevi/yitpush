@@ -19,6 +19,8 @@ yitpush --confirm
 - **⚡ One-Command Workflow**: Replaces `git add . && git commit -m "..." && git push` with a single command
 - **🚀 Fast & Efficient**: Automatically proceeds without confirmation (use `--confirm` to review)
 - **🔒 Safe & Reliable**: Full git diff analysis and error handling
+- **📋 PR Descriptions**: Generate AI-powered pull request descriptions by comparing branches with `--pr-description`
+- **💾 Save to File**: Optionally save commit messages or PR descriptions to markdown files with `--save`
 - **☁️ Azure DevOps Integration**: Create new Azure DevOps repositories interactively with `--new-repo-azure`
 - **🌍 Cross-Platform Compatibility**: Install as a global .NET tool or run directly from source, with full Unicode/emoji support for Windows PowerShell, macOS Terminal, and Linux
 
@@ -97,6 +99,8 @@ Use the `--detailed` flag to generate a commit message with body including expla
 | `--detailed` | Generate detailed commit with body (title + paragraphs + bullet points) |
 | `--language` | Set output language for commit message (e.g., 'english', 'spanish', 'french') |
 | `--new-repo-azure` | Create a new Azure DevOps repository interactively |
+| `--pr-description` | Generate a PR description by comparing two branches |
+| `--save` | Save the output to a markdown file |
 | `--help`    | Show help message |
 
 **Examples:**
@@ -127,6 +131,18 @@ yitpush --new-repo-azure
 
 # Create Azure DevOps repo with confirmation
 yitpush --new-repo-azure --confirm
+
+# Generate PR description (interactive branch selection)
+yitpush --pr-description
+
+# PR description in Spanish, detailed mode
+yitpush --pr-description --detailed --lang es
+
+# PR description and save to markdown file
+yitpush --pr-description --save
+
+# Save commit message to markdown file
+yitpush --save
 
 # Show help
 yitpush --help
@@ -193,6 +209,47 @@ yitpush --new-repo-azure --detailed --language spanish
 - [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) installed
 - Logged into Azure (`az login` - YitPush will prompt if not logged in)
 - Access to an Azure DevOps organization and project
+
+### PR Description Generator
+
+YitPush can generate AI-powered pull request descriptions by comparing two branches using the `--pr-description` flag:
+
+- **Interactive branch selection**: Pick source and target branches from a list showing local/remote type and last modified date
+- **AI-generated markdown**: Produces a structured PR description with title, summary, and changes
+- **Combinable flags**: Works with `--detailed`, `--language`, and `--save`
+- **Separate flow**: Does not commit or push — only generates the description
+
+**Examples:**
+```bash
+# Generate PR description
+yitpush --pr-description
+
+# Detailed PR description in Spanish
+yitpush --pr-description --detailed --lang es
+
+# Generate and save to markdown file
+yitpush --pr-description --save
+
+# All options combined
+yitpush --pr-description --detailed --language french --save
+```
+
+### Save to File
+
+Use the `--save` flag to save the output to a markdown file. Works with both the default commit flow and the PR description mode:
+
+- **Commit mode**: Saves the commit message to `commit-message-<timestamp>.md`
+- **PR description mode**: Saves the PR description to `pr-description-<source>-to-<target>.md`
+- **Disabled by default**: Output is only displayed on screen unless `--save` is specified
+
+**Examples:**
+```bash
+# Save commit message to file
+yitpush --save
+
+# Save PR description to file
+yitpush --pr-description --save
+```
 
 ## 📝 Example Workflow
 

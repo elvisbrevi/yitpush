@@ -12,7 +12,7 @@
 
     <!-- Package Metadata -->
     <PackageId>YitPush</PackageId>
-    <Version>1.0.9</Version>
+    <Version>1.1.0</Version>
     <Authors>Elvis Brevi</Authors>
     <Description>AI-powered git commit automation tool. Analyzes code changes with DeepSeek
       Reasoning AI and generates meaningful commit messages. Run 'yitpush' to automatically stage,
@@ -35,10 +35,10 @@
 
     <!-- Additional Metadata -->
     <Copyright>Copyright (c) 2026 Elvis Brevi</Copyright>
-    <PackageReleaseNotes>New: Multi-language support with --language flag (English, Spanish, French,
-      etc.)
-      Fix: Emoji display issues in Windows PowerShell with UTF-8 encoding
-      Fix: Increase max_tokens to 8000 and timeout to 120s for deepseek-reasoner model</PackageReleaseNotes>
+    <PackageReleaseNotes>New: PR description generator with --pr-description flag (interactive branch selection, AI-generated markdown)
+      New: --save flag to optionally save output to markdown file (works with commit and PR description modes)
+      New: Commit message display with panel border for better readability
+      New: Branch list shows local/remote type and last modified date</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
