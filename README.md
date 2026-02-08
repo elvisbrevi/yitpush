@@ -19,6 +19,7 @@ yitpush --confirm
 - **⚡ One-Command Workflow**: Replaces `git add . && git commit -m "..." && git push` with a single command
 - **🚀 Fast & Efficient**: Automatically proceeds without confirmation (use `--confirm` to review)
 - **🔒 Safe & Reliable**: Full git diff analysis and error handling
+- **☁️ Azure DevOps Integration**: Create new Azure DevOps repositories interactively with `--new-repo-azure`
 - **🌍 Cross-Platform Compatibility**: Install as a global .NET tool or run directly from source, with full Unicode/emoji support for Windows PowerShell, macOS Terminal, and Linux
 
 ## 📦 Installation
@@ -95,6 +96,7 @@ Use the `--detailed` flag to generate a commit message with body including expla
 | `--confirm` | Ask for confirmation before committing (default: automatic) |
 | `--detailed` | Generate detailed commit with body (title + paragraphs + bullet points) |
 | `--language` | Set output language for commit message (e.g., 'english', 'spanish', 'french') |
+| `--new-repo-azure` | Create a new Azure DevOps repository interactively |
 | `--help`    | Show help message |
 
 **Examples:**
@@ -119,6 +121,12 @@ yitpush --lang es
 
 # Combine all options: Spanish, detailed, with confirmation
 yitpush --language spanish --detailed --confirm
+
+# Create a new Azure DevOps repo and push
+yitpush --new-repo-azure
+
+# Create Azure DevOps repo with confirmation
+yitpush --new-repo-azure --confirm
 
 # Show help
 yitpush --help
@@ -158,6 +166,33 @@ yitpush --lang it
 ```
 
 The language flag instructs the AI model to generate commit messages following conventional commit format but in the specified language, maintaining all formatting and style requirements.
+
+### Azure DevOps Repository Creation
+
+YitPush can create a new Azure DevOps repository and push your code in a single command using the `--new-repo-azure` flag:
+
+- **Interactive setup**: Guides you through selecting organization, project, and repository name
+- **Requires Azure CLI**: The `az` CLI must be installed with the `azure-devops` extension (auto-installed if missing)
+- **Smart defaults**: Suggests the current directory name as the repository name
+- **Handles existing repos**: Detects if the repository already exists and offers to reuse it
+- **Flexible remotes**: If `origin` is already configured, lets you choose an alternative remote name (e.g., `azure`)
+
+**Examples:**
+```bash
+# Create a new Azure DevOps repo and push
+yitpush --new-repo-azure
+
+# Create repo with commit confirmation
+yitpush --new-repo-azure --confirm
+
+# Create repo with detailed commit in Spanish
+yitpush --new-repo-azure --detailed --language spanish
+```
+
+**Prerequisites:**
+- [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) installed
+- Logged into Azure (`az login` - YitPush will prompt if not logged in)
+- Access to an Azure DevOps organization and project
 
 ## 📝 Example Workflow
 
@@ -219,6 +254,8 @@ cd YitPush && dotnet run
 | `❌ Error: Not a git repository` | Run the command from inside a git repository |
 | `❌ Error: git push failed` | Check remote configuration and credentials |
 | `❌ Error: Failed to generate commit message` | Verify API key and internet connection |
+| `❌ Azure CLI (az) is not installed` | Install [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) |
+| `❌ No Azure DevOps organizations found` | Verify your Azure account has access to Azure DevOps |
 
 ## 🏗️ Project Structure
 
