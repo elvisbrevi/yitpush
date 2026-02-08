@@ -220,7 +220,7 @@ class Program
                 }
 
                 // git commit
-                Console.WriteLine($"   git commit -m \"{commitMessage}\"");
+                Console.WriteLine($"   git commit");
                 if (!await ExecuteGitCommand($"commit -m \"{commitMessage}\""))
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
