@@ -44,4 +44,8 @@ Fix: Increase max_tokens to 8000 and timeout to 120s for deepseek-reasoner model
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Spectre.Console" Version="0.54.0" />
+  </ItemGroup>
+
 </Project>
