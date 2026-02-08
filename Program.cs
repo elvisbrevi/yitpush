@@ -794,23 +794,24 @@ Generate only the commit message:";
             return false;
         }
     }
-    private static async Task<List<string>> GetGitBranches()
+    private static async Task<List<(string Name, string Type, string Date)>> GetGitBranches()
     {
-        var branches = new List<string>();
+        var branches = new List<(string Name, string Type, string Date)>();
         try
         {
-            var process = new Process
+            var psi = new ProcessStartInfo
             {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName = "git",
-                    Arguments = "branch -a --format=%(refname:short)",
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true,
-                    UseShellExecute = false,
-                    CreateNoWindow = true
-                }
+                FileName = "git",
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true
             };
+            psi.ArgumentList.Add("branch");
+            psi.ArgumentList.Add("-a");
+            psi.ArgumentList.Add("--sort=-committerdate");
+            psi.ArgumentList.Add("--format=%(refname:short)|%(committerdate:format:%Y-%m-%d %H:%M)|%(refname)");
+            var process = new Process { StartInfo = psi };
 
             process.Start();
             var output = await process.StandardOutput.ReadToEndAsync();
@@ -821,10 +822,20 @@ Generate only the commit message:";
             {
                 foreach (var line in output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
                 {
-                    if (!string.IsNullOrWhiteSpace(line))
-                    {
-                        branches.Add(line);
-                    }
+                    if (string.IsNullOrWhiteSpace(line)) continue;
+
+                    var parts = line.Split('|', 3);
+                    if (parts.Length < 3) continue;
+
+                    var name = parts[0].Trim();
+                    var date = parts[1].Trim();
+                    var refname = parts[2].Trim();
+
+                    // Skip HEAD pointers (e.g. refs/remotes/origin/HEAD)
+                    if (refname.Contains("/HEAD", StringComparison.OrdinalIgnoreCase)) continue;
+
+                    var type = refname.StartsWith("refs/remotes/") ? "remote" : "local";
+                    branches.Add((name, type, date));
                 }
             }
         }
@@ -1064,25 +1075,39 @@ Generate the pull request description in Markdown:";
             return 1;
         }
 
+        // Build display strings with columns: name | type | date
+        var maxNameLen = branches.Max(b => b.Name.Length);
+        var displayMap = new Dictionary<string, string>(); // display -> branch name
+        var displayList = new List<string>();
+
+        foreach (var b in branches)
+        {
+            var display = $"{b.Name.PadRight(maxNameLen + 2)} {b.Type.PadRight(8)} {b.Date}";
+            displayMap[display] = b.Name;
+            displayList.Add(display);
+        }
+
         // Select source branch (from - the branch with changes)
-        var fromBranch = AnsiConsole.Prompt(
+        var fromDisplay = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
                 .Title("📋 Select [green]source[/] branch (branch with changes):")
                 .PageSize(15)
                 .HighlightStyle(new Style(Color.Cyan1))
-                .AddChoices(branches));
+                .AddChoices(displayList));
 
+        var fromBranch = displayMap[fromDisplay];
         AnsiConsole.MarkupLine($"\n[green]✅ Source branch:[/] {fromBranch}");
 
         // Select target branch (to - the branch to merge into)
-        var targetBranches = branches.Where(b => b != fromBranch).ToList();
-        var toBranch = AnsiConsole.Prompt(
+        var targetDisplayList = displayList.Where(d => displayMap[d] != fromBranch).ToList();
+        var toDisplay = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
                 .Title("📋 Select [green]target[/] branch (branch to merge into):")
                 .PageSize(15)
                 .HighlightStyle(new Style(Color.Cyan1))
-                .AddChoices(targetBranches));
+                .AddChoices(targetDisplayList));
 
+        var toBranch = displayMap[toDisplay];
         AnsiConsole.MarkupLine($"\n[green]✅ Target branch:[/] {toBranch}");
 
         // Get diff between branches
