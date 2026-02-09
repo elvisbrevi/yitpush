@@ -29,7 +29,7 @@ class Program
 
     // Process command line arguments
     bool requireConfirmation = args.Contains("--confirm");
-    bool showHelp = args.Contains("--help");
+    bool showHelp = args.Contains("--help") || args.Contains("-h") || args.Contains("-help");
     bool detailed = args.Contains("--detailed");
     bool createAzureRepo = args.Contains("--new-repo-azure");
     bool prDescription = args.Contains("--pr-description");
@@ -56,23 +56,39 @@ class Program
     
     if (showHelp)
     {
-        Console.WriteLine("Usage: yitpush [options]");
-        Console.WriteLine();
-        Console.WriteLine("Options:");
-        Console.WriteLine("  --confirm    Ask for confirmation before committing");
-        Console.WriteLine("  --detailed        Generate detailed commit with body (title + paragraphs + bullet points)");
-        Console.WriteLine("  --language        Set output language for commit message (e.g., 'english', 'spanish', 'french')");
-        Console.WriteLine("  --new-repo-azure  Create a new Azure DevOps repository interactively");
-        Console.WriteLine("  --pr-description  Generate a PR description by comparing two branches");
-        Console.WriteLine("  --save            Save the output to a markdown file");
-        Console.WriteLine("  --help            Show this help message");
-        Console.WriteLine();
-        Console.WriteLine("By default, YitPush will automatically commit and push without confirmation.");
-        Console.WriteLine("Use --confirm if you want to review the commit message before proceeding.");
-        Console.WriteLine("Use --detailed for detailed commit messages with full explanations.");
-        Console.WriteLine("Use --language to specify the output language (default: english).");
-        Console.WriteLine("Use --pr-description to generate a PR description (combinable with --lang, --detailed and --save).");
-        Console.WriteLine("Use --save to save the output to a markdown file (works with default and --pr-description modes).");
+        AnsiConsole.MarkupLine("[bold]Usage:[/] yitpush [options]\n");
+        AnsiConsole.MarkupLine("[bold]Description:[/]");
+        AnsiConsole.MarkupLine("  AI-powered git commit automation tool. Analyzes code changes with DeepSeek");
+        AnsiConsole.MarkupLine("  Reasoning AI and generates meaningful conventional commit messages.\n");
+
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Cyan1)
+            .Title("[bold cyan]Options[/]")
+            .AddColumn(new TableColumn("[bold]Flag[/]").NoWrap())
+            .AddColumn(new TableColumn("[bold]Short[/]").NoWrap())
+            .AddColumn(new TableColumn("[bold]Description[/]"));
+
+        table.AddRow("--confirm", "", "Ask for confirmation before committing (default: automatic)");
+        table.AddRow("--detailed", "", "Generate detailed commit with body (title + paragraphs + bullet points)");
+        table.AddRow("--language <lang>", "--lang", "Set output language (e.g., 'english', 'spanish', 'french', 'es', 'fr')");
+        table.AddRow("--new-repo-azure", "", "Create a new Azure DevOps repository interactively");
+        table.AddRow("--pr-description", "", "Generate a PR description by comparing two branches");
+        table.AddRow("--save", "", "Save the output to a markdown file");
+        table.AddRow("--help", "-h", "Show this help message");
+
+        AnsiConsole.Write(table);
+
+        AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
+        AnsiConsole.MarkupLine("  yitpush                                    [dim]# Auto commit and push[/]");
+        AnsiConsole.MarkupLine("  yitpush --confirm                          [dim]# Review before committing[/]");
+        AnsiConsole.MarkupLine("  yitpush --detailed                         [dim]# Detailed commit message[/]");
+        AnsiConsole.MarkupLine("  yitpush --lang es --detailed --confirm     [dim]# Spanish, detailed, with review[/]");
+        AnsiConsole.MarkupLine("  yitpush --pr-description                   [dim]# Generate PR description[/]");
+        AnsiConsole.MarkupLine("  yitpush --pr-description --save            [dim]# PR description saved to file[/]");
+        AnsiConsole.MarkupLine("  yitpush --new-repo-azure                   [dim]# Create Azure DevOps repo[/]");
+        AnsiConsole.MarkupLine("  yitpush --save                             [dim]# Save commit message to file[/]");
+        AnsiConsole.MarkupLine("  yitpush -h                                 [dim]# Show this help[/]");
         Console.WriteLine();
         return 0;
     }
