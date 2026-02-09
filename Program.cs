@@ -189,11 +189,11 @@ class Program
                 try
                 {
                     ClipboardService.SetText(commitMessage);
-                    AnsiConsole.MarkupLine("[green]✅ Mensaje copiado al portapapeles[/]");
+                    AnsiConsole.MarkupLine("[green]✅ Copied to clipboard[/]");
                 }
                 catch (Exception ex)
                 {
-                    AnsiConsole.MarkupLine($"[yellow]⚠️  No se pudo copiar al portapapeles: {ex.Message}[/]");
+                    AnsiConsole.MarkupLine($"[yellow]⚠️  Could not copy to clipboard: {ex.Message}[/]");
                 }
                 Console.WriteLine();
 
@@ -1070,11 +1070,11 @@ Generate the pull request description in Markdown:";
         try
         {
             ClipboardService.SetText(description);
-            AnsiConsole.MarkupLine("\n[green]✅ Descripción copiada al portapapeles[/]");
+            AnsiConsole.MarkupLine("\n[green]✅ Copied to clipboard[/]");
         }
         catch (Exception ex)
         {
-            AnsiConsole.MarkupLine($"\n[yellow]⚠️  No se pudo copiar al portapapeles: {ex.Message}[/]");
+            AnsiConsole.MarkupLine($"\n[yellow]⚠️  Could not copy to clipboard: {ex.Message}[/]");
         }
 
         if (save)
