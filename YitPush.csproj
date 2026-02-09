@@ -12,7 +12,7 @@
 
     <!-- Package Metadata -->
     <PackageId>YitPush</PackageId>
-    <Version>1.2.0</Version>
+    <Version>1.2.1</Version>
     <Authors>Elvis Brevi</Authors>
     <Description>AI-powered git commit automation tool. Analyzes code changes with DeepSeek
       Reasoning AI and generates meaningful commit messages. Run 'yitpush' to automatically stage,
@@ -37,7 +37,8 @@
     <Copyright>Copyright (c) 2026 Elvis Brevi</Copyright>
     <PackageReleaseNotes>New: --check flag for interactive branch checkout
       New: -h and -help short flags as aliases for --help
-      New: Improved help output with formatted table showing all flags, short forms, and descriptions
+      New: Improved help output with formatted table showing all flags, short forms, and
+      descriptions
       Refactor: Extract shared DeepSeek API call logic to reduce code duplication</PackageReleaseNotes>
   </PropertyGroup>
 
