@@ -34,6 +34,7 @@ class Program
     bool createAzureRepo = args.Contains("--new-repo-azure");
     bool prDescription = args.Contains("--pr-description");
     bool save = args.Contains("--save");
+    bool check = args.Contains("--check");
     string language = "english"; // default language
     
     // Parse language flag (supports --language es, --lang es, --language=es, --lang=es)
@@ -62,6 +63,7 @@ class Program
         Console.WriteLine("  --confirm    Ask for confirmation before committing");
         Console.WriteLine("  --detailed        Generate detailed commit with body (title + paragraphs + bullet points)");
         Console.WriteLine("  --language        Set output language for commit message (e.g., 'english', 'spanish', 'french')");
+        Console.WriteLine("  --check           Interactive branch checkout");
         Console.WriteLine("  --new-repo-azure  Create a new Azure DevOps repository interactively");
         Console.WriteLine("  --pr-description  Generate a PR description by comparing two branches");
         Console.WriteLine("  --save            Save the output to a markdown file");
@@ -71,6 +73,7 @@ class Program
         Console.WriteLine("Use --confirm if you want to review the commit message before proceeding.");
         Console.WriteLine("Use --detailed for detailed commit messages with full explanations.");
         Console.WriteLine("Use --language to specify the output language (default: english).");
+        Console.WriteLine("Use --check to interactively select and checkout a branch.");
         Console.WriteLine("Use --pr-description to generate a PR description (combinable with --lang, --detailed and --save).");
         Console.WriteLine("Use --save to save the output to a markdown file (works with default and --pr-description modes).");
         Console.WriteLine();
@@ -87,6 +90,12 @@ class Program
                 Console.ResetColor();
                 Console.WriteLine("\nPlease run this command from within a git repository.");
                 return 1;
+            }
+
+            // Interactive branch checkout mode
+            if (check)
+            {
+                return await CheckoutBranch();
             }
 
             // PR description mode - separate flow
@@ -390,8 +399,6 @@ class Program
 
     private static async Task<string> GenerateCommitMessage(string apiKey, string diff, bool detailed = false, string language = "english")
     {
-        const int maxRetries = 3;
-        const int baseDelayMs = 1000;
         const int deepseekMaxContextTokens = 131072;
         const int maxCompletionTokens = 8000;
         const int reservedTokens = maxCompletionTokens + 5000;
@@ -399,23 +406,12 @@ class Program
         const int averageCharsPerToken = 4;
         const int maxPromptChars = maxPromptTokens * averageCharsPerToken;
 
-
         diff = TruncateDiff(diff, maxPromptChars);
 
-        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        string prompt;
+        if (detailed)
         {
-            try
-            {
-                using var httpClient = new HttpClient
-                {
-                    Timeout = TimeSpan.FromSeconds(120) // Increased timeout for reasoning models
-                };
-                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
-
-                string prompt;
-                if (detailed)
-                {
-                    prompt = $@"You are a git commit message expert. Based on the following git diff, generate a detailed conventional commit with title and body.
+            prompt = $@"You are a git commit message expert. Based on the following git diff, generate a detailed conventional commit with title and body.
 
 LANGUAGE: Write the commit message in {language}.
 
@@ -443,10 +439,10 @@ Git diff:
 {diff}
 
 Generate the complete commit message (title + body):";
-                }
-                else
-                {
-                    prompt = $@"You are a git commit message expert. Based on the following git diff, generate a concise, clear, and descriptive commit message following conventional commits format.
+        }
+        else
+        {
+            prompt = $@"You are a git commit message expert. Based on the following git diff, generate a concise, clear, and descriptive commit message following conventional commits format.
 
 LANGUAGE: Write the commit message in {language}.
 
@@ -461,7 +457,42 @@ Git diff:
 {diff}
 
 Generate only the commit message:";
-                }
+        }
+
+        return await CallDeepSeekApi(apiKey, prompt);
+    }
+
+    private static string TruncateDiff(string diff, int maxChars)
+    {
+        if (string.IsNullOrEmpty(diff) || diff.Length <= maxChars)
+        {
+            return diff;
+        }
+
+        Console.WriteLine($"\n⚠️  Diff is too large ({diff.Length} chars). Truncating to {maxChars} chars...");
+
+        int keepBeginning = maxChars / 2;
+        int keepEnd = maxChars - keepBeginning;
+        string beginning = diff.Substring(0, keepBeginning);
+        string end = diff.Substring(diff.Length - keepEnd);
+
+        return $"{beginning}\n\n...[TRUNCATED - {diff.Length - maxChars} characters omitted]...\n\n{end}";
+    }
+
+    private static async Task<string> CallDeepSeekApi(string apiKey, string prompt)
+    {
+        const int maxRetries = 3;
+        const int baseDelayMs = 1000;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                using var httpClient = new HttpClient
+                {
+                    Timeout = TimeSpan.FromSeconds(120)
+                };
+                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
 
                 var requestBody = new
                 {
@@ -470,7 +501,7 @@ Generate only the commit message:";
                     {
                         new { role = "user", content = prompt }
                     },
-                    max_tokens = 8000  // Increased for reasoning models to complete both reasoning and final answer
+                    max_tokens = 8000
                 };
 
                 var jsonContent = JsonSerializer.Serialize(requestBody);
@@ -484,7 +515,6 @@ Generate only the commit message:";
                     Console.WriteLine($"API Error (attempt {attempt}/{maxRetries}): {response.StatusCode}");
                     Console.WriteLine($"Response: {errorContent}");
 
-                    // If it's a rate limit or server error, retry
                     if (attempt < maxRetries && ((int)response.StatusCode == 429 || (int)response.StatusCode >= 500))
                     {
                         var delay = baseDelayMs * (int)Math.Pow(2, attempt - 1);
@@ -515,8 +545,6 @@ Generate only the commit message:";
                 }
 
                 var message = apiResponse.Choices[0].Message?.Content?.Trim() ?? string.Empty;
-
-                // Clean up the message (remove quotes if present)
                 message = message.Trim('"', '\'', ' ', '\n', '\r');
 
                 return message;
@@ -566,23 +594,6 @@ Generate only the commit message:";
         }
 
         return string.Empty;
-    }
-
-    private static string TruncateDiff(string diff, int maxChars)
-    {
-        if (string.IsNullOrEmpty(diff) || diff.Length <= maxChars)
-        {
-            return diff;
-        }
-
-        Console.WriteLine($"\n⚠️  Diff is too large ({diff.Length} chars). Truncating to {maxChars} chars...");
-
-        int keepBeginning = maxChars / 2;
-        int keepEnd = maxChars - keepBeginning;
-        string beginning = diff.Substring(0, keepBeginning);
-        string end = diff.Substring(diff.Length - keepEnd);
-
-        return $"{beginning}\n\n...[TRUNCATED - {diff.Length - maxChars} characters omitted]...\n\n{end}";
     }
 
     private static async Task<string?> GetCurrentBranch()
@@ -877,8 +888,6 @@ Generate only the commit message:";
 
     private static async Task<string> GeneratePrDescriptionContent(string apiKey, string diff, bool detailed, string language)
     {
-        const int maxRetries = 3;
-        const int baseDelayMs = 1000;
         const int deepseekMaxContextTokens = 131072;
         const int maxCompletionTokens = 8000;
         const int reservedTokens = maxCompletionTokens + 5000;
@@ -888,20 +897,10 @@ Generate only the commit message:";
 
         diff = TruncateDiff(diff, maxPromptChars);
 
-        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        string prompt;
+        if (detailed)
         {
-            try
-            {
-                using var httpClient = new HttpClient
-                {
-                    Timeout = TimeSpan.FromSeconds(120)
-                };
-                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
-
-                string prompt;
-                if (detailed)
-                {
-                    prompt = $@"You are a pull request description expert. Based on the following git diff between two branches, generate a detailed pull request description in Markdown format.
+            prompt = $@"You are a pull request description expert. Based on the following git diff between two branches, generate a detailed pull request description in Markdown format.
 
 LANGUAGE: Write the description in {language}.
 
@@ -923,10 +922,10 @@ Git diff:
 {diff}
 
 Generate the complete pull request description in Markdown:";
-                }
-                else
-                {
-                    prompt = $@"You are a pull request description expert. Based on the following git diff between two branches, generate a concise pull request description in Markdown format.
+        }
+        else
+        {
+            prompt = $@"You are a pull request description expert. Based on the following git diff between two branches, generate a concise pull request description in Markdown format.
 
 LANGUAGE: Write the description in {language}.
 
@@ -945,108 +944,9 @@ Git diff:
 {diff}
 
 Generate the pull request description in Markdown:";
-                }
-
-                var requestBody = new
-                {
-                    model = DeepSeekModel,
-                    messages = new[]
-                    {
-                        new { role = "user", content = prompt }
-                    },
-                    max_tokens = 8000
-                };
-
-                var jsonContent = JsonSerializer.Serialize(requestBody);
-                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
-
-                var response = await httpClient.PostAsync(DeepSeekApiUrl, content);
-
-                if (!response.IsSuccessStatusCode)
-                {
-                    var errorContent = await response.Content.ReadAsStringAsync();
-                    Console.WriteLine($"API Error (attempt {attempt}/{maxRetries}): {response.StatusCode}");
-                    Console.WriteLine($"Response: {errorContent}");
-
-                    if (attempt < maxRetries && ((int)response.StatusCode == 429 || (int)response.StatusCode >= 500))
-                    {
-                        var delay = baseDelayMs * (int)Math.Pow(2, attempt - 1);
-                        Console.WriteLine($"Retrying in {delay}ms...");
-                        await Task.Delay(delay);
-                        continue;
-                    }
-
-                    return string.Empty;
-                }
-
-                var responseJson = await response.Content.ReadAsStringAsync();
-                var apiResponse = JsonSerializer.Deserialize<DeepSeekResponse>(responseJson);
-
-                if (apiResponse?.Choices == null || apiResponse.Choices.Length == 0)
-                {
-                    Console.WriteLine($"No response from API (attempt {attempt}/{maxRetries})");
-
-                    if (attempt < maxRetries)
-                    {
-                        var delay = baseDelayMs * (int)Math.Pow(2, attempt - 1);
-                        Console.WriteLine($"Retrying in {delay}ms...");
-                        await Task.Delay(delay);
-                        continue;
-                    }
-
-                    return string.Empty;
-                }
-
-                var message = apiResponse.Choices[0].Message?.Content?.Trim() ?? string.Empty;
-                message = message.Trim('"', '\'', ' ', '\n', '\r');
-
-                return message;
-            }
-            catch (TaskCanceledException ex)
-            {
-                Console.WriteLine($"Request timeout (attempt {attempt}/{maxRetries}): {ex.Message}");
-
-                if (attempt < maxRetries)
-                {
-                    var delay = baseDelayMs * (int)Math.Pow(2, attempt - 1);
-                    Console.WriteLine($"Retrying in {delay}ms...");
-                    await Task.Delay(delay);
-                    continue;
-                }
-
-                return string.Empty;
-            }
-            catch (HttpRequestException ex)
-            {
-                Console.WriteLine($"Network error (attempt {attempt}/{maxRetries}): {ex.Message}");
-
-                if (attempt < maxRetries)
-                {
-                    var delay = baseDelayMs * (int)Math.Pow(2, attempt - 1);
-                    Console.WriteLine($"Retrying in {delay}ms...");
-                    await Task.Delay(delay);
-                    continue;
-                }
-
-                return string.Empty;
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error calling DeepSeek API (attempt {attempt}/{maxRetries}): {ex.Message}");
-
-                if (attempt < maxRetries)
-                {
-                    var delay = baseDelayMs * (int)Math.Pow(2, attempt - 1);
-                    Console.WriteLine($"Retrying in {delay}ms...");
-                    await Task.Delay(delay);
-                    continue;
-                }
-
-                return string.Empty;
-            }
         }
 
-        return string.Empty;
+        return await CallDeepSeekApi(apiKey, prompt);
     }
 
     private static async Task<int> GeneratePrDescription(bool detailed, string language, bool save)
@@ -1146,6 +1046,95 @@ Generate the pull request description in Markdown:";
         }
 
         return 0;
+    }
+
+    private static async Task<int> CheckoutBranch()
+    {
+        AnsiConsole.MarkupLine("[bold blue]🔀 Interactive Branch Checkout[/]\n");
+
+        // Fetch latest remote branches
+        AnsiConsole.MarkupLine("🔄 Fetching remote branches...");
+        if (!await ExecuteGitCommand("fetch --all --prune"))
+        {
+            AnsiConsole.MarkupLine("[yellow]⚠️  Could not fetch remote branches. Continuing with known branches...[/]\n");
+        }
+
+        // Get all branches
+        var branches = await GetGitBranches();
+        var currentBranch = await GetCurrentBranch();
+
+        // Filter out current branch
+        if (!string.IsNullOrEmpty(currentBranch))
+        {
+            branches = branches.Where(b => b.Name != currentBranch).ToList();
+            AnsiConsole.MarkupLine($"Current branch: [cyan]{currentBranch}[/]\n");
+        }
+
+        if (branches.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[yellow]⚠️  No other branches found.[/]");
+            return 0;
+        }
+
+        // Build display strings
+        var maxNameLen = branches.Max(b => b.Name.Length);
+        var displayMap = new Dictionary<string, (string Name, string Type)>();
+        var displayList = new List<string>();
+
+        foreach (var b in branches)
+        {
+            var display = $"{b.Name.PadRight(maxNameLen + 2)} {b.Type.PadRight(8)} {b.Date}";
+            displayMap[display] = (b.Name, b.Type);
+            displayList.Add(display);
+        }
+
+        var selected = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("📋 Select branch to checkout:")
+                .PageSize(15)
+                .HighlightStyle(new Style(Color.Cyan1))
+                .AddChoices(displayList));
+
+        var (branchName, branchType) = displayMap[selected];
+
+        // Checkout the branch
+        string checkoutArgs;
+        if (branchType == "remote")
+        {
+            // Remote branch: extract the name after the remote prefix (e.g., "origin/feature-x" -> "feature-x")
+            var slashIndex = branchName.IndexOf('/');
+            var localName = slashIndex >= 0 ? branchName.Substring(slashIndex + 1) : branchName;
+            checkoutArgs = $"checkout -t {branchName}";
+            AnsiConsole.MarkupLine($"\n⚙️  Checking out remote branch [cyan]{branchName}[/] as [cyan]{localName}[/]...");
+        }
+        else
+        {
+            checkoutArgs = $"checkout {branchName}";
+            AnsiConsole.MarkupLine($"\n⚙️  Checking out [cyan]{branchName}[/]...");
+        }
+
+        if (await ExecuteGitCommand(checkoutArgs))
+        {
+            AnsiConsole.MarkupLine($"[green]✅ Switched to branch '{branchName}'[/]");
+            return 0;
+        }
+        else
+        {
+            // If tracking checkout failed (branch already exists locally), try plain checkout
+            if (branchType == "remote")
+            {
+                var slashIndex = branchName.IndexOf('/');
+                var localName = slashIndex >= 0 ? branchName.Substring(slashIndex + 1) : branchName;
+                AnsiConsole.MarkupLine($"[yellow]⚠️  Tracking branch may already exist. Trying local checkout...[/]");
+                if (await ExecuteGitCommand($"checkout {localName}"))
+                {
+                    AnsiConsole.MarkupLine($"[green]✅ Switched to branch '{localName}'[/]");
+                    return 0;
+                }
+            }
+            AnsiConsole.MarkupLine("[red]❌ Failed to checkout branch.[/]");
+            return 1;
+        }
     }
 
     private static async Task<string?> CreateAzureDevOpsRepo()
