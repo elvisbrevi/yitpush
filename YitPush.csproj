@@ -12,7 +12,7 @@
 
     <!-- Package Metadata -->
     <PackageId>YitPush</PackageId>
-    <Version>1.1.0</Version>
+    <Version>1.2.0</Version>
     <Authors>Elvis Brevi</Authors>
     <Description>AI-powered git commit automation tool. Analyzes code changes with DeepSeek
       Reasoning AI and generates meaningful commit messages. Run 'yitpush' to automatically stage,
@@ -35,10 +35,10 @@
 
     <!-- Additional Metadata -->
     <Copyright>Copyright (c) 2026 Elvis Brevi</Copyright>
-    <PackageReleaseNotes>New: PR description generator with --pr-description flag (interactive branch selection, AI-generated markdown)
-      New: --save flag to optionally save output to markdown file (works with commit and PR description modes)
-      New: Commit message display with panel border for better readability
-      New: Branch list shows local/remote type and last modified date</PackageReleaseNotes>
+    <PackageReleaseNotes>New: --check flag for interactive branch checkout
+      New: -h and -help short flags as aliases for --help
+      New: Improved help output with formatted table showing all flags, short forms, and descriptions
+      Refactor: Extract shared DeepSeek API call logic to reduce code duplication</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

@@ -93,15 +93,16 @@ Use the `--detailed` flag to generate a commit message with body including expla
 
 ### Command Line Options
 
-| Option | Description |
-|--------|-------------|
-| `--confirm` | Ask for confirmation before committing (default: automatic) |
-| `--detailed` | Generate detailed commit with body (title + paragraphs + bullet points) |
-| `--language` | Set output language for commit message (e.g., 'english', 'spanish', 'french') |
-| `--new-repo-azure` | Create a new Azure DevOps repository interactively |
-| `--pr-description` | Generate a PR description by comparing two branches |
-| `--save` | Save the output to a markdown file |
-| `--help`    | Show help message |
+| Option | Short | Description |
+|--------|-------|-------------|
+| `--confirm` | | Ask for confirmation before committing (default: automatic) |
+| `--detailed` | | Generate detailed commit with body (title + paragraphs + bullet points) |
+| `--language` | `--lang` | Set output language for commit message (e.g., 'english', 'spanish', 'french') |
+| `--check` | | Interactive branch checkout |
+| `--new-repo-azure` | | Create a new Azure DevOps repository interactively |
+| `--pr-description` | | Generate a PR description by comparing two branches |
+| `--save` | | Save the output to a markdown file |
+| `--help` | `-h` | Show help message with all available options |
 
 **Examples:**
 ```bash
@@ -146,6 +147,7 @@ yitpush --save
 
 # Show help
 yitpush --help
+yitpush -h
 ```
 
 ### Detailed Mode
