@@ -4,6 +4,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using Spectre.Console;
+using TextCopy;
 
 namespace YitPush;
 
@@ -183,6 +184,17 @@ class Program
                     .Header("Commit Message")
                     .BorderColor(Color.Cyan1)
                     .Padding(1, 0));
+                
+                // Copy to clipboard
+                try
+                {
+                    ClipboardService.SetText(commitMessage);
+                    AnsiConsole.MarkupLine("[green]✅ Mensaje copiado al portapapeles[/]");
+                }
+                catch (Exception ex)
+                {
+                    AnsiConsole.MarkupLine($"[yellow]⚠️  No se pudo copiar al portapapeles: {ex.Message}[/]");
+                }
                 Console.WriteLine();
 
                 if (save)
@@ -1053,6 +1065,17 @@ Generate the pull request description in Markdown:";
             .Header("PR Description")
             .BorderColor(Color.Cyan1)
             .Padding(1, 0));
+
+        // Copy to clipboard
+        try
+        {
+            ClipboardService.SetText(description);
+            AnsiConsole.MarkupLine("\n[green]✅ Descripción copiada al portapapeles[/]");
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"\n[yellow]⚠️  No se pudo copiar al portapapeles: {ex.Message}[/]");
+        }
 
         if (save)
         {
