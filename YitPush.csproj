@@ -12,7 +12,7 @@
 
     <!-- Package Metadata -->
     <PackageId>YitPush</PackageId>
-    <Version>1.2.1</Version>
+    <Version>1.2.2</Version>
     <Authors>Elvis Brevi</Authors>
     <Description>AI-powered git commit automation tool. Analyzes code changes with DeepSeek
       Reasoning AI and generates meaningful commit messages. Run 'yitpush' to automatically stage,
@@ -35,11 +35,9 @@
 
     <!-- Additional Metadata -->
     <Copyright>Copyright (c) 2026 Elvis Brevi</Copyright>
-    <PackageReleaseNotes>New: --check flag for interactive branch checkout
-      New: -h and -help short flags as aliases for --help
-      New: Improved help output with formatted table showing all flags, short forms, and
-      descriptions
-      Refactor: Extract shared DeepSeek API call logic to reduce code duplication</PackageReleaseNotes>
+    <PackageReleaseNotes>New: Selectable variable group list - select a group to view its variables
+      New: Back navigation (← Back) across all interactive flows (org/project selection, branch checkout, PR description, repo creation)
+      Fix: Handle null isSecret values in Azure DevOps variable groups</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

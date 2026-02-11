@@ -21,7 +21,8 @@ yitpush --confirm
 - **🔒 Safe & Reliable**: Full git diff analysis and error handling
 - **📋 PR Descriptions**: Generate AI-powered pull request descriptions by comparing branches with `--pr-description`
 - **💾 Save to File**: Optionally save commit messages or PR descriptions to markdown files with `--save`
-- **☁️ Azure DevOps Integration**: Create new Azure DevOps repositories interactively with `--new-repo-azure`
+- **☁️ Azure DevOps Integration**: Create repos and browse variable groups with `azure-devops` subcommands
+- **🔀 Back Navigation**: All interactive flows support `← Back` to return to the previous step
 - **🌍 Cross-Platform Compatibility**: Install as a global .NET tool or run directly from source, with full Unicode/emoji support for Windows PowerShell, macOS Terminal, and Linux
 
 ## 📦 Installation
@@ -99,10 +100,16 @@ Use the `--detailed` flag to generate a commit message with body including expla
 | `--detailed` | | Generate detailed commit with body (title + paragraphs + bullet points) |
 | `--language` | `--lang` | Set output language for commit message (e.g., 'english', 'spanish', 'french') |
 | `--check` | | Interactive branch checkout |
-| `--new-repo-azure` | | Create a new Azure DevOps repository interactively |
 | `--pr-description` | | Generate a PR description by comparing two branches |
 | `--save` | | Save the output to a markdown file |
 | `--help` | `-h` | Show help message with all available options |
+
+**Subcommands:**
+
+| Command | Description |
+|---------|-------------|
+| `azure-devops repo new` | Create a new Azure DevOps repository interactively |
+| `azure-devops variable-group list` | Browse and inspect variable groups in an Azure DevOps project |
 
 **Examples:**
 ```bash
@@ -127,11 +134,11 @@ yitpush --lang es
 # Combine all options: Spanish, detailed, with confirmation
 yitpush --language spanish --detailed --confirm
 
-# Create a new Azure DevOps repo and push
-yitpush --new-repo-azure
+# Create a new Azure DevOps repo
+yitpush azure-devops repo new
 
-# Create Azure DevOps repo with confirmation
-yitpush --new-repo-azure --confirm
+# List and inspect variable groups
+yitpush azure-devops variable-group list
 
 # Generate PR description (interactive branch selection)
 yitpush --pr-description
@@ -185,27 +192,33 @@ yitpush --lang it
 
 The language flag instructs the AI model to generate commit messages following conventional commit format but in the specified language, maintaining all formatting and style requirements.
 
-### Azure DevOps Repository Creation
+### Azure DevOps Integration
 
-YitPush can create a new Azure DevOps repository and push your code in a single command using the `--new-repo-azure` flag:
+YitPush provides Azure DevOps subcommands for repository and variable group management:
+
+#### Create Repository
+
+```bash
+yitpush azure-devops repo new
+```
 
 - **Interactive setup**: Guides you through selecting organization, project, and repository name
 - **Requires Azure CLI**: The `az` CLI must be installed with the `azure-devops` extension (auto-installed if missing)
 - **Smart defaults**: Suggests the current directory name as the repository name
 - **Handles existing repos**: Detects if the repository already exists and offers to reuse it
 - **Flexible remotes**: If `origin` is already configured, lets you choose an alternative remote name (e.g., `azure`)
+- **Back navigation**: Use `← Back` to return to previous steps at any point
 
-**Examples:**
+#### Variable Groups
+
 ```bash
-# Create a new Azure DevOps repo and push
-yitpush --new-repo-azure
-
-# Create repo with commit confirmation
-yitpush --new-repo-azure --confirm
-
-# Create repo with detailed commit in Spanish
-yitpush --new-repo-azure --detailed --language spanish
+yitpush azure-devops variable-group list
 ```
+
+- **Selectable list**: Browse variable groups with an interactive selection prompt
+- **Variable inspection**: Select a group to view its variables in a formatted table
+- **Secret handling**: Secret values are displayed as `******`
+- **Back navigation**: Return to the list after inspecting a group, or exit with `← Back`
 
 **Prerequisites:**
 - [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) installed
@@ -219,6 +232,7 @@ YitPush can generate AI-powered pull request descriptions by comparing two branc
 - **Interactive branch selection**: Pick source and target branches from a list showing local/remote type and last modified date
 - **AI-generated markdown**: Produces a structured PR description with title, summary, and changes
 - **Combinable flags**: Works with `--detailed`, `--language`, and `--save`
+- **Back navigation**: Use `← Back` to return to source branch selection from target
 - **Separate flow**: Does not commit or push — only generates the description
 
 **Examples:**

@@ -12,6 +12,7 @@ class Program
 {
     private const string DeepSeekApiUrl = "https://api.deepseek.com/v1/chat/completions";
     private const string DeepSeekModel = "deepseek-reasoner";
+    private const string BackOption = "← Back";
 
     static async Task<int> Main(string[] args)
     {
@@ -32,7 +33,6 @@ class Program
     bool requireConfirmation = args.Contains("--confirm");
     bool showHelp = args.Contains("--help") || args.Contains("-h") || args.Contains("-help");
     bool detailed = args.Contains("--detailed");
-    bool createAzureRepo = args.Contains("--new-repo-azure");
     bool prDescription = args.Contains("--pr-description");
     bool save = args.Contains("--save");
     bool check = args.Contains("--check");
@@ -75,7 +75,6 @@ class Program
         table.AddRow("--detailed", "", "Generate detailed commit with body (title + paragraphs + bullet points)");
         table.AddRow("--language <lang>", "--lang", "Set output language (e.g., 'english', 'spanish', 'french', 'es', 'fr')");
         table.AddRow("--check", "", "Interactive branch checkout");
-        table.AddRow("--new-repo-azure", "", "Create a new Azure DevOps repository interactively");
         table.AddRow("--pr-description", "", "Generate a PR description by comparing two branches");
         table.AddRow("--save", "", "Save the output to a markdown file");
         table.AddRow("--help", "-h", "Show this help message");
@@ -90,11 +89,56 @@ class Program
         AnsiConsole.MarkupLine("  yitpush --check                            [dim]# Interactive branch checkout[/]");
         AnsiConsole.MarkupLine("  yitpush --pr-description                   [dim]# Generate PR description[/]");
         AnsiConsole.MarkupLine("  yitpush --pr-description --save            [dim]# PR description saved to file[/]");
-        AnsiConsole.MarkupLine("  yitpush --new-repo-azure                   [dim]# Create Azure DevOps repo[/]");
         AnsiConsole.MarkupLine("  yitpush --save                             [dim]# Save commit message to file[/]");
         AnsiConsole.MarkupLine("  yitpush -h                                 [dim]# Show this help[/]");
+
+        AnsiConsole.MarkupLine("\n[bold]Subcommands:[/]");
+        var subTable = new Table()
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Cyan1)
+            .Title("[bold cyan]Azure DevOps[/]")
+            .AddColumn(new TableColumn("[bold]Command[/]").NoWrap())
+            .AddColumn(new TableColumn("[bold]Description[/]"));
+
+        subTable.AddRow("azure-devops repo new", "Create a new Azure DevOps repository interactively");
+        subTable.AddRow("azure-devops variable-group list", "List variable groups in an Azure DevOps project");
+
+        AnsiConsole.Write(subTable);
+
+        AnsiConsole.MarkupLine("\n[bold]Subcommand Examples:[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops repo new              [dim]# Create Azure DevOps repo[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops variable-group list   [dim]# List variable groups[/]");
         Console.WriteLine();
         return 0;
+    }
+
+    // Handle azure-devops subcommand (does not require git repo)
+    if (args.Length >= 1 && args[0] == "azure-devops")
+    {
+        if (args.Length < 3)
+        {
+            ShowAzureDevOpsHelp();
+            return 1;
+        }
+
+        var resource = args[1];
+        var action = args[2];
+
+        if (resource == "repo" && action == "new")
+        {
+            var remote = await CreateAzureDevOpsRepo();
+            return remote != null ? 0 : 1;
+        }
+        else if (resource == "variable-group" && action == "list")
+        {
+            return await ListAzureVariableGroups();
+        }
+        else
+        {
+            AnsiConsole.MarkupLine($"[red]❌ Unknown command:[/] azure-devops {resource} {action}\n");
+            ShowAzureDevOpsHelp();
+            return 1;
+        }
     }
 
     try
@@ -119,18 +163,6 @@ class Program
             if (prDescription)
             {
                 return await GeneratePrDescription(detailed, language, save);
-            }
-
-            // Create Azure DevOps repository if requested
-            string? targetRemote = null;
-            if (createAzureRepo)
-            {
-                targetRemote = await CreateAzureDevOpsRepo();
-                if (targetRemote == null)
-                {
-                    return 1;
-                }
-                Console.WriteLine();
             }
 
             // Get API key from environment variable
@@ -268,7 +300,7 @@ class Program
             }
 
             // git push
-            if (!await ExecuteGitPush(requireConfirmation, targetRemote))
+            if (!await ExecuteGitPush(requireConfirmation))
             {
                 return 1;
             }
@@ -1015,28 +1047,41 @@ Generate the pull request description in Markdown:";
             displayList.Add(display);
         }
 
-        // Select source branch (from - the branch with changes)
-        var fromDisplay = AnsiConsole.Prompt(
-            new SelectionPrompt<string>()
-                .Title("📋 Select [green]source[/] branch (branch with changes):")
-                .PageSize(15)
-                .HighlightStyle(new Style(Color.Cyan1))
-                .AddChoices(displayList));
+        string fromBranch;
+        string toBranch;
 
-        var fromBranch = displayMap[fromDisplay];
-        AnsiConsole.MarkupLine($"\n[green]✅ Source branch:[/] {fromBranch}");
+        while (true)
+        {
+            // Select source branch (from - the branch with changes)
+            var sourceChoices = new List<string>(displayList) { BackOption };
+            var fromDisplay = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("📋 Select [green]source[/] branch (branch with changes):\n[dim](Select ← Back to return to previous step)[/]")
+                    .PageSize(15)
+                    .HighlightStyle(new Style(Color.Cyan1))
+                    .AddChoices(sourceChoices));
 
-        // Select target branch (to - the branch to merge into)
-        var targetDisplayList = displayList.Where(d => displayMap[d] != fromBranch).ToList();
-        var toDisplay = AnsiConsole.Prompt(
-            new SelectionPrompt<string>()
-                .Title("📋 Select [green]target[/] branch (branch to merge into):")
-                .PageSize(15)
-                .HighlightStyle(new Style(Color.Cyan1))
-                .AddChoices(targetDisplayList));
+            if (fromDisplay == BackOption) return 0;
 
-        var toBranch = displayMap[toDisplay];
-        AnsiConsole.MarkupLine($"\n[green]✅ Target branch:[/] {toBranch}");
+            fromBranch = displayMap[fromDisplay];
+            AnsiConsole.MarkupLine($"\n[green]✅ Source branch:[/] {fromBranch}");
+
+            // Select target branch (to - the branch to merge into)
+            var targetDisplayList = displayList.Where(d => displayMap[d] != fromBranch).ToList();
+            var targetChoices = new List<string>(targetDisplayList) { BackOption };
+            var toDisplay = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("📋 Select [green]target[/] branch (branch to merge into):\n[dim](Select ← Back to return to previous step)[/]")
+                    .PageSize(15)
+                    .HighlightStyle(new Style(Color.Cyan1))
+                    .AddChoices(targetChoices));
+
+            if (toDisplay == BackOption) continue;
+
+            toBranch = displayMap[toDisplay];
+            AnsiConsole.MarkupLine($"\n[green]✅ Target branch:[/] {toBranch}");
+            break;
+        }
 
         // Get diff between branches
         AnsiConsole.MarkupLine($"\n📊 Analyzing differences between [cyan]{fromBranch}[/] and [cyan]{toBranch}[/]...");
@@ -1127,12 +1172,15 @@ Generate the pull request description in Markdown:";
             displayList.Add(display);
         }
 
+        var choices = new List<string>(displayList) { BackOption };
         var selected = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
-                .Title("📋 Select branch to checkout:")
+                .Title("📋 Select branch to checkout:\n[dim](Select ← Back to cancel)[/]")
                 .PageSize(15)
                 .HighlightStyle(new Style(Color.Cyan1))
-                .AddChoices(displayList));
+                .AddChoices(choices));
+
+        if (selected == BackOption) return 0;
 
         var (branchName, branchType) = displayMap[selected];
 
@@ -1155,6 +1203,11 @@ Generate the pull request description in Markdown:";
         if (await ExecuteGitCommand(checkoutArgs))
         {
             AnsiConsole.MarkupLine($"[green]✅ Switched to branch '{branchName}'[/]");
+            AnsiConsole.MarkupLine("🔄 Pulling latest changes...");
+            if (!await ExecuteGitCommand("pull"))
+            {
+                AnsiConsole.MarkupLine("[yellow]⚠️  Could not pull latest changes.[/]");
+            }
             return 0;
         }
         else
@@ -1168,6 +1221,11 @@ Generate the pull request description in Markdown:";
                 if (await ExecuteGitCommand($"checkout {localName}"))
                 {
                     AnsiConsole.MarkupLine($"[green]✅ Switched to branch '{localName}'[/]");
+                    AnsiConsole.MarkupLine("🔄 Pulling latest changes...");
+                    if (!await ExecuteGitCommand("pull"))
+                    {
+                        AnsiConsole.MarkupLine("[yellow]⚠️  Could not pull latest changes.[/]");
+                    }
                     return 0;
                 }
             }
@@ -1176,10 +1234,8 @@ Generate the pull request description in Markdown:";
         }
     }
 
-    private static async Task<string?> CreateAzureDevOpsRepo()
+    private static async Task<(string OrgUrl, string Project)?> EnsureAzureDevOpsSetup()
     {
-        AnsiConsole.MarkupLine("[bold blue]☁️  Azure DevOps - Create New Repository[/]\n");
-
         // 1. Check if az CLI is installed
         var azCheck = await RunCommandCapture("az", "--version");
         if (azCheck == null)
@@ -1243,149 +1299,333 @@ Generate the pull request description in Markdown:";
         }
 
         organizations.Sort(StringComparer.OrdinalIgnoreCase);
-        var selectedOrg = AnsiConsole.Prompt(
-            new SelectionPrompt<string>()
-                .Title("📋 Select [green]organization[/]:")
-                .PageSize(10)
-                .HighlightStyle(new Style(Color.Cyan1))
-                .AddChoices(organizations));
 
-        var orgUrl = $"https://dev.azure.com/{selectedOrg}";
-        AnsiConsole.MarkupLine($"\n[green]✅ Organization:[/] {selectedOrg}");
-
-        // 5. List projects
-        AnsiConsole.MarkupLine("\n📋 Fetching projects...");
-        var projects = await FetchAzureProjects(orgUrl);
-
-        if (projects.Count == 0)
+        while (true)
         {
-            AnsiConsole.MarkupLine("[red]❌ No projects found in this organization.[/]");
-            return null;
-        }
+            var orgChoices = new List<string>(organizations) { BackOption };
+            var selectedOrg = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("📋 Select [green]organization[/]:\n[dim](Select ← Back to return to previous step)[/]")
+                    .PageSize(10)
+                    .HighlightStyle(new Style(Color.Cyan1))
+                    .AddChoices(orgChoices));
 
-        projects.Sort(StringComparer.OrdinalIgnoreCase);
-        var selectedProject = AnsiConsole.Prompt(
-            new SelectionPrompt<string>()
-                .Title("📋 Select [green]project[/]:")
-                .PageSize(10)
-                .HighlightStyle(new Style(Color.Cyan1))
-                .AddChoices(projects));
+            if (selectedOrg == BackOption) return null;
 
-        AnsiConsole.MarkupLine($"\n[green]✅ Project:[/] {selectedProject}");
+            var orgUrl = $"https://dev.azure.com/{selectedOrg}";
+            AnsiConsole.MarkupLine($"\n[green]✅ Organization:[/] {selectedOrg}");
 
-        // 6. Repository name (suggest current directory name as default)
-        var currentDirName = new DirectoryInfo(Directory.GetCurrentDirectory()).Name;
-        var repoName = AnsiConsole.Prompt(
-            new TextPrompt<string>("📝 Repository name:")
-                .DefaultValue(currentDirName)
-                .PromptStyle(new Style(Color.Cyan1)));
+            // 5. List projects
+            AnsiConsole.MarkupLine("\n📋 Fetching projects...");
+            var projects = await FetchAzureProjects(orgUrl);
 
-        // 7. Check if repo already exists
-        AnsiConsole.MarkupLine($"\n🔍 Checking if repository '[cyan]{repoName}[/]' already exists...");
-        var existingRepoJson = await RunCommandCapture("az",
-            $"repos show --repository \"{repoName}\" --organization {orgUrl} --project \"{selectedProject}\" --output json");
-
-        string? remoteUrl = null;
-
-        if (existingRepoJson != null)
-        {
-            try
+            if (projects.Count == 0)
             {
-                using var doc = JsonDocument.Parse(existingRepoJson);
-                if (doc.RootElement.TryGetProperty("remoteUrl", out var urlProp))
+                AnsiConsole.MarkupLine("[red]❌ No projects found in this organization.[/]");
+                return null;
+            }
+
+            projects.Sort(StringComparer.OrdinalIgnoreCase);
+            var projectChoices = new List<string>(projects) { BackOption };
+            var selectedProject = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("📋 Select [green]project[/]:\n[dim](Select ← Back to return to previous step)[/]")
+                    .PageSize(10)
+                    .HighlightStyle(new Style(Color.Cyan1))
+                    .AddChoices(projectChoices));
+
+            if (selectedProject == BackOption) continue;
+
+            AnsiConsole.MarkupLine($"\n[green]✅ Project:[/] {selectedProject}");
+
+            return (orgUrl, selectedProject);
+        }
+    }
+
+    private static async Task<string?> CreateAzureDevOpsRepo()
+    {
+        AnsiConsole.MarkupLine("[bold blue]☁️  Azure DevOps - Create New Repository[/]\n");
+
+        var setup = await EnsureAzureDevOpsSetup();
+        if (setup == null) return null;
+
+        var (orgUrl, selectedProject) = setup.Value;
+
+        while (true)
+        {
+            // 6. Repository name (suggest current directory name as default)
+            var currentDirName = new DirectoryInfo(Directory.GetCurrentDirectory()).Name;
+            var repoName = AnsiConsole.Prompt(
+                new TextPrompt<string>("📝 Repository name:")
+                    .DefaultValue(currentDirName)
+                    .PromptStyle(new Style(Color.Cyan1)));
+
+            // 7. Check if repo already exists
+            AnsiConsole.MarkupLine($"\n🔍 Checking if repository '[cyan]{repoName}[/]' already exists...");
+            var existingRepoJson = await RunCommandCapture("az",
+                $"repos show --repository \"{repoName}\" --organization {orgUrl} --project \"{selectedProject}\" --output json");
+
+            string? remoteUrl = null;
+
+            if (existingRepoJson != null)
+            {
+                try
                 {
-                    remoteUrl = urlProp.GetString();
+                    using var doc = JsonDocument.Parse(existingRepoJson);
+                    if (doc.RootElement.TryGetProperty("remoteUrl", out var urlProp))
+                    {
+                        remoteUrl = urlProp.GetString();
+                    }
+                }
+                catch { }
+
+                AnsiConsole.MarkupLine($"[yellow]⚠️  Repository '{repoName}' already exists:[/] {remoteUrl}");
+                var useExisting = AnsiConsole.Prompt(
+                    new SelectionPrompt<string>()
+                        .Title("What do you want to do?")
+                        .HighlightStyle(new Style(Color.Cyan1))
+                        .AddChoices(new[] { "Use existing repository", "Cancel" }));
+
+                if (useExisting == "Cancel")
+                {
+                    AnsiConsole.MarkupLine("[yellow]Cancelled.[/]");
+                    return null;
+                }
+
+                AnsiConsole.MarkupLine($"[green]✅ Using existing repository:[/] {remoteUrl}");
+            }
+            else
+            {
+                // Create repository
+                AnsiConsole.MarkupLine($"🔨 Creating repository '[cyan]{repoName}[/]'...");
+                var createJson = await RunCommandCapture("az",
+                    $"repos create --name \"{repoName}\" --organization {orgUrl} --project \"{selectedProject}\" --output json");
+
+                if (createJson == null)
+                {
+                    AnsiConsole.MarkupLine("[red]❌ Failed to create repository.[/]");
+                    return null;
+                }
+
+                try
+                {
+                    using var doc = JsonDocument.Parse(createJson);
+                    if (doc.RootElement.TryGetProperty("remoteUrl", out var urlProp))
+                    {
+                        remoteUrl = urlProp.GetString();
+                    }
+                }
+                catch { }
+
+                if (string.IsNullOrWhiteSpace(remoteUrl))
+                {
+                    AnsiConsole.MarkupLine("[red]❌ Repository created but could not get remote URL.[/]");
+                    return null;
+                }
+
+                AnsiConsole.MarkupLine($"[green]✅ Repository created:[/] {remoteUrl}");
+            }
+
+            // 8. Add git remote
+            var existingOrigin = await RunCommandCapture("git", "remote get-url origin");
+            string finalRemoteName;
+
+            if (existingOrigin != null)
+            {
+                AnsiConsole.MarkupLine($"\n[yellow]⚠️  Remote 'origin' already exists:[/] {existingOrigin.Trim()}");
+                finalRemoteName = AnsiConsole.Prompt(
+                    new SelectionPrompt<string>()
+                        .Title("Select [green]remote name[/] for Azure DevOps:\n[dim](Select ← Back to return to previous step)[/]")
+                        .HighlightStyle(new Style(Color.Cyan1))
+                        .AddChoices(new[] { "azure", "origin (replace)", "custom", BackOption }));
+
+                if (finalRemoteName == BackOption) continue;
+
+                if (finalRemoteName == "origin (replace)")
+                {
+                    await ExecuteGitCommand($"remote remove origin");
+                    finalRemoteName = "origin";
+                }
+                else if (finalRemoteName == "custom")
+                {
+                    finalRemoteName = AnsiConsole.Prompt(
+                        new TextPrompt<string>("Enter remote name:")
+                            .DefaultValue("azure")
+                            .PromptStyle(new Style(Color.Cyan1)));
                 }
             }
-            catch { }
-
-            AnsiConsole.MarkupLine($"[yellow]⚠️  Repository '{repoName}' already exists:[/] {remoteUrl}");
-            var useExisting = AnsiConsole.Prompt(
-                new SelectionPrompt<string>()
-                    .Title("What do you want to do?")
-                    .HighlightStyle(new Style(Color.Cyan1))
-                    .AddChoices(new[] { "Use existing repository", "Cancel" }));
-
-            if (useExisting == "Cancel")
+            else
             {
-                AnsiConsole.MarkupLine("[yellow]Cancelled.[/]");
-                return null;
-            }
-
-            AnsiConsole.MarkupLine($"[green]✅ Using existing repository:[/] {remoteUrl}");
-        }
-        else
-        {
-            // Create repository
-            AnsiConsole.MarkupLine($"🔨 Creating repository '[cyan]{repoName}[/]'...");
-            var createJson = await RunCommandCapture("az",
-                $"repos create --name \"{repoName}\" --organization {orgUrl} --project \"{selectedProject}\" --output json");
-
-            if (createJson == null)
-            {
-                AnsiConsole.MarkupLine("[red]❌ Failed to create repository.[/]");
-                return null;
-            }
-
-            try
-            {
-                using var doc = JsonDocument.Parse(createJson);
-                if (doc.RootElement.TryGetProperty("remoteUrl", out var urlProp))
-                {
-                    remoteUrl = urlProp.GetString();
-                }
-            }
-            catch { }
-
-            if (string.IsNullOrWhiteSpace(remoteUrl))
-            {
-                AnsiConsole.MarkupLine("[red]❌ Repository created but could not get remote URL.[/]");
-                return null;
-            }
-
-            AnsiConsole.MarkupLine($"[green]✅ Repository created:[/] {remoteUrl}");
-        }
-
-        // 8. Add git remote
-        var existingOrigin = await RunCommandCapture("git", "remote get-url origin");
-        string finalRemoteName;
-
-        if (existingOrigin != null)
-        {
-            AnsiConsole.MarkupLine($"\n[yellow]⚠️  Remote 'origin' already exists:[/] {existingOrigin.Trim()}");
-            finalRemoteName = AnsiConsole.Prompt(
-                new SelectionPrompt<string>()
-                    .Title("Select [green]remote name[/] for Azure DevOps:")
-                    .HighlightStyle(new Style(Color.Cyan1))
-                    .AddChoices(new[] { "azure", "origin (replace)", "custom" }));
-
-            if (finalRemoteName == "origin (replace)")
-            {
-                await ExecuteGitCommand($"remote remove origin");
                 finalRemoteName = "origin";
             }
-            else if (finalRemoteName == "custom")
+
+            if (!await ExecuteGitCommand($"remote add {finalRemoteName} {remoteUrl}"))
             {
-                finalRemoteName = AnsiConsole.Prompt(
-                    new TextPrompt<string>("Enter remote name:")
-                        .DefaultValue("azure")
-                        .PromptStyle(new Style(Color.Cyan1)));
+                AnsiConsole.MarkupLine($"[red]❌ Failed to add remote '{finalRemoteName}'.[/]");
+                return null;
+            }
+
+            AnsiConsole.MarkupLine($"\n[green]✅ Remote '{finalRemoteName}' configured:[/] {remoteUrl}");
+
+            return finalRemoteName;
+        }
+    }
+
+    private static async Task<int> ListAzureVariableGroups()
+    {
+        AnsiConsole.MarkupLine("[bold blue]☁️  Azure DevOps - Variable Groups[/]\n");
+
+        var setup = await EnsureAzureDevOpsSetup();
+        if (setup == null) return 1;
+
+        var (orgUrl, project) = setup.Value;
+
+        AnsiConsole.MarkupLine("\n📋 Fetching variable groups...");
+        var json = await RunCommandCapture("az",
+            $"pipelines variable-group list --organization {orgUrl} --project \"{project}\" --output json");
+
+        if (json == null)
+        {
+            AnsiConsole.MarkupLine("[red]❌ Failed to fetch variable groups.[/]");
+            return 1;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            JsonElement items;
+            if (doc.RootElement.ValueKind == JsonValueKind.Array)
+            {
+                items = doc.RootElement;
+            }
+            else if (doc.RootElement.TryGetProperty("value", out var valueProp))
+            {
+                items = valueProp;
+            }
+            else
+            {
+                AnsiConsole.MarkupLine("[yellow]⚠️  No variable groups found.[/]");
+                return 0;
+            }
+
+            if (items.GetArrayLength() == 0)
+            {
+                AnsiConsole.MarkupLine("[yellow]⚠️  No variable groups found in this project.[/]");
+                return 0;
+            }
+
+            // Parse groups into a list for the selectable prompt
+            var groups = new List<(string Id, string Name, string Description, int VarCount, JsonElement Variables)>();
+            foreach (var group in items.EnumerateArray())
+            {
+                var id = group.TryGetProperty("id", out var idProp) ? idProp.ToString() : "-";
+                var name = group.TryGetProperty("name", out var nameProp) ? nameProp.GetString() ?? "-" : "-";
+                var description = group.TryGetProperty("description", out var descProp) ? descProp.GetString() ?? "" : "";
+                var variableCount = 0;
+                JsonElement variablesElement = default;
+                if (group.TryGetProperty("variables", out var varsProp) && varsProp.ValueKind == JsonValueKind.Object)
+                {
+                    variableCount = varsProp.EnumerateObject().Count();
+                    variablesElement = varsProp.Clone();
+                }
+                groups.Add((id, name, description, variableCount, variablesElement));
+            }
+
+            // Build columnar display strings
+            var maxIdLen = groups.Max(g => g.Id.Length);
+            var maxNameLen = groups.Max(g => g.Name.Length);
+            var maxDescLen = Math.Min(groups.Max(g => g.Description.Length), 30);
+
+            var displayMap = new Dictionary<string, int>(); // display -> index
+            var displayList = new List<string>();
+
+            for (int i = 0; i < groups.Count; i++)
+            {
+                var g = groups[i];
+                var desc = g.Description.Length > 30 ? g.Description.Substring(0, 27) + "..." : g.Description;
+                var display = $"{g.Id.PadRight(maxIdLen + 2)} {g.Name.PadRight(maxNameLen + 2)} {desc.PadRight(maxDescLen + 2)} Vars: {g.VarCount}";
+                displayMap[display] = i;
+                displayList.Add(display);
+            }
+
+            while (true)
+            {
+                var choices = new List<string>(displayList) { BackOption };
+                var selected = AnsiConsole.Prompt(
+                    new SelectionPrompt<string>()
+                        .Title("📋 Select a [green]variable group[/] to view its variables:\n[dim](Select ← Back to return)[/]")
+                        .PageSize(15)
+                        .HighlightStyle(new Style(Color.Cyan1))
+                        .AddChoices(choices));
+
+                if (selected == BackOption) return 0;
+
+                var idx = displayMap[selected];
+                var selectedGroup = groups[idx];
+
+                AnsiConsole.MarkupLine($"\n[bold cyan]Variables in '{Markup.Escape(selectedGroup.Name)}':[/]\n");
+
+                if (selectedGroup.Variables.ValueKind == JsonValueKind.Object)
+                {
+                    var varTable = new Table()
+                        .Border(TableBorder.Rounded)
+                        .BorderColor(Color.Cyan1)
+                        .AddColumn(new TableColumn("[bold]Name[/]"))
+                        .AddColumn(new TableColumn("[bold]Value[/]"));
+
+                    foreach (var variable in selectedGroup.Variables.EnumerateObject())
+                    {
+                        var varName = variable.Name;
+                        var isSecret = variable.Value.TryGetProperty("isSecret", out var secretProp)
+                            && secretProp.ValueKind == JsonValueKind.True;
+                        var varValue = isSecret
+                            ? "******"
+                            : variable.Value.TryGetProperty("value", out var valProp) && valProp.ValueKind == JsonValueKind.String
+                                ? valProp.GetString() ?? ""
+                                : "";
+
+                        varTable.AddRow(Markup.Escape(varName), Markup.Escape(varValue));
+                    }
+
+                    AnsiConsole.Write(varTable);
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine("[yellow]No variables found in this group.[/]");
+                }
+
+                AnsiConsole.MarkupLine("\n[dim]Press any key to return to the list...[/]");
+                Console.ReadKey(true);
+                AnsiConsole.WriteLine();
             }
         }
-        else
+        catch (Exception ex)
         {
-            finalRemoteName = "origin";
+            AnsiConsole.MarkupLine($"[red]❌ Error parsing variable groups: {ex.Message}[/]");
+            return 1;
         }
+    }
 
-        if (!await ExecuteGitCommand($"remote add {finalRemoteName} {remoteUrl}"))
-        {
-            AnsiConsole.MarkupLine($"[red]❌ Failed to add remote '{finalRemoteName}'.[/]");
-            return null;
-        }
+    private static void ShowAzureDevOpsHelp()
+    {
+        AnsiConsole.MarkupLine("[bold]Usage:[/] yitpush azure-devops <resource> <action>\n");
 
-        AnsiConsole.MarkupLine($"\n[green]✅ Remote '{finalRemoteName}' configured:[/] {remoteUrl}");
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Cyan1)
+            .Title("[bold cyan]Azure DevOps Commands[/]")
+            .AddColumn(new TableColumn("[bold]Command[/]").NoWrap())
+            .AddColumn(new TableColumn("[bold]Description[/]"));
 
-        return finalRemoteName;
+        table.AddRow("repo new", "Create a new Azure DevOps repository interactively");
+        table.AddRow("variable-group list", "List variable groups in an Azure DevOps project");
+
+        AnsiConsole.Write(table);
+
+        AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops repo new              [dim]# Create Azure DevOps repo[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops variable-group list   [dim]# List variable groups[/]");
+        Console.WriteLine();
     }
 
     private static async Task<List<string>> FetchAzureOrganizations()
