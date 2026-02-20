@@ -12,7 +12,7 @@
 
     <!-- Package Metadata -->
     <PackageId>YitPush</PackageId>
-    <Version>1.2.2</Version>
+    <Version>1.2.3</Version>
     <Authors>Elvis Brevi</Authors>
     <Description>AI-powered git commit automation tool. Analyzes code changes with DeepSeek
       Reasoning AI and generates meaningful commit messages. Run 'yitpush' to automatically stage,
@@ -36,7 +36,8 @@
     <!-- Additional Metadata -->
     <Copyright>Copyright (c) 2026 Elvis Brevi</Copyright>
     <PackageReleaseNotes>New: Selectable variable group list - select a group to view its variables
-      New: Back navigation (← Back) across all interactive flows (org/project selection, branch checkout, PR description, repo creation)
+      New: Back navigation (← Back) across all interactive flows (org/project selection, branch
+      checkout, PR description, repo creation)
       Fix: Handle null isSecret values in Azure DevOps variable groups</PackageReleaseNotes>
   </PropertyGroup>
 
