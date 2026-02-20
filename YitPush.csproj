@@ -12,7 +12,7 @@
 
     <!-- Package Metadata -->
     <PackageId>YitPush</PackageId>
-    <Version>1.2.3</Version>
+    <Version>1.3.0</Version>
     <Authors>Elvis Brevi</Authors>
     <Description>AI-powered git commit automation tool. Analyzes code changes with DeepSeek
       Reasoning AI and generates meaningful commit messages. Run 'yitpush' to automatically stage,
@@ -35,10 +35,13 @@
 
     <!-- Additional Metadata -->
     <Copyright>Copyright (c) 2026 Elvis Brevi</Copyright>
-    <PackageReleaseNotes>New: Selectable variable group list - select a group to view its variables
-      New: Back navigation (← Back) across all interactive flows (org/project selection, branch
-      checkout, PR description, repo creation)
-      Fix: Handle null isSecret values in Azure DevOps variable groups</PackageReleaseNotes>
+    <PackageReleaseNotes>Breaking: CLI restructured to subcommand style (commit, checkout, pr, azure-devops)
+      New: Running yitpush with no args shows help, like traditional CLI tools
+      New: yitpush commit replaces the default flag-based commit flow
+      New: yitpush checkout replaces --check flag
+      New: yitpush pr replaces --pr-description flag
+      Fix: Windows support for Azure CLI - automatically uses cmd.exe /c az to find az.cmd
+      Fix: Azure DevOps organization fallback - prompts for manual entry when auto-detection fails</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

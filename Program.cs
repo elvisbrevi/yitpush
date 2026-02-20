@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -16,162 +17,56 @@ class Program
 
     static async Task<int> Main(string[] args)
     {
-        // Configure console encoding for Unicode support (especially Windows PowerShell)
         try
         {
             Console.OutputEncoding = Encoding.UTF8;
             Console.InputEncoding = Encoding.UTF8;
         }
-        catch
+        catch { }
+
+        Console.WriteLine("🚀 YitPush - AI-Powered Git Commit Tool\n");
+
+        if (args.Length == 0 || args[0] is "--help" or "-h" or "-help" or "help")
         {
-            // Ignore encoding errors - console may not support UTF-8
+            ShowHelp();
+            return 0;
         }
 
-    Console.WriteLine("🚀 YitPush - AI-Powered Git Commit Tool\n");
-
-    // Process command line arguments
-    bool requireConfirmation = args.Contains("--confirm");
-    bool showHelp = args.Contains("--help") || args.Contains("-h") || args.Contains("-help");
-    bool detailed = args.Contains("--detailed");
-    bool prDescription = args.Contains("--pr-description");
-    bool save = args.Contains("--save");
-    bool check = args.Contains("--check");
-    string language = "english"; // default language
-    
-    // Parse language flag (supports --language es, --lang es, --language=es, --lang=es)
-    for (int i = 0; i < args.Length; i++)
-    {
-        if (args[i] == "--language" || args[i] == "--lang")
+        switch (args[0])
         {
-            if (i + 1 < args.Length && !args[i + 1].StartsWith("--"))
-            {
-                language = args[i + 1];
-            }
-            break;
-        }
-        else if (args[i].StartsWith("--language=") || args[i].StartsWith("--lang="))
-        {
-            language = args[i].Split('=', 2)[1];
-            break;
-        }
-    }
-    
-    if (showHelp)
-    {
-        AnsiConsole.MarkupLine("[bold]Usage:[/] yitpush [[options]]\n");
-        AnsiConsole.MarkupLine("[bold]Description:[/]");
-        AnsiConsole.MarkupLine("  AI-powered git commit automation tool. Analyzes code changes with DeepSeek");
-        AnsiConsole.MarkupLine("  Reasoning AI and generates meaningful conventional commit messages.\n");
-
-        var table = new Table()
-            .Border(TableBorder.Rounded)
-            .BorderColor(Color.Cyan1)
-            .Title("[bold cyan]Options[/]")
-            .AddColumn(new TableColumn("[bold]Flag[/]").NoWrap())
-            .AddColumn(new TableColumn("[bold]Short[/]").NoWrap())
-            .AddColumn(new TableColumn("[bold]Description[/]"));
-
-        table.AddRow("--confirm", "", "Ask for confirmation before committing (default: automatic)");
-        table.AddRow("--detailed", "", "Generate detailed commit with body (title + paragraphs + bullet points)");
-        table.AddRow("--language <lang>", "--lang", "Set output language (e.g., 'english', 'spanish', 'french', 'es', 'fr')");
-        table.AddRow("--check", "", "Interactive branch checkout");
-        table.AddRow("--pr-description", "", "Generate a PR description by comparing two branches");
-        table.AddRow("--save", "", "Save the output to a markdown file");
-        table.AddRow("--help", "-h", "Show this help message");
-
-        AnsiConsole.Write(table);
-
-        AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
-        AnsiConsole.MarkupLine("  yitpush                                    [dim]# Auto commit and push[/]");
-        AnsiConsole.MarkupLine("  yitpush --confirm                          [dim]# Review before committing[/]");
-        AnsiConsole.MarkupLine("  yitpush --detailed                         [dim]# Detailed commit message[/]");
-        AnsiConsole.MarkupLine("  yitpush --lang es --detailed --confirm     [dim]# Spanish, detailed, with review[/]");
-        AnsiConsole.MarkupLine("  yitpush --check                            [dim]# Interactive branch checkout[/]");
-        AnsiConsole.MarkupLine("  yitpush --pr-description                   [dim]# Generate PR description[/]");
-        AnsiConsole.MarkupLine("  yitpush --pr-description --save            [dim]# PR description saved to file[/]");
-        AnsiConsole.MarkupLine("  yitpush --save                             [dim]# Save commit message to file[/]");
-        AnsiConsole.MarkupLine("  yitpush -h                                 [dim]# Show this help[/]");
-
-        AnsiConsole.MarkupLine("\n[bold]Subcommands:[/]");
-        var subTable = new Table()
-            .Border(TableBorder.Rounded)
-            .BorderColor(Color.Cyan1)
-            .Title("[bold cyan]Azure DevOps[/]")
-            .AddColumn(new TableColumn("[bold]Command[/]").NoWrap())
-            .AddColumn(new TableColumn("[bold]Description[/]"));
-
-        subTable.AddRow("azure-devops repo new", "Create a new Azure DevOps repository interactively");
-        subTable.AddRow("azure-devops repo checkout", "Clone an Azure DevOps repository interactively");
-        subTable.AddRow("azure-devops variable-group list", "List variable groups in an Azure DevOps project");
-
-        AnsiConsole.Write(subTable);
-
-        AnsiConsole.MarkupLine("\n[bold]Subcommand Examples:[/]");
-        AnsiConsole.MarkupLine("  yitpush azure-devops repo new              [dim]# Create Azure DevOps repo[/]");
-        AnsiConsole.MarkupLine("  yitpush azure-devops repo checkout         [dim]# Clone Azure DevOps repo[/]");
-        AnsiConsole.MarkupLine("  yitpush azure-devops variable-group list   [dim]# List variable groups[/]");
-        Console.WriteLine();
-        return 0;
-    }
-
-    // Handle azure-devops subcommand (does not require git repo)
-    if (args.Length >= 1 && args[0] == "azure-devops")
-    {
-        if (args.Length < 3)
-        {
-            ShowAzureDevOpsHelp();
-            return 1;
-        }
-
-        var resource = args[1];
-        var action = args[2];
-
-        if (resource == "repo" && action == "new")
-        {
-            var remote = await CreateAzureDevOpsRepo();
-            return remote != null ? 0 : 1;
-        }
-        else if (resource == "repo" && action == "checkout")
-        {
-            return await CheckoutAzureDevOpsRepo();
-        }
-        else if (resource == "variable-group" && action == "list")
-        {
-            return await ListAzureVariableGroups();
-        }
-        else
-        {
-            AnsiConsole.MarkupLine($"[red]❌ Unknown command:[/] azure-devops {resource} {action}\n");
-            ShowAzureDevOpsHelp();
-            return 1;
+            case "commit":
+                return await CommitCommand(args.Skip(1).ToArray());
+            case "checkout":
+                return await CheckoutBranch();
+            case "pr":
+                return await PrCommand(args.Skip(1).ToArray());
+            case "azure-devops":
+                return await AzureDevOpsCommand(args.Skip(1).ToArray());
+            default:
+                AnsiConsole.MarkupLine($"[red]❌ Unknown command:[/] {Markup.Escape(args[0])}\n");
+                ShowHelp();
+                return 1;
         }
     }
 
-    try
+    // ─── Commands ────────────────────────────────────────────────────────────
+
+    private static async Task<int> CommitCommand(string[] args)
+    {
+        bool requireConfirmation = args.Contains("--confirm");
+        bool detailed = args.Contains("--detailed");
+        bool save = args.Contains("--save");
+        string language = ParseLanguage(args);
+
+        try
         {
-            // Check if we're in a git repository
             if (!await IsGitRepository())
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("❌ Error: Not a git repository.");
-                Console.ResetColor();
+                AnsiConsole.MarkupLine("[red]❌ Error: Not a git repository.[/]");
                 Console.WriteLine("\nPlease run this command from within a git repository.");
                 return 1;
             }
 
-            // Interactive branch checkout mode
-            if (check)
-            {
-                return await CheckoutBranch();
-            }
-
-            // PR description mode - separate flow
-            if (prDescription)
-            {
-                return await GeneratePrDescription(detailed, language, save);
-            }
-
-            // Get API key from environment variable
             var apiKey = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
             if (string.IsNullOrWhiteSpace(apiKey))
             {
@@ -183,12 +78,10 @@ class Program
                 return 1;
             }
 
-            // Get git diff
             Console.WriteLine("📊 Analyzing git changes...");
             var diff = await GetGitDiff();
-
             bool hasChanges = !string.IsNullOrWhiteSpace(diff);
-            
+
             if (hasChanges)
             {
                 Console.WriteLine($"Found changes ({diff.Length} characters)\n");
@@ -202,10 +95,9 @@ class Program
             }
 
             string? commitMessage = null;
-            
+
             if (hasChanges)
             {
-                // Get commit message from DeepSeek
                 Console.WriteLine($"🤖 Generating commit message with DeepSeek Reasoning...{(detailed ? " (detailed mode)" : "")}");
                 commitMessage = await GenerateCommitMessage(apiKey, diff, detailed, language);
 
@@ -222,8 +114,7 @@ class Program
                     .Header("Commit Message")
                     .BorderColor(Color.Cyan1)
                     .Padding(1, 0));
-                
-                // Copy to clipboard
+
                 try
                 {
                     ClipboardService.SetText(commitMessage);
@@ -242,12 +133,10 @@ class Program
                     AnsiConsole.MarkupLine($"[green]✅ Commit message saved to:[/] {fileName}\n");
                 }
 
-                // Confirm with user if --confirm flag is set
                 if (requireConfirmation)
                 {
                     Console.Write("Do you want to proceed with this commit? (y/n): ");
                     var response = Console.ReadLine()?.Trim().ToLower();
-
                     if (response != "y" && response != "yes")
                     {
                         Console.WriteLine("\n❌ Commit cancelled.");
@@ -261,12 +150,10 @@ class Program
             }
             else
             {
-                // No changes, just push - confirm if in confirmation mode
                 if (requireConfirmation)
                 {
                     Console.Write("No changes to commit. Do you want to push existing commits? (y/n): ");
                     var response = Console.ReadLine()?.Trim().ToLower();
-
                     if (response != "y" && response != "yes")
                     {
                         Console.WriteLine("\n❌ Push cancelled.");
@@ -279,12 +166,10 @@ class Program
                 }
             }
 
-            // Execute git commands
             Console.WriteLine("\n⚙️  Executing git commands...");
 
             if (hasChanges)
             {
-                // git add .
                 Console.WriteLine("   git add .");
                 if (!await ExecuteGitCommand("add ."))
                 {
@@ -294,8 +179,7 @@ class Program
                     return 1;
                 }
 
-                // git commit
-                Console.WriteLine($"   git commit");
+                Console.WriteLine("   git commit");
                 if (!await ExecuteGitCommand($"commit -m \"{commitMessage}\""))
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
@@ -305,21 +189,13 @@ class Program
                 }
             }
 
-            // git push
             if (!await ExecuteGitPush(requireConfirmation))
-            {
                 return 1;
-            }
 
             Console.ForegroundColor = ConsoleColor.Green;
-            if (hasChanges)
-            {
-                Console.WriteLine("\n✅ Successfully committed and pushed changes!");
-            }
-            else
-            {
-                Console.WriteLine("\n✅ Successfully pushed changes!");
-            }
+            Console.WriteLine(hasChanges
+                ? "\n✅ Successfully committed and pushed changes!"
+                : "\n✅ Successfully pushed changes!");
             Console.ResetColor();
 
             return 0;
@@ -332,6 +208,167 @@ class Program
             return 1;
         }
     }
+
+    private static async Task<int> PrCommand(string[] args)
+    {
+        bool detailed = args.Contains("--detailed");
+        bool save = args.Contains("--save");
+        string language = ParseLanguage(args);
+
+        if (!await IsGitRepository())
+        {
+            AnsiConsole.MarkupLine("[red]❌ Error: Not a git repository.[/]");
+            Console.WriteLine("\nPlease run this command from within a git repository.");
+            return 1;
+        }
+
+        return await GeneratePrDescription(detailed, language, save);
+    }
+
+    private static async Task<int> AzureDevOpsCommand(string[] args)
+    {
+        if (args.Length < 2)
+        {
+            ShowAzureDevOpsHelp();
+            return 1;
+        }
+
+        var resource = args[0];
+        var action = args[1];
+
+        if (resource == "repo" && action == "new")
+        {
+            var remote = await CreateAzureDevOpsRepo();
+            return remote != null ? 0 : 1;
+        }
+        else if (resource == "repo" && action == "checkout")
+        {
+            return await CheckoutAzureDevOpsRepo();
+        }
+        else if (resource == "variable-group" && action == "list")
+        {
+            return await ListAzureVariableGroups();
+        }
+        else
+        {
+            AnsiConsole.MarkupLine($"[red]❌ Unknown command:[/] azure-devops {Markup.Escape(resource)} {Markup.Escape(action)}\n");
+            ShowAzureDevOpsHelp();
+            return 1;
+        }
+    }
+
+    // ─── Help ─────────────────────────────────────────────────────────────────
+
+    private static void ShowHelp()
+    {
+        AnsiConsole.MarkupLine("[bold]Usage:[/] yitpush [bold]<command>[/] [[options]]\n");
+
+        var commandsTable = new Table()
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Cyan1)
+            .Title("[bold cyan]Commands[/]")
+            .AddColumn(new TableColumn("[bold]Command[/]").NoWrap())
+            .AddColumn(new TableColumn("[bold]Description[/]"));
+
+        commandsTable.AddRow("commit", "Stage, commit and push changes with an AI-generated message");
+        commandsTable.AddRow("checkout", "Interactive branch checkout");
+        commandsTable.AddRow("pr", "Generate a pull request description between two branches");
+        commandsTable.AddRow("azure-devops", "Manage Azure DevOps resources (repos, variable groups)");
+
+        AnsiConsole.Write(commandsTable);
+
+        AnsiConsole.MarkupLine("\n[bold cyan]commit[/] options:");
+        var commitTable = new Table()
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Grey)
+            .AddColumn(new TableColumn("[bold]Flag[/]").NoWrap())
+            .AddColumn(new TableColumn("[bold]Description[/]"));
+
+        commitTable.AddRow("--confirm", "Ask for confirmation before committing");
+        commitTable.AddRow("--detailed", "Generate detailed commit with title + body");
+        commitTable.AddRow("--language <lang>", "Output language (e.g., english, spanish, french)");
+        commitTable.AddRow("--save", "Save commit message to a markdown file");
+
+        AnsiConsole.Write(commitTable);
+
+        AnsiConsole.MarkupLine("\n[bold cyan]pr[/] options:");
+        var prTable = new Table()
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Grey)
+            .AddColumn(new TableColumn("[bold]Flag[/]").NoWrap())
+            .AddColumn(new TableColumn("[bold]Description[/]"));
+
+        prTable.AddRow("--detailed", "Generate detailed PR description");
+        prTable.AddRow("--language <lang>", "Output language");
+        prTable.AddRow("--save", "Save PR description to a markdown file");
+
+        AnsiConsole.Write(prTable);
+
+        AnsiConsole.MarkupLine("\n[bold cyan]azure-devops[/] subcommands:");
+        var azTable = new Table()
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Grey)
+            .AddColumn(new TableColumn("[bold]Subcommand[/]").NoWrap())
+            .AddColumn(new TableColumn("[bold]Description[/]"));
+
+        azTable.AddRow("repo new", "Create a new repository interactively");
+        azTable.AddRow("repo checkout", "Clone a repository interactively");
+        azTable.AddRow("variable-group list", "List and inspect variable groups");
+
+        AnsiConsole.Write(azTable);
+
+        AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
+        AnsiConsole.MarkupLine("  yitpush commit                              [dim]# Auto commit and push[/]");
+        AnsiConsole.MarkupLine("  yitpush commit --confirm                    [dim]# Review before committing[/]");
+        AnsiConsole.MarkupLine("  yitpush commit --detailed --lang es         [dim]# Detailed commit, in Spanish[/]");
+        AnsiConsole.MarkupLine("  yitpush checkout                            [dim]# Switch branch interactively[/]");
+        AnsiConsole.MarkupLine("  yitpush pr                                  [dim]# Generate PR description[/]");
+        AnsiConsole.MarkupLine("  yitpush pr --detailed --save                [dim]# Detailed PR, save to file[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops repo new               [dim]# Create Azure DevOps repo[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops repo checkout          [dim]# Clone Azure DevOps repo[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops variable-group list    [dim]# Browse variable groups[/]");
+        Console.WriteLine();
+    }
+
+    private static void ShowAzureDevOpsHelp()
+    {
+        AnsiConsole.MarkupLine("[bold]Usage:[/] yitpush azure-devops [bold]<subcommand>[/]\n");
+
+        var table = new Table()
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Cyan1)
+            .Title("[bold cyan]azure-devops subcommands[/]")
+            .AddColumn(new TableColumn("[bold]Subcommand[/]").NoWrap())
+            .AddColumn(new TableColumn("[bold]Description[/]"));
+
+        table.AddRow("repo new", "Create a new repository interactively");
+        table.AddRow("repo checkout", "Clone a repository interactively");
+        table.AddRow("variable-group list", "List and inspect variable groups");
+
+        AnsiConsole.Write(table);
+
+        AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops repo new              [dim]# Create Azure DevOps repo[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops repo checkout         [dim]# Clone Azure DevOps repo[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops variable-group list   [dim]# List variable groups[/]");
+        Console.WriteLine();
+    }
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    private static string ParseLanguage(string[] args)
+    {
+        for (int i = 0; i < args.Length; i++)
+        {
+            if ((args[i] == "--language" || args[i] == "--lang") && i + 1 < args.Length && !args[i + 1].StartsWith("--"))
+                return args[i + 1];
+            if (args[i].StartsWith("--language=") || args[i].StartsWith("--lang="))
+                return args[i].Split('=', 2)[1];
+        }
+        return "english";
+    }
+
+    // ─── Git helpers ──────────────────────────────────────────────────────────
 
     private static async Task<bool> IsGitRepository()
     {
@@ -871,6 +908,7 @@ Generate only the commit message:";
             return false;
         }
     }
+
     private static async Task<List<(string Name, string Type, string Date)>> GetGitBranches()
     {
         var branches = new List<(string Name, string Type, string Date)>();
@@ -951,6 +989,8 @@ Generate only the commit message:";
             return string.Empty;
         }
     }
+
+    // ─── PR Description ───────────────────────────────────────────────────────
 
     private static async Task<string> GeneratePrDescriptionContent(string apiKey, string diff, bool detailed, string language)
     {
@@ -1138,8 +1178,17 @@ Generate the pull request description in Markdown:";
         return 0;
     }
 
+    // ─── Branch checkout ──────────────────────────────────────────────────────
+
     private static async Task<int> CheckoutBranch()
     {
+        if (!await IsGitRepository())
+        {
+            AnsiConsole.MarkupLine("[red]❌ Error: Not a git repository.[/]");
+            Console.WriteLine("\nPlease run this command from within a git repository.");
+            return 1;
+        }
+
         AnsiConsole.MarkupLine("[bold blue]🔀 Interactive Branch Checkout[/]\n");
 
         // Fetch latest remote branches
@@ -1240,10 +1289,12 @@ Generate the pull request description in Markdown:";
         }
     }
 
+    // ─── Azure DevOps ─────────────────────────────────────────────────────────
+
     private static async Task<(string OrgUrl, string Project)?> EnsureAzureDevOpsSetup()
     {
         // 1. Check if az CLI is installed
-        var azCheck = await RunCommandCapture("az", "--version");
+        var azCheck = await RunAzCapture("--version");
         if (azCheck == null)
         {
             AnsiConsole.MarkupLine("[red]❌ Azure CLI (az) is not installed.[/]");
@@ -1253,11 +1304,11 @@ Generate the pull request description in Markdown:";
 
         // 2. Check if azure-devops extension is installed
         AnsiConsole.MarkupLine("🔍 Checking Azure DevOps extension...");
-        var extCheck = await RunCommandCapture("az", "extension show --name azure-devops --output json");
+        var extCheck = await RunAzCapture("extension show --name azure-devops --output json");
         if (extCheck == null)
         {
             AnsiConsole.MarkupLine("📦 Installing Azure DevOps extension...");
-            var installResult = await RunCommandPassthrough("az", "extension add --name azure-devops");
+            var installResult = await RunAzPassthrough("extension add --name azure-devops");
             if (!installResult)
             {
                 AnsiConsole.MarkupLine("[red]❌ Failed to install Azure DevOps extension.[/]");
@@ -1267,11 +1318,11 @@ Generate the pull request description in Markdown:";
         AnsiConsole.MarkupLine("[green]✅ Azure DevOps extension available.[/]\n");
 
         // 3. Check if logged in
-        var accountJson = await RunCommandCapture("az", "account show --output json");
+        var accountJson = await RunAzCapture("account show --output json");
         if (accountJson == null)
         {
             AnsiConsole.MarkupLine("🔐 Not logged into Azure. Starting interactive login...\n");
-            var loginResult = await RunCommandPassthrough("az", "login");
+            var loginResult = await RunAzPassthrough("login");
             if (!loginResult)
             {
                 AnsiConsole.MarkupLine("[red]❌ Azure login failed.[/]");
@@ -1300,8 +1351,24 @@ Generate the pull request description in Markdown:";
 
         if (organizations.Count == 0)
         {
-            AnsiConsole.MarkupLine("[red]❌ No Azure DevOps organizations found for this account.[/]");
-            return null;
+            AnsiConsole.MarkupLine("[yellow]⚠️  Could not automatically detect Azure DevOps organizations.[/]");
+            AnsiConsole.MarkupLine("[dim]This can happen if your Azure account is not linked to Azure DevOps via the API.[/]\n");
+
+            var manualChoice = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("How would you like to specify the organization?")
+                    .HighlightStyle(new Style(Color.Cyan1))
+                    .AddChoices("Enter organization name manually", "Cancel"));
+
+            if (manualChoice == "Cancel") return null;
+
+            var orgName = AnsiConsole.Prompt(
+                new TextPrompt<string>("Enter organization name [dim](from https://dev.azure.com/[bold]organization[/])[/]:")
+                    .PromptStyle(new Style(Color.Cyan1)));
+
+            if (string.IsNullOrWhiteSpace(orgName)) return null;
+
+            organizations.Add(orgName.Trim());
         }
 
         organizations.Sort(StringComparer.OrdinalIgnoreCase);
@@ -1368,7 +1435,7 @@ Generate the pull request description in Markdown:";
 
             // 7. Check if repo already exists
             AnsiConsole.MarkupLine($"\n🔍 Checking if repository '[cyan]{repoName}[/]' already exists...");
-            var existingRepoJson = await RunCommandCapture("az",
+            var existingRepoJson = await RunAzCapture(
                 $"repos show --repository \"{repoName}\" --organization {orgUrl} --project \"{selectedProject}\" --output json");
 
             string? remoteUrl = null;
@@ -1404,7 +1471,7 @@ Generate the pull request description in Markdown:";
             {
                 // Create repository
                 AnsiConsole.MarkupLine($"🔨 Creating repository '[cyan]{repoName}[/]'...");
-                var createJson = await RunCommandCapture("az",
+                var createJson = await RunAzCapture(
                     $"repos create --name \"{repoName}\" --organization {orgUrl} --project \"{selectedProject}\" --output json");
 
                 if (createJson == null)
@@ -1539,7 +1606,7 @@ Generate the pull request description in Markdown:";
         var (orgUrl, project) = setup.Value;
 
         AnsiConsole.MarkupLine("\n📋 Fetching variable groups...");
-        var json = await RunCommandCapture("az",
+        var json = await RunAzCapture(
             $"pipelines variable-group list --organization {orgUrl} --project \"{project}\" --output json");
 
         if (json == null)
@@ -1664,37 +1731,13 @@ Generate the pull request description in Markdown:";
         }
     }
 
-    private static void ShowAzureDevOpsHelp()
-    {
-        AnsiConsole.MarkupLine("[bold]Usage:[/] yitpush azure-devops <resource> <action>\n");
-
-        var table = new Table()
-            .Border(TableBorder.Rounded)
-            .BorderColor(Color.Cyan1)
-            .Title("[bold cyan]Azure DevOps Commands[/]")
-            .AddColumn(new TableColumn("[bold]Command[/]").NoWrap())
-            .AddColumn(new TableColumn("[bold]Description[/]"));
-
-        table.AddRow("repo new", "Create a new Azure DevOps repository interactively");
-        table.AddRow("repo checkout", "Clone an Azure DevOps repository interactively");
-        table.AddRow("variable-group list", "List variable groups in an Azure DevOps project");
-
-        AnsiConsole.Write(table);
-
-        AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
-        AnsiConsole.MarkupLine("  yitpush azure-devops repo new              [dim]# Create Azure DevOps repo[/]");
-        AnsiConsole.MarkupLine("  yitpush azure-devops repo checkout         [dim]# Clone Azure DevOps repo[/]");
-        AnsiConsole.MarkupLine("  yitpush azure-devops variable-group list   [dim]# List variable groups[/]");
-        Console.WriteLine();
-    }
-
     private static async Task<List<string>> FetchAzureOrganizations()
     {
         var organizations = new List<string>();
 
         // Get user profile to obtain memberId
         AnsiConsole.MarkupLine("📋 Fetching organizations...");
-        var profileJson = await RunCommandCapture("az",
+        var profileJson = await RunAzCapture(
             "rest --method get --resource 499b84ac-1321-427f-aa17-267ca6975798 --url https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=7.0");
 
         string? memberId = null;
@@ -1717,7 +1760,7 @@ Generate the pull request description in Markdown:";
         }
 
         // List organizations for this member
-        var orgsJson = await RunCommandCapture("az",
+        var orgsJson = await RunAzCapture(
             $"rest --method get --resource 499b84ac-1321-427f-aa17-267ca6975798 --url \"https://app.vssps.visualstudio.com/_apis/accounts?memberId={memberId}&api-version=7.0\"");
 
         if (orgsJson == null)
@@ -1760,7 +1803,7 @@ Generate the pull request description in Markdown:";
     private static async Task<List<string>> FetchAzureProjects(string orgUrl)
     {
         var projects = new List<string>();
-        var projectsJson = await RunCommandCapture("az", $"devops project list --organization {orgUrl} --output json");
+        var projectsJson = await RunAzCapture($"devops project list --organization {orgUrl} --output json");
 
         if (projectsJson == null)
         {
@@ -1801,7 +1844,7 @@ Generate the pull request description in Markdown:";
     private static async Task<List<(string Name, string RemoteUrl)>> FetchAzureRepos(string orgUrl, string project)
     {
         var repos = new List<(string Name, string RemoteUrl)>();
-        var reposJson = await RunCommandCapture("az",
+        var reposJson = await RunAzCapture(
             $"repos list --organization {orgUrl} --project \"{project}\" --output json");
 
         if (reposJson == null) return repos;
@@ -1828,6 +1871,22 @@ Generate the pull request description in Markdown:";
         catch { }
 
         return repos;
+    }
+
+    // ─── Process helpers ──────────────────────────────────────────────────────
+
+    private static Task<string?> RunAzCapture(string arguments)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return RunCommandCapture("cmd.exe", $"/c az {arguments}");
+        return RunCommandCapture("az", arguments);
+    }
+
+    private static Task<bool> RunAzPassthrough(string arguments)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return RunCommandPassthrough("cmd.exe", $"/c az {arguments}");
+        return RunCommandPassthrough("az", arguments);
     }
 
     private static async Task<string?> RunCommandCapture(string command, string arguments)
