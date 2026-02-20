@@ -21,7 +21,7 @@ yitpush --confirm
 - **🔒 Safe & Reliable**: Full git diff analysis and error handling
 - **📋 PR Descriptions**: Generate AI-powered pull request descriptions by comparing branches with `--pr-description`
 - **💾 Save to File**: Optionally save commit messages or PR descriptions to markdown files with `--save`
-- **☁️ Azure DevOps Integration**: Create repos and browse variable groups with `azure-devops` subcommands
+- **☁️ Azure DevOps Integration**: Create/clone repos and browse variable groups with `azure-devops` subcommands
 - **🔀 Back Navigation**: All interactive flows support `← Back` to return to the previous step
 - **🌍 Cross-Platform Compatibility**: Install as a global .NET tool or run directly from source, with full Unicode/emoji support for Windows PowerShell, macOS Terminal, and Linux
 
@@ -109,6 +109,7 @@ Use the `--detailed` flag to generate a commit message with body including expla
 | Command | Description |
 |---------|-------------|
 | `azure-devops repo new` | Create a new Azure DevOps repository interactively |
+| `azure-devops repo checkout` | Clone an Azure DevOps repository interactively |
 | `azure-devops variable-group list` | Browse and inspect variable groups in an Azure DevOps project |
 
 **Examples:**
@@ -136,6 +137,9 @@ yitpush --language spanish --detailed --confirm
 
 # Create a new Azure DevOps repo
 yitpush azure-devops repo new
+
+# Clone an existing Azure DevOps repo interactively
+yitpush azure-devops repo checkout
 
 # List and inspect variable groups
 yitpush azure-devops variable-group list
@@ -207,6 +211,17 @@ yitpush azure-devops repo new
 - **Smart defaults**: Suggests the current directory name as the repository name
 - **Handles existing repos**: Detects if the repository already exists and offers to reuse it
 - **Flexible remotes**: If `origin` is already configured, lets you choose an alternative remote name (e.g., `azure`)
+- **Back navigation**: Use `← Back` to return to previous steps at any point
+
+#### Clone Repository
+
+```bash
+yitpush azure-devops repo checkout
+```
+
+- **Interactive selection**: Guides you through selecting organization, project, and repository from lists
+- **Requires Azure CLI**: The `az` CLI must be installed with the `azure-devops` extension (auto-installed if missing)
+- **Custom destination**: Prompts for the target directory with `<current_dir>/<repo_name>` as default
 - **Back navigation**: Use `← Back` to return to previous steps at any point
 
 #### Variable Groups
@@ -329,6 +344,8 @@ cd YitPush && dotnet run
 | `❌ Error: Failed to generate commit message` | Verify API key and internet connection |
 | `❌ Azure CLI (az) is not installed` | Install [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli) |
 | `❌ No Azure DevOps organizations found` | Verify your Azure account has access to Azure DevOps |
+| `❌ No repositories found in this project` | Verify the selected project contains repositories |
+| `❌ Failed to clone repository` | Check network access and Azure DevOps permissions |
 
 ## 🏗️ Project Structure
 
