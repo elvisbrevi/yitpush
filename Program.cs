@@ -101,12 +101,14 @@ class Program
             .AddColumn(new TableColumn("[bold]Description[/]"));
 
         subTable.AddRow("azure-devops repo new", "Create a new Azure DevOps repository interactively");
+        subTable.AddRow("azure-devops repo checkout", "Clone an Azure DevOps repository interactively");
         subTable.AddRow("azure-devops variable-group list", "List variable groups in an Azure DevOps project");
 
         AnsiConsole.Write(subTable);
 
         AnsiConsole.MarkupLine("\n[bold]Subcommand Examples:[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops repo new              [dim]# Create Azure DevOps repo[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops repo checkout         [dim]# Clone Azure DevOps repo[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops variable-group list   [dim]# List variable groups[/]");
         Console.WriteLine();
         return 0;
@@ -128,6 +130,10 @@ class Program
         {
             var remote = await CreateAzureDevOpsRepo();
             return remote != null ? 0 : 1;
+        }
+        else if (resource == "repo" && action == "checkout")
+        {
+            return await CheckoutAzureDevOpsRepo();
         }
         else if (resource == "variable-group" && action == "list")
         {
@@ -1471,6 +1477,58 @@ Generate the pull request description in Markdown:";
         }
     }
 
+    private static async Task<int> CheckoutAzureDevOpsRepo()
+    {
+        AnsiConsole.MarkupLine("[bold blue]☁️  Azure DevOps - Clone Repository[/]\n");
+
+        var setup = await EnsureAzureDevOpsSetup();
+        if (setup == null) return 1;
+
+        var (orgUrl, selectedProject) = setup.Value;
+
+        AnsiConsole.MarkupLine("\n📋 Fetching repositories...");
+        var repos = await FetchAzureRepos(orgUrl, selectedProject);
+
+        if (repos.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[red]❌ No repositories found in this project.[/]");
+            return 1;
+        }
+
+        repos.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name));
+
+        var repoChoices = new List<string>(repos.Select(r => r.Name)) { BackOption };
+        var selectedRepoName = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("📋 Select [green]repository[/] to clone:\n[dim](Select ← Back to return to previous step)[/]")
+                .PageSize(15)
+                .HighlightStyle(new Style(Color.Cyan1))
+                .AddChoices(repoChoices));
+
+        if (selectedRepoName == BackOption) return 0;
+
+        var selectedRepo = repos.First(r => r.Name == selectedRepoName);
+        AnsiConsole.MarkupLine($"\n[green]✅ Repository:[/] {selectedRepo.Name}");
+
+        var defaultDir = Path.Combine(Directory.GetCurrentDirectory(), selectedRepo.Name);
+        var targetDir = AnsiConsole.Prompt(
+            new TextPrompt<string>("📁 Clone into directory:")
+                .DefaultValue(defaultDir)
+                .PromptStyle(new Style(Color.Cyan1)));
+
+        AnsiConsole.MarkupLine($"\n🔄 Cloning [cyan]{selectedRepo.Name}[/]...");
+        var success = await RunCommandPassthrough("git", $"clone \"{selectedRepo.RemoteUrl}\" \"{targetDir}\"");
+
+        if (!success)
+        {
+            AnsiConsole.MarkupLine("[red]❌ Failed to clone repository.[/]");
+            return 1;
+        }
+
+        AnsiConsole.MarkupLine($"\n[green]✅ Repository cloned successfully into:[/] {targetDir}");
+        return 0;
+    }
+
     private static async Task<int> ListAzureVariableGroups()
     {
         AnsiConsole.MarkupLine("[bold blue]☁️  Azure DevOps - Variable Groups[/]\n");
@@ -1618,12 +1676,14 @@ Generate the pull request description in Markdown:";
             .AddColumn(new TableColumn("[bold]Description[/]"));
 
         table.AddRow("repo new", "Create a new Azure DevOps repository interactively");
+        table.AddRow("repo checkout", "Clone an Azure DevOps repository interactively");
         table.AddRow("variable-group list", "List variable groups in an Azure DevOps project");
 
         AnsiConsole.Write(table);
 
         AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops repo new              [dim]# Create Azure DevOps repo[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops repo checkout         [dim]# Clone Azure DevOps repo[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops variable-group list   [dim]# List variable groups[/]");
         Console.WriteLine();
     }
@@ -1736,6 +1796,38 @@ Generate the pull request description in Markdown:";
         catch { }
 
         return projects;
+    }
+
+    private static async Task<List<(string Name, string RemoteUrl)>> FetchAzureRepos(string orgUrl, string project)
+    {
+        var repos = new List<(string Name, string RemoteUrl)>();
+        var reposJson = await RunCommandCapture("az",
+            $"repos list --organization {orgUrl} --project \"{project}\" --output json");
+
+        if (reposJson == null) return repos;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(reposJson);
+            JsonElement items;
+            if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                items = doc.RootElement;
+            else if (doc.RootElement.TryGetProperty("value", out var valueProp))
+                items = valueProp;
+            else
+                return repos;
+
+            foreach (var repo in items.EnumerateArray())
+            {
+                var name = repo.TryGetProperty("name", out var nameProp) ? nameProp.GetString() : null;
+                var remoteUrl = repo.TryGetProperty("remoteUrl", out var urlProp) ? urlProp.GetString() : null;
+                if (name != null && remoteUrl != null)
+                    repos.Add((name, remoteUrl));
+            }
+        }
+        catch { }
+
+        return repos;
     }
 
     private static async Task<string?> RunCommandCapture(string command, string arguments)
