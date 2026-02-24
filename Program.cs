@@ -504,9 +504,9 @@ class Program
     {
         const int deepseekMaxContextTokens = 131072;
         const int maxCompletionTokens = 8000;
-        const int reservedTokens = maxCompletionTokens + 5000;
+        const int reservedTokens = maxCompletionTokens + 8000; // extra buffer for system prompt + formatting
         const int maxPromptTokens = deepseekMaxContextTokens - reservedTokens;
-        const int averageCharsPerToken = 4;
+        const int averageCharsPerToken = 3; // conservative estimate for code diffs
         const int maxPromptChars = maxPromptTokens * averageCharsPerToken;
 
         diff = TruncateDiff(diff, maxPromptChars);
@@ -996,9 +996,9 @@ Generate only the commit message:";
     {
         const int deepseekMaxContextTokens = 131072;
         const int maxCompletionTokens = 8000;
-        const int reservedTokens = maxCompletionTokens + 5000;
+        const int reservedTokens = maxCompletionTokens + 8000; // extra buffer for system prompt + formatting
         const int maxPromptTokens = deepseekMaxContextTokens - reservedTokens;
-        const int averageCharsPerToken = 4;
+        const int averageCharsPerToken = 3; // conservative estimate for code diffs
         const int maxPromptChars = maxPromptTokens * averageCharsPerToken;
 
         diff = TruncateDiff(diff, maxPromptChars);
