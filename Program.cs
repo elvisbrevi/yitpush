@@ -1731,14 +1731,66 @@ Generate the pull request description in Markdown:";
         }
     }
 
+    private static bool IsAzureAuthError(string? error)
+    {
+        if (string.IsNullOrEmpty(error)) return false;
+        return error.Contains("AADSTS50078") // MFA expired
+            || error.Contains("AADSTS700082") // Token expired
+            || error.Contains("AADSTS50076") // MFA required
+            || error.Contains("AADSTS70043") // Bad token
+            || error.Contains("AADSTS50173") // Credential expired
+            || error.Contains("AADSTS700024") // Client assertion expired
+            || error.Contains("AADSTS65001") // Consent required
+            || error.Contains("InvalidAuthenticationToken")
+            || error.Contains("Authentication failed");
+    }
+
+    private static async Task<bool> HandleAzureReLogin()
+    {
+        AnsiConsole.MarkupLine("[yellow]⚠️  Your Azure session has expired or requires re-authentication.[/]");
+        var reloginChoice = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("Would you like to [green]re-login[/] to Azure?")
+                .HighlightStyle(new Style(Color.Cyan1))
+                .AddChoices("Yes, re-login", "Cancel"));
+
+        if (reloginChoice == "Cancel") return false;
+
+        AnsiConsole.MarkupLine("\n🔐 Starting Azure re-authentication...\n");
+        var logoutResult = await RunAzPassthrough("logout");
+        if (!logoutResult)
+        {
+            AnsiConsole.MarkupLine("[dim]Note: logout returned an error (may already be logged out).[/]");
+        }
+
+        var loginResult = await RunAzPassthrough("login");
+        if (!loginResult)
+        {
+            AnsiConsole.MarkupLine("[red]❌ Azure login failed.[/]");
+            return false;
+        }
+
+        AnsiConsole.MarkupLine("\n[green]✅ Successfully re-authenticated with Azure.[/]\n");
+        return true;
+    }
+
     private static async Task<List<string>> FetchAzureOrganizations()
     {
         var organizations = new List<string>();
+        const string azDevOpsResource = "499b84ac-1321-427f-aa17-267ca6975798";
 
         // Get user profile to obtain memberId
         AnsiConsole.MarkupLine("📋 Fetching organizations...");
-        var profileJson = await RunAzCapture(
-            "rest --method get --resource 499b84ac-1321-427f-aa17-267ca6975798 --url https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=7.0");
+        var (profileJson, profileError) = await RunAzCaptureWithError(
+            $"rest --method get --resource {azDevOpsResource} --url https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=7.0");
+
+        if (profileJson == null && IsAzureAuthError(profileError))
+        {
+            if (!await HandleAzureReLogin()) return organizations;
+
+            (profileJson, profileError) = await RunAzCaptureWithError(
+                $"rest --method get --resource {azDevOpsResource} --url https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=7.0");
+        }
 
         string? memberId = null;
         if (profileJson != null)
@@ -1756,15 +1808,31 @@ Generate the pull request description in Markdown:";
 
         if (memberId == null)
         {
+            if (profileError != null)
+            {
+                AnsiConsole.MarkupLine($"[red]❌ Failed to fetch Azure DevOps profile:[/] [dim]{Markup.Escape(profileError.Trim())}[/]");
+            }
             return organizations;
         }
 
         // List organizations for this member
-        var orgsJson = await RunAzCapture(
-            $"rest --method get --resource 499b84ac-1321-427f-aa17-267ca6975798 --url \"https://app.vssps.visualstudio.com/_apis/accounts?memberId={memberId}&api-version=7.0\"");
+        var (orgsJson, orgsError) = await RunAzCaptureWithError(
+            $"rest --method get --resource {azDevOpsResource} --url \"https://app.vssps.visualstudio.com/_apis/accounts?memberId={memberId}&api-version=7.0\"");
+
+        if (orgsJson == null && IsAzureAuthError(orgsError))
+        {
+            if (!await HandleAzureReLogin()) return organizations;
+
+            (orgsJson, orgsError) = await RunAzCaptureWithError(
+                $"rest --method get --resource {azDevOpsResource} --url \"https://app.vssps.visualstudio.com/_apis/accounts?memberId={memberId}&api-version=7.0\"");
+        }
 
         if (orgsJson == null)
         {
+            if (orgsError != null)
+            {
+                AnsiConsole.MarkupLine($"[red]❌ Failed to fetch organizations:[/] [dim]{Markup.Escape(orgsError.Trim())}[/]");
+            }
             return organizations;
         }
 
@@ -1882,6 +1950,13 @@ Generate the pull request description in Markdown:";
         return RunCommandCapture("az", arguments);
     }
 
+    private static Task<(string? Output, string? Error)> RunAzCaptureWithError(string arguments)
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+            return RunCommandCaptureWithError("cmd.exe", $"/c az {arguments}");
+        return RunCommandCaptureWithError("az", arguments);
+    }
+
     private static Task<bool> RunAzPassthrough(string arguments)
     {
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
@@ -1889,7 +1964,7 @@ Generate the pull request description in Markdown:";
         return RunCommandPassthrough("az", arguments);
     }
 
-    private static async Task<string?> RunCommandCapture(string command, string arguments)
+    private static async Task<(string? Output, string? Error)> RunCommandCaptureWithError(string command, string arguments)
     {
         try
         {
@@ -1908,15 +1983,21 @@ Generate the pull request description in Markdown:";
 
             process.Start();
             var output = await process.StandardOutput.ReadToEndAsync();
-            await process.StandardError.ReadToEndAsync();
+            var error = await process.StandardError.ReadToEndAsync();
             await process.WaitForExitAsync();
 
-            return process.ExitCode == 0 ? output : null;
+            return process.ExitCode == 0 ? (output, null) : (null, error);
         }
-        catch
+        catch (Exception ex)
         {
-            return null;
+            return (null, ex.Message);
         }
+    }
+
+    private static async Task<string?> RunCommandCapture(string command, string arguments)
+    {
+        var (output, _) = await RunCommandCaptureWithError(command, arguments);
+        return output;
     }
 
     private static async Task<bool> RunCommandPassthrough(string command, string arguments)
