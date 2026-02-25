@@ -12,7 +12,7 @@
 
     <!-- Package Metadata -->
     <PackageId>YitPush</PackageId>
-    <Version>1.3.2</Version>
+    <Version>1.3.3</Version>
     <Authors>Elvis Brevi</Authors>
     <Description>AI-powered git commit automation tool. Analyzes code changes with DeepSeek
       Reasoning AI and generates meaningful commit messages. Run 'yitpush' to automatically stage,
@@ -35,7 +35,8 @@
 
     <!-- Additional Metadata -->
     <Copyright>Copyright (c) 2026 Elvis Brevi</Copyright>
-    <PackageReleaseNotes>Breaking: CLI restructured to subcommand style (commit, checkout, pr, azure-devops)
+    <PackageReleaseNotes>Breaking: CLI restructured to subcommand style (commit, checkout, pr,
+      azure-devops)
       New: Running yitpush with no args shows help, like traditional CLI tools
       New: yitpush commit replaces the default flag-based commit flow
       New: yitpush checkout replaces --check flag
