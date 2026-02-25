@@ -180,7 +180,7 @@ class Program
                 }
 
                 Console.WriteLine("   git commit");
-                if (!await ExecuteGitCommand($"commit -m \"{commitMessage}\""))
+                if (!await ExecuteGitCommitWithMessage(commitMessage))
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine("❌ Error: git commit failed.");
@@ -906,6 +906,23 @@ Generate only the commit message:";
         {
             Console.WriteLine($"Error executing git command: {ex.Message}");
             return false;
+        }
+    }
+
+    private static async Task<bool> ExecuteGitCommitWithMessage(string commitMessage)
+    {
+        string tempFile = Path.Combine(Path.GetTempPath(), $"git_commit_msg_{Guid.NewGuid():N}.txt");
+        try
+        {
+            await File.WriteAllTextAsync(tempFile, commitMessage, Encoding.UTF8);
+            return await ExecuteGitCommand($"commit -F \"{tempFile}\"");
+        }
+        finally
+        {
+            if (File.Exists(tempFile))
+            {
+                File.Delete(tempFile);
+            }
         }
     }
 
