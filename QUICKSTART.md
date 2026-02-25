@@ -99,6 +99,7 @@ Found changes (1234 characters)
 | `yitpush pr --detailed --save` | Detailed PR description, saved to file |
 | `yitpush azure-devops repo new` | Create an Azure DevOps repository |
 | `yitpush azure-devops repo checkout` | Clone an Azure DevOps repository |
+| `yitpush azure-devops hu list` | List and manage your User Stories |
 
 ## Troubleshooting
 

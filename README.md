@@ -162,6 +162,7 @@ Manage Azure DevOps resources. Requires [Azure CLI](https://docs.microsoft.com/e
 | `repo new` | Create a new repository interactively |
 | `repo checkout` | Clone a repository interactively |
 | `variable-group list` | List and inspect variable groups |
+| `hu list` | List your User Stories and manage them (create tasks, branches) |
 
 **Examples:**
 ```bash
@@ -173,6 +174,9 @@ yitpush azure-devops repo checkout
 
 # Browse variable groups
 yitpush azure-devops variable-group list
+
+# Browse and manage your User Stories
+yitpush azure-devops hu list
 ```
 
 **Features:**
@@ -182,6 +186,7 @@ yitpush azure-devops variable-group list
 - Handles existing remotes (choose between `azure`, `origin`, or custom)
 - Full `← Back` navigation at every step
 - **Windows**: automatically uses `cmd.exe /c az` to find `az.cmd`
+- **User Stories**: Lists your assigned HUs by date, allowing you to create standard tasks, branches, or update status.
 
 ---
 

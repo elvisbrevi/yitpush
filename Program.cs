@@ -249,6 +249,10 @@ class Program
         {
             return await ListAzureVariableGroups();
         }
+        else if (resource == "hu" && action == "list")
+        {
+            return await ListAzureUserStories();
+        }
         else
         {
             AnsiConsole.MarkupLine($"[red]❌ Unknown command:[/] azure-devops {Markup.Escape(resource)} {Markup.Escape(action)}\n");
@@ -314,6 +318,7 @@ class Program
         azTable.AddRow("repo new", "Create a new repository interactively");
         azTable.AddRow("repo checkout", "Clone a repository interactively");
         azTable.AddRow("variable-group list", "List and inspect variable groups");
+        azTable.AddRow("hu list", "List your User Stories and manage them");
 
         AnsiConsole.Write(azTable);
 
@@ -327,6 +332,7 @@ class Program
         AnsiConsole.MarkupLine("  yitpush azure-devops repo new               [dim]# Create Azure DevOps repo[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops repo checkout          [dim]# Clone Azure DevOps repo[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops variable-group list    [dim]# Browse variable groups[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops hu list                [dim]# Browse your User Stories[/]");
         Console.WriteLine();
     }
 
@@ -344,6 +350,7 @@ class Program
         table.AddRow("repo new", "Create a new repository interactively");
         table.AddRow("repo checkout", "Clone a repository interactively");
         table.AddRow("variable-group list", "List and inspect variable groups");
+        table.AddRow("hu list", "List your User Stories and manage them");
 
         AnsiConsole.Write(table);
 
@@ -351,6 +358,7 @@ class Program
         AnsiConsole.MarkupLine("  yitpush azure-devops repo new              [dim]# Create Azure DevOps repo[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops repo checkout         [dim]# Clone Azure DevOps repo[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops variable-group list   [dim]# List variable groups[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops hu list               [dim]# Browse your User Stories[/]");
         Console.WriteLine();
     }
 
@@ -1613,6 +1621,123 @@ Generate the pull request description in Markdown:";
         return 0;
     }
 
+    private static async Task<int> ListAzureUserStories()
+    {
+        AnsiConsole.MarkupLine("[bold blue]☁️  Azure DevOps - User Stories[/]\n");
+
+        var setup = await EnsureAzureDevOpsSetup();
+        if (setup == null) return 1;
+
+        var (orgUrl, project) = setup.Value;
+
+        // Try to get current user to show in debug
+        var accountJson = await RunAzCapture("account show --output json");
+        string userName = "unknown";
+        if (accountJson != null)
+        {
+            try {
+                using var doc = JsonDocument.Parse(accountJson);
+                userName = doc.RootElement.TryGetProperty("user", out var userProp)
+                    && userProp.TryGetProperty("name", out var nameProp)
+                    ? nameProp.GetString() ?? "unknown" : "unknown";
+            } catch {}
+        }
+
+        AnsiConsole.MarkupLine($"[dim]🔍 Searching for User Stories assigned to:[/] [cyan]{userName}[/]");
+        AnsiConsole.MarkupLine($"[dim]🔍 Organization:[/] [cyan]{orgUrl}[/]");
+        AnsiConsole.MarkupLine($"[dim]🔍 Project:[/] [cyan]{project}[/]\n");
+
+        AnsiConsole.MarkupLine("📋 Fetching your User Stories...");
+        var hus = await FetchAzureUserStories(orgUrl, project);
+
+        if (hus.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[yellow]⚠️  No User Stories found assigned to you in this project.[/]");
+            return 0;
+        }
+
+        var maxIdLen = hus.Max(h => h.Id.Length);
+        var displayMap = new Dictionary<string, (string Id, string Title, string State, string Date)>();
+        var displayList = new List<string>();
+
+        foreach (var hu in hus)
+        {
+            var display = $"[grey]{hu.Date}[/] [cyan]{hu.Id.PadRight(maxIdLen + 1)}[/] {Markup.Escape(hu.Title)} [dim]({Markup.Escape(hu.State)})[/]";
+            displayMap[display] = hu;
+            displayList.Add(display);
+        }
+
+        while (true)
+        {
+            var choices = new List<string>(displayList) { BackOption };
+            var selected = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("📋 Select a [green]User Story[/] to manage:\n[dim](Select ← Back to return)[/]")
+                    .PageSize(15)
+                    .HighlightStyle(new Style(Color.Cyan1))
+                    .AddChoices(choices));
+
+            if (selected == BackOption) return 0;
+
+            var selectedHu = displayMap[selected];
+            AnsiConsole.MarkupLine($"\n[bold cyan]Managing User Story:[/] {selectedHu.Id} - {selectedHu.Title} ({selectedHu.State})\n");
+
+            var action = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("What would you like to do?")
+                    .AddChoices("Create standard tasks", "Create branch for this HU", "Mark as In Progress", BackOption));
+
+            if (action == BackOption) continue;
+
+            if (action == "Create standard tasks")
+            {
+                await CreateTasksForUserStory(orgUrl, project, selectedHu.Id);
+            }
+            else if (action == "Create branch for this HU")
+            {
+                var branchName = $"feature/{selectedHu.Id}-{selectedHu.Title.ToLower().Replace(" ", "-").Replace("\"", "")}";
+                branchName = new string(branchName.Where(c => char.IsLetterOrDigit(c) || c == '/' || c == '-').ToArray());
+                
+                AnsiConsole.MarkupLine($"\n🔄 Creating branch [cyan]{branchName}[/]...");
+                var success = await RunCommandPassthrough("git", $"checkout -b {branchName}");
+                if (success)
+                    AnsiConsole.MarkupLine($"[green]✅ Branch created and checked out.[/]");
+            }
+            else if (action == "Mark as In Progress")
+            {
+                AnsiConsole.MarkupLine($"\n🔄 Updating status to [cyan]In Progress[/]...");
+                var success = await RunAzPassthrough(
+                    $"boards work-item update --id {selectedHu.Id} --state \"In Progress\" --organization {orgUrl}");
+                if (success)
+                    AnsiConsole.MarkupLine($"[green]✅ Status updated.[/]");
+            }
+        }
+    }
+
+    private static async Task<int> CreateTasksForUserStory(string orgUrl, string project, string huId)
+    {
+        var taskTitles = AnsiConsole.Prompt(
+            new TextPrompt<string>("Enter task titles (comma separated):")
+                .DefaultValue("Desarrollo, Pruebas Unitarias, Code Review"));
+
+        var titles = taskTitles.Split(',').Select(t => t.Trim()).Where(t => !string.IsNullOrEmpty(t));
+
+        foreach (var title in titles)
+        {
+            AnsiConsole.MarkupLine($"\n🔄 Creating task: [cyan]{Markup.Escape(title)}[/]...");
+            // az boards work-item create --title "..." --type Task --parent {HU_ID}
+            var success = await RunAzPassthrough(
+                $"boards work-item create --title \"{title}\" --type Task --parent {huId} --project \"{project}\" --organization {orgUrl}");
+            
+            if (success)
+                AnsiConsole.MarkupLine($"[green]✅ Created:[/] {Markup.Escape(title)}");
+            else
+                AnsiConsole.MarkupLine($"[red]❌ Failed to create:[/] {Markup.Escape(title)}");
+        }
+
+        return 0;
+    }
+
     private static async Task<int> ListAzureVariableGroups()
     {
         AnsiConsole.MarkupLine("[bold blue]☁️  Azure DevOps - Variable Groups[/]\n");
@@ -1956,6 +2081,132 @@ Generate the pull request description in Markdown:";
         catch { }
 
         return repos;
+    }
+
+    private static async Task<List<(string Id, string Title, string State, string Date)>> FetchAzureUserStories(string orgUrl, string project)
+    {
+        var stories = new List<(string Id, string Title, string State, string Date)>();
+        var huTypes = "([System.WorkItemType] = 'User Story' OR [System.WorkItemType] = 'Historia de usuario' OR [System.WorkItemType] = 'Product Backlog Item')";
+
+        // Try to get current user email
+        var accountJson = await RunAzCapture("account show --output json");
+        string? userEmail = null;
+        if (accountJson != null)
+        {
+            try {
+                using var doc = JsonDocument.Parse(accountJson);
+                userEmail = doc.RootElement.TryGetProperty("user", out var userProp)
+                    && userProp.TryGetProperty("name", out var nameProp)
+                    ? nameProp.GetString() : null;
+            } catch {}
+        }
+        
+        var userFilter = "@Me";
+        if (!string.IsNullOrEmpty(userEmail))
+        {
+            userFilter = $"@Me, '{userEmail}'";
+        }
+
+        // 1. Search for HUs where user is AssignedTo or Desarrollador
+        var developerFields = new[] { "Custom.Desarrollador", "Custom.Developer", "Microsoft.VSTS.Common.Developer" };
+        
+        foreach (var devField in developerFields)
+        {
+            var query = $"SELECT [System.Id], [System.Title], [System.State], [System.CreatedDate] FROM WorkItems WHERE [System.TeamProject] = '{project}' AND {huTypes} AND ([System.AssignedTo] IN ({userFilter}) OR [{devField}] IN ({userFilter})) ORDER BY [System.CreatedDate] DESC";
+            var results = await ExecuteWiqlQuery(orgUrl, project, query, silent: true);
+            foreach (var r in results)
+            {
+                if (!stories.Any(s => s.Id == r.Id)) stories.Add(r);
+            }
+        }
+
+        // 2. If no HUs found directly, find HUs that are PARENTS of tasks assigned to the user
+        if (stories.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[dim]🔍 No HUs found directly. Searching for parents of your assigned tasks...[/]");
+            // This query finds the IDs of parents (HUs) of tasks assigned to user
+            var parentQuery = $"SELECT [System.Id], [System.Title], [System.State], [System.CreatedDate] FROM WorkItems WHERE [System.TeamProject] = '{project}' AND {huTypes} AND [System.Id] IN (SELECT [System.Parent] FROM WorkItems WHERE [System.TeamProject] = '{project}' AND [System.WorkItemType] = 'Task' AND [System.AssignedTo] IN ({userFilter})) ORDER BY [System.CreatedDate] DESC";
+            
+            // Note: Standard WIQL doesn't always support the subquery IN (SELECT Parent). 
+            // We'll try a simpler approach if that fails: fetch tasks, get parent IDs, then fetch those IDs.
+            var taskQuery = $"SELECT [System.Parent] FROM WorkItems WHERE [System.TeamProject] = '{project}' AND [System.WorkItemType] = 'Task' AND [System.AssignedTo] IN ({userFilter})";
+            var tasks = await ExecuteWiqlQuery(orgUrl, project, taskQuery, silent: true);
+            var parentIds = tasks.Select(t => t.Title).Where(p => p != "-" && p != "0").Distinct().ToList(); // Parent is often in Title here due to how ExecuteWiqlQuery works for this specific query
+
+            if (parentIds.Count > 0)
+            {
+                var idList = string.Join(",", parentIds);
+                var fetchParentsQuery = $"SELECT [System.Id], [System.Title], [System.State], [System.CreatedDate] FROM WorkItems WHERE [System.Id] IN ({idList}) AND {huTypes} ORDER BY [System.CreatedDate] DESC";
+                var parents = await ExecuteWiqlQuery(orgUrl, project, fetchParentsQuery);
+                stories.AddRange(parents);
+            }
+        }
+
+        // 3. Last fallback: Any HU in the project (might be too much, but better than nothing if searching for a specific ID)
+        if (stories.Count == 0)
+        {
+             AnsiConsole.MarkupLine("[dim]🔍 Still no HUs found. Showing recent HUs in the project...[/]");
+             var recentQuery = $"SELECT [System.Id], [System.Title], [System.State], [System.CreatedDate] FROM WorkItems WHERE [System.TeamProject] = '{project}' AND {huTypes} ORDER BY [System.CreatedDate] DESC";
+             stories = await ExecuteWiqlQuery(orgUrl, project, recentQuery);
+        }
+
+        return stories;
+    }
+
+    private static async Task<List<(string Id, string Title, string State, string Date)>> ExecuteWiqlQuery(string orgUrl, string project, string wiql, bool silent = false)
+    {
+        var results = new List<(string Id, string Title, string State, string Date)>();
+        var escapedWiql = wiql.Replace("\"", "\\\"");
+        
+        var (json, error) = await RunAzCaptureWithError(
+            $"boards query --wiql \"{escapedWiql}\" --organization {orgUrl} --project \"{project}\" --output json");
+
+        if (json == null) 
+        {
+            if (!silent && !string.IsNullOrEmpty(error))
+                AnsiConsole.MarkupLine($"[red]❌ Query error:[/] {Markup.Escape(error)}");
+            return results;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            JsonElement items;
+            if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                items = doc.RootElement;
+            else if (doc.RootElement.TryGetProperty("value", out var valueProp))
+                items = valueProp;
+            else
+                return results;
+
+            foreach (var item in items.EnumerateArray())
+            {
+                var fields = item.TryGetProperty("fields", out var fieldsProp) ? fieldsProp : item;
+                
+                var id = item.TryGetProperty("id", out var idProp) ? idProp.ToString() : "-";
+                
+                // Get Title or first available text field
+                string? title = null;
+                if (fields.TryGetProperty("System.Title", out var titleProp)) title = titleProp.GetString();
+                else if (fields.TryGetProperty("System.Parent", out var parentProp)) title = parentProp.ToString(); // Special case for when we just want the parent ID
+                
+                var state = fields.TryGetProperty("System.State", out var stateProp) ? stateProp.GetString() : "-";
+                var createdDate = fields.TryGetProperty("System.CreatedDate", out var dateProp) ? dateProp.GetString() : "-";
+                
+                if (id != "-")
+                {
+                    // Format date to something short: YYYY-MM-DD
+                    var dateStr = createdDate != "-" && DateTime.TryParse(createdDate, out var dt) 
+                        ? dt.ToString("yyyy-MM-dd") 
+                        : createdDate;
+
+                    results.Add((id, title ?? "-", state ?? "-", dateStr ?? "-"));
+                }
+            }
+        }
+        catch { }
+
+        return results;
     }
 
     // ─── Process helpers ──────────────────────────────────────────────────────
