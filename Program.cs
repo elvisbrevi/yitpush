@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Text.RegularExpressions;
 using Spectre.Console;
 using TextCopy;
 
@@ -1657,7 +1658,7 @@ Generate the pull request description in Markdown:";
         }
 
         var maxIdLen = hus.Max(h => h.Id.Length);
-        var displayMap = new Dictionary<string, (string Id, string Title, string State, string Date)>();
+        var displayMap = new Dictionary<string, (string Id, string Title, string State, string Date, string Area, string Iteration)>();
         var displayList = new List<string>();
 
         foreach (var hu in hus)
@@ -1691,7 +1692,7 @@ Generate the pull request description in Markdown:";
 
             if (action == "Create standard tasks")
             {
-                await CreateTasksForUserStory(orgUrl, project, selectedHu.Id);
+                await CreateTasksForUserStory(orgUrl, project, selectedHu.Id, selectedHu.Area, selectedHu.Iteration);
             }
             else if (action == "Create branch for this HU")
             {
@@ -1714,7 +1715,7 @@ Generate the pull request description in Markdown:";
         }
     }
 
-    private static async Task<int> CreateTasksForUserStory(string orgUrl, string project, string huId)
+    private static async Task<int> CreateTasksForUserStory(string orgUrl, string project, string huId, string areaPath, string iterationPath)
     {
         var taskTitles = AnsiConsole.Prompt(
             new TextPrompt<string>("Enter task titles (comma separated):")
@@ -1722,17 +1723,105 @@ Generate the pull request description in Markdown:";
 
         var titles = taskTitles.Split(',').Select(t => t.Trim()).Where(t => !string.IsNullOrEmpty(t));
 
+        string[] meses = { "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre" };
+        string currentMonth = meses[DateTime.Now.Month - 1];
+
         foreach (var title in titles)
         {
             AnsiConsole.MarkupLine($"\n🔄 Creating task: [cyan]{Markup.Escape(title)}[/]...");
-            // az boards work-item create --title "..." --type Task --parent {HU_ID}
-            var success = await RunAzPassthrough(
-                $"boards work-item create --title \"{title}\" --type Task --parent {huId} --project \"{project}\" --organization {orgUrl}");
             
-            if (success)
-                AnsiConsole.MarkupLine($"[green]✅ Created:[/] {Markup.Escape(title)}");
-            else
-                AnsiConsole.MarkupLine($"[red]❌ Failed to create:[/] {Markup.Escape(title)}");
+            // Initial fields based on SAG project requirements
+            var fields = $"\"Microsoft.VSTS.Scheduling.RemainingWork=0\" \"Custom.EsfuerzoEstimadoHH=1\" \"Custom.Mes={currentMonth}\"";
+            
+            string? createJson = null;
+            string? createError = null;
+            bool success = false;
+
+            while (!success)
+            {
+                (createJson, createError) = await RunAzCaptureWithError(
+                    $"boards work-item create --title \"{title}\" --type Task --project \"{project}\" --area \"{areaPath}\" --iteration \"{iterationPath}\" --fields {fields} --organization {orgUrl} --output json");
+
+                if (createJson != null)
+                {
+                    success = true;
+                }
+                else if (createError != null && (createError.Contains("TF401320") || createError.Contains("TF51535")))
+                {
+                    if (createError.Contains("TF401320")) // Mandatory field missing
+                    {
+                        AnsiConsole.MarkupLine("[yellow]⚠️  Missing mandatory field detected.[/]");
+                        var match = Regex.Match(createError, @"field ([^.]+)\.");
+                        if (match.Success)
+                        {
+                            var fieldName = match.Groups[1].Value;
+                            var val = AnsiConsole.Prompt(
+                                new TextPrompt<string>($"Field [yellow]{fieldName}[/] is required. Enter value:")
+                                    .DefaultValue(fieldName == "Activity" ? "Development" : "1"));
+                            
+                            // Guess internal name if needed
+                            var internalName = fieldName;
+                            if (fieldName == "Mes" || fieldName == "EsfuerzoEstimadoHH") internalName = "Custom." + fieldName;
+                            else if (fieldName == "Activity" || fieldName == "Priority") internalName = "Microsoft.VSTS.Common." + fieldName;
+
+                            fields += $" \"{internalName}={val}\"";
+                            AnsiConsole.MarkupLine("🔄 Retrying with added field...");
+                        }
+                        else
+                        {
+                            AnsiConsole.MarkupLine($"[dim]Error: {Markup.Escape(createError.Trim())}[/]");
+                            var extraFields = AnsiConsole.Prompt(
+                                new TextPrompt<string>("Enter missing fields as 'Field=Value' pairs:")
+                                    .AllowEmpty());
+                            if (string.IsNullOrEmpty(extraFields)) break;
+                            fields += " " + extraFields;
+                        }
+                    }
+                    else // TF51535: Cannot find field
+                    {
+                        AnsiConsole.MarkupLine("[red]❌ Error: Azure DevOps cannot find one of the fields.[/]");
+                        AnsiConsole.MarkupLine($"[dim]{Markup.Escape(createError.Trim())}[/]");
+                        var corrected = AnsiConsole.Prompt(
+                            new TextPrompt<string>("Re-enter ALL field=value pairs correctly (or leave empty to skip):")
+                                .AllowEmpty());
+                        if (string.IsNullOrEmpty(corrected)) break;
+                        fields = corrected;
+                    }
+                }
+                else
+                {
+                    AnsiConsole.MarkupLine($"[red]❌ Unexpected error creating task:[/] [dim]{Markup.Escape(createError ?? "Unknown error")}[/]");
+                    break;
+                }
+            }
+
+            if (createJson != null)
+            {
+                string? taskId = null;
+                try
+                {
+                    using var doc = JsonDocument.Parse(createJson);
+                    if (doc.RootElement.TryGetProperty("id", out var idProp))
+                    {
+                        taskId = idProp.ToString();
+                    }
+                }
+                catch { }
+
+                if (taskId != null)
+                {
+                    AnsiConsole.MarkupLine($"[green]✅ Created task:[/] {taskId}");
+                    AnsiConsole.MarkupLine($"🔗 Linking to User Story [cyan]{huId}[/]...");
+                    
+                    var linkSuccess = await RunAzPassthrough(
+                        $"boards work-item relation add --id {taskId} --relation-type parent --target-id {huId} --organization {orgUrl} --output none");
+                    
+                    if (linkSuccess)
+                        AnsiConsole.MarkupLine($"[green]✅ Linked:[/] {Markup.Escape(title)}");
+                    else
+                        AnsiConsole.MarkupLine($"[yellow]⚠️  Task created ({taskId}) but failed to link to parent.[/]");
+                }
+            }
         }
 
         return 0;
@@ -2083,9 +2172,9 @@ Generate the pull request description in Markdown:";
         return repos;
     }
 
-    private static async Task<List<(string Id, string Title, string State, string Date)>> FetchAzureUserStories(string orgUrl, string project)
+    private static async Task<List<(string Id, string Title, string State, string Date, string Area, string Iteration)>> FetchAzureUserStories(string orgUrl, string project)
     {
-        var stories = new List<(string Id, string Title, string State, string Date)>();
+        var stories = new List<(string Id, string Title, string State, string Date, string Area, string Iteration)>();
         var huTypes = "([System.WorkItemType] = 'User Story' OR [System.WorkItemType] = 'Historia de usuario' OR [System.WorkItemType] = 'Product Backlog Item')";
 
         // Try to get current user email
@@ -2112,7 +2201,7 @@ Generate the pull request description in Markdown:";
         
         foreach (var devField in developerFields)
         {
-            var query = $"SELECT [System.Id], [System.Title], [System.State], [System.CreatedDate] FROM WorkItems WHERE [System.TeamProject] = '{project}' AND {huTypes} AND ([System.AssignedTo] IN ({userFilter}) OR [{devField}] IN ({userFilter})) ORDER BY [System.CreatedDate] DESC";
+            var query = $"SELECT [System.Id], [System.Title], [System.State], [System.CreatedDate], [System.AreaPath], [System.IterationPath] FROM WorkItems WHERE [System.TeamProject] = '{project}' AND {huTypes} AND ([System.AssignedTo] IN ({userFilter}) OR [{devField}] IN ({userFilter})) ORDER BY [System.CreatedDate] DESC";
             var results = await ExecuteWiqlQuery(orgUrl, project, query, silent: true);
             foreach (var r in results)
             {
@@ -2125,37 +2214,33 @@ Generate the pull request description in Markdown:";
         {
             AnsiConsole.MarkupLine("[dim]🔍 No HUs found directly. Searching for parents of your assigned tasks...[/]");
             // This query finds the IDs of parents (HUs) of tasks assigned to user
-            var parentQuery = $"SELECT [System.Id], [System.Title], [System.State], [System.CreatedDate] FROM WorkItems WHERE [System.TeamProject] = '{project}' AND {huTypes} AND [System.Id] IN (SELECT [System.Parent] FROM WorkItems WHERE [System.TeamProject] = '{project}' AND [System.WorkItemType] = 'Task' AND [System.AssignedTo] IN ({userFilter})) ORDER BY [System.CreatedDate] DESC";
-            
-            // Note: Standard WIQL doesn't always support the subquery IN (SELECT Parent). 
-            // We'll try a simpler approach if that fails: fetch tasks, get parent IDs, then fetch those IDs.
             var taskQuery = $"SELECT [System.Parent] FROM WorkItems WHERE [System.TeamProject] = '{project}' AND [System.WorkItemType] = 'Task' AND [System.AssignedTo] IN ({userFilter})";
             var tasks = await ExecuteWiqlQuery(orgUrl, project, taskQuery, silent: true);
-            var parentIds = tasks.Select(t => t.Title).Where(p => p != "-" && p != "0").Distinct().ToList(); // Parent is often in Title here due to how ExecuteWiqlQuery works for this specific query
+            var parentIds = tasks.Select(t => t.Id).Where(p => p != "-" && p != "0").Distinct().ToList();
 
             if (parentIds.Count > 0)
             {
                 var idList = string.Join(",", parentIds);
-                var fetchParentsQuery = $"SELECT [System.Id], [System.Title], [System.State], [System.CreatedDate] FROM WorkItems WHERE [System.Id] IN ({idList}) AND {huTypes} ORDER BY [System.CreatedDate] DESC";
+                var fetchParentsQuery = $"SELECT [System.Id], [System.Title], [System.State], [System.CreatedDate], [System.AreaPath], [System.IterationPath] FROM WorkItems WHERE [System.Id] IN ({idList}) AND {huTypes} ORDER BY [System.CreatedDate] DESC";
                 var parents = await ExecuteWiqlQuery(orgUrl, project, fetchParentsQuery);
                 stories.AddRange(parents);
             }
         }
 
-        // 3. Last fallback: Any HU in the project (might be too much, but better than nothing if searching for a specific ID)
+        // 3. Last fallback: Any HU in the project
         if (stories.Count == 0)
         {
              AnsiConsole.MarkupLine("[dim]🔍 Still no HUs found. Showing recent HUs in the project...[/]");
-             var recentQuery = $"SELECT [System.Id], [System.Title], [System.State], [System.CreatedDate] FROM WorkItems WHERE [System.TeamProject] = '{project}' AND {huTypes} ORDER BY [System.CreatedDate] DESC";
+             var recentQuery = $"SELECT [System.Id], [System.Title], [System.State], [System.CreatedDate], [System.AreaPath], [System.IterationPath] FROM WorkItems WHERE [System.TeamProject] = '{project}' AND {huTypes} ORDER BY [System.CreatedDate] DESC";
              stories = await ExecuteWiqlQuery(orgUrl, project, recentQuery);
         }
 
         return stories;
     }
 
-    private static async Task<List<(string Id, string Title, string State, string Date)>> ExecuteWiqlQuery(string orgUrl, string project, string wiql, bool silent = false)
+    private static async Task<List<(string Id, string Title, string State, string Date, string Area, string Iteration)>> ExecuteWiqlQuery(string orgUrl, string project, string wiql, bool silent = false)
     {
-        var results = new List<(string Id, string Title, string State, string Date)>();
+        var results = new List<(string Id, string Title, string State, string Date, string Area, string Iteration)>();
         var escapedWiql = wiql.Replace("\"", "\\\"");
         
         var (json, error) = await RunAzCaptureWithError(
@@ -2192,6 +2277,8 @@ Generate the pull request description in Markdown:";
                 
                 var state = fields.TryGetProperty("System.State", out var stateProp) ? stateProp.GetString() : "-";
                 var createdDate = fields.TryGetProperty("System.CreatedDate", out var dateProp) ? dateProp.GetString() : "-";
+                var areaPath = fields.TryGetProperty("System.AreaPath", out var areaProp) ? areaProp.GetString() : "-";
+                var iterationPath = fields.TryGetProperty("System.IterationPath", out var iterationProp) ? iterationProp.GetString() : "-";
                 
                 if (id != "-")
                 {
@@ -2200,7 +2287,7 @@ Generate the pull request description in Markdown:";
                         ? dt.ToString("yyyy-MM-dd") 
                         : createdDate;
 
-                    results.Add((id, title ?? "-", state ?? "-", dateStr ?? "-"));
+                    results.Add((id, title ?? "-", state ?? "-", dateStr ?? "-", areaPath ?? "-", iterationPath ?? "-"));
                 }
             }
         }
