@@ -229,6 +229,13 @@ class Program
 
     private static async Task<int> AzureDevOpsCommand(string[] args)
     {
+        // If no arguments, show interactive menu
+        if (args.Length == 0)
+        {
+            return await AzureDevOpsInteractiveMenu();
+        }
+
+        // If insufficient arguments but some provided, show help
         if (args.Length < 2)
         {
             ShowAzureDevOpsHelp();
@@ -245,21 +252,78 @@ class Program
         }
         else if (resource == "repo" && action == "checkout")
         {
-            return await CheckoutAzureDevOpsRepo();
+            var result = await CheckoutAzureDevOpsRepo();
+            return result == BackToMenu ? 0 : result;
         }
         else if (resource == "variable-group" && action == "list")
         {
-            return await ListAzureVariableGroups();
+            var result = await ListAzureVariableGroups();
+            return result == BackToMenu ? 0 : result;
         }
         else if (resource == "hu" && action == "list")
         {
-            return await ListAzureUserStories();
+            var result = await ListAzureUserStories();
+            return result == BackToMenu ? 0 : result;
         }
         else
         {
             AnsiConsole.MarkupLine($"[red]❌ Unknown command:[/] azure-devops {Markup.Escape(resource)} {Markup.Escape(action)}\n");
             ShowAzureDevOpsHelp();
             return 1;
+        }
+    }
+
+    private static async Task<int> AzureDevOpsInteractiveMenu()
+    {
+        while (true)
+        {
+            AnsiConsole.MarkupLine("[bold blue]☁️  Azure DevOps - Interactive Menu[/]\n");
+            
+            var choice = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("Select an operation:")
+                    .PageSize(10)
+                    .HighlightStyle(new Style(Color.Cyan1))
+                    .AddChoices(
+                        "Create new repository",
+                        "Clone repository", 
+                        "Browse variable groups",
+                        "Manage User Stories",
+                        "Exit"
+                    ));
+
+            if (choice == "Exit")
+                return 0;
+
+            int result = 0;
+            if (choice == "Create new repository")
+            {
+                var remote = await CreateAzureDevOpsRepo();
+                result = remote != null ? 0 : 1;
+            }
+            else if (choice == "Clone repository")
+            {
+                result = await CheckoutAzureDevOpsRepo();
+            }
+            else if (choice == "Browse variable groups")
+            {
+                result = await ListAzureVariableGroups();
+            }
+            else if (choice == "Manage User Stories")
+            {
+                result = await ListAzureUserStories();
+            }
+
+            // If command returned BackToMenu, continue showing menu
+            if (result == BackToMenu)
+                continue;
+            
+            // Otherwise, return the result (0 for success, 1 for error)
+            // But in interactive mode, we might want to stay in menu even after success
+            // Let's always return to menu unless result indicates error and we want to exit?
+            // For now, after any command completion, show menu again.
+            // However, if result is 1 (error), maybe we should still show menu?
+            // Let's just continue loop.
         }
     }
 
@@ -340,7 +404,8 @@ class Program
 
     private static void ShowAzureDevOpsHelp()
     {
-        AnsiConsole.MarkupLine("[bold]Usage:[/] yitpush azure-devops [bold]<subcommand>[/]\n");
+        AnsiConsole.MarkupLine("[bold]Usage:[/] yitpush azure-devops [bold]<subcommand>[/]");
+        AnsiConsole.MarkupLine("[dim]Run without subcommands for interactive menu[/]\n");
 
         var table = new Table()
             .Border(TableBorder.Rounded)
@@ -1599,7 +1664,7 @@ Generate the pull request description in Markdown:";
                 .HighlightStyle(new Style(Color.Cyan1))
                 .AddChoices(repoChoices));
 
-        if (selectedRepoName == BackOption) return 0;
+        if (selectedRepoName == BackOption) return BackToMenu;
 
         var selectedRepo = repos.First(r => r.Name == selectedRepoName);
         AnsiConsole.MarkupLine($"\n[green]✅ Repository:[/] {selectedRepo.Name}");
@@ -1679,7 +1744,7 @@ Generate the pull request description in Markdown:";
                     .HighlightStyle(new Style(Color.Cyan1))
                     .AddChoices(choices));
 
-            if (selected == BackOption) return 0;
+            if (selected == BackOption) return BackToMenu;
 
             var selectedHu = displayMap[selected];
             AnsiConsole.MarkupLine($"\n[bold cyan]Managing User Story:[/] {selectedHu.Id} - {selectedHu.Title} ({selectedHu.State})\n");
@@ -2085,7 +2150,7 @@ Generate the pull request description in Markdown:";
                         .HighlightStyle(new Style(Color.Cyan1))
                         .AddChoices(choices));
 
-                if (selected == BackOption) return 0;
+                if (selected == BackOption) return BackToMenu;
 
                 var idx = displayMap[selected];
                 var selectedGroup = groups[idx];
