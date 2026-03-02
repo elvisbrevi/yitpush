@@ -1940,48 +1940,59 @@ Generate the pull request description in Markdown:";
         var setup = await EnsureAzureDevOpsReady();
         if (setup == null) return 1;
 
-        var wiql = $"SELECT [System.Id], [System.Title], [System.State], [System.AssignedTo] FROM WorkItems WHERE [System.WorkItemType] = 'Task' AND [System.Parent] = {huId} ORDER BY [System.Id]";
-        var (json, error) = await RunAzCaptureWithError(
-            $"boards query --wiql \"{wiql}\" --organization {orgUrl} --project \"{project}\" --output json");
+        // Fetch the HU work item to get its child relations
+        var wiJson = await RunAzCapture(
+            $"boards work-item show --id {huId} --organization {orgUrl} --expand relations --output json");
 
-        if (json == null)
+        if (wiJson == null)
         {
-            AnsiConsole.MarkupLine($"[red]Failed to fetch tasks.[/]");
+            AnsiConsole.MarkupLine($"[red]Failed to fetch HU {huId}.[/]");
             return 1;
         }
 
-        var tasks = new List<(string Id, string Title, string State)>();
+        var childIds = new List<string>();
         try
         {
-            using var doc = JsonDocument.Parse(json);
-            var items = doc.RootElement.TryGetProperty("workItems", out var wi) ? wi : doc.RootElement;
-            if (items.ValueKind == JsonValueKind.Array)
+            using var doc = JsonDocument.Parse(wiJson);
+            if (doc.RootElement.TryGetProperty("relations", out var relations) && relations.ValueKind == JsonValueKind.Array)
             {
-                foreach (var item in items.EnumerateArray())
+                foreach (var rel in relations.EnumerateArray())
                 {
-                    var id = item.TryGetProperty("id", out var idP) ? idP.ToString() : "";
-                    if (string.IsNullOrEmpty(id)) continue;
-
-                    // Fetch details for each task
-                    var detailJson = await RunAzCapture(
-                        $"boards work-item show --id {id} --organization {orgUrl} --output json");
-                    string title = id, state = "";
-                    if (detailJson != null)
+                    var relType = rel.TryGetProperty("rel", out var rp) ? rp.GetString() : "";
+                    if (relType == "System.LinkTypes.Hierarchy-Forward") // child
                     {
-                        try
+                        var url = rel.TryGetProperty("url", out var up) ? up.GetString() : "";
+                        if (url != null)
                         {
-                            using var detailDoc = JsonDocument.Parse(detailJson);
-                            var fields = detailDoc.RootElement.GetProperty("fields");
-                            title = fields.TryGetProperty("System.Title", out var tp) ? tp.GetString() ?? id : id;
-                            state = fields.TryGetProperty("System.State", out var sp) ? sp.GetString() ?? "" : "";
+                            var lastSlash = url.LastIndexOf('/');
+                            if (lastSlash >= 0)
+                                childIds.Add(url[(lastSlash + 1)..]);
                         }
-                        catch { }
                     }
-                    tasks.Add((id, title, state));
                 }
             }
         }
         catch { }
+
+        var tasks = new List<(string Id, string Title, string State)>();
+        foreach (var id in childIds)
+        {
+            var detailJson = await RunAzCapture(
+                $"boards work-item show --id {id} --organization {orgUrl} --output json");
+            string title = id, state = "";
+            if (detailJson != null)
+            {
+                try
+                {
+                    using var detailDoc = JsonDocument.Parse(detailJson);
+                    var fields = detailDoc.RootElement.GetProperty("fields");
+                    title = fields.TryGetProperty("System.Title", out var tp) ? tp.GetString() ?? id : id;
+                    state = fields.TryGetProperty("System.State", out var sp) ? sp.GetString() ?? "" : "";
+                }
+                catch { }
+            }
+            tasks.Add((id, title, state));
+        }
 
         if (tasks.Count == 0)
         {
@@ -1989,7 +2000,6 @@ Generate the pull request description in Markdown:";
             return 0;
         }
 
-        AnsiConsole.MarkupLine($"[bold]Tasks for HU {huId}:[/]");
         foreach (var t in tasks)
         {
             var stateColor = t.State switch
@@ -2001,20 +2011,22 @@ Generate the pull request description in Markdown:";
             AnsiConsole.MarkupLine($"  [{stateColor}]{t.Id}[/] {Markup.Escape(t.Title)} [dim]({Markup.Escape(t.State)})[/]");
         }
 
-        // Offer to add link to a task
-        var taskChoices = tasks.Select(t => $"{t.Id} - {t.Title}").ToList();
-        taskChoices.Add(BackOption);
-        var selected = AnsiConsole.Prompt(
-            new SelectionPrompt<string>()
-                .Title("Add link to task:")
-                .PageSize(15)
-                .HighlightStyle(new Style(Color.Cyan1))
-                .AddChoices(taskChoices));
+        while (true)
+        {
+            var taskChoices = tasks.Select(t => $"{t.Id} - {t.Title}").ToList();
+            taskChoices.Add(BackOption);
+            var selected = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("Add link to task:")
+                    .PageSize(15)
+                    .HighlightStyle(new Style(Color.Cyan1))
+                    .AddChoices(taskChoices));
 
-        if (selected == BackOption) return 0;
+            if (selected == BackOption) return 0;
 
-        var taskId = selected.Split(" - ")[0].Trim();
-        return await AddLinkToRepo(orgUrl, project, taskId);
+            var taskId = selected.Split(" - ")[0].Trim();
+            await AddLinkToRepo(orgUrl, project, taskId);
+        }
     }
 
     private static async Task<int> ListAzureUserStoriesForTaskList()
@@ -2042,18 +2054,21 @@ Generate the pull request description in Markdown:";
             displayList.Add(display);
         }
 
-        var choices = new List<string>(displayList) { BackOption };
-        var selected = AnsiConsole.Prompt(
-            new SelectionPrompt<string>()
-                .Title("User Story:")
-                .PageSize(15)
-                .HighlightStyle(new Style(Color.Cyan1))
-                .AddChoices(choices));
+        while (true)
+        {
+            var choices = new List<string>(displayList) { BackOption };
+            var selected = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("User Story:")
+                    .PageSize(15)
+                    .HighlightStyle(new Style(Color.Cyan1))
+                    .AddChoices(choices));
 
-        if (selected == BackOption) return BackToMenu;
+            if (selected == BackOption) return BackToMenu;
 
-        var huId = displayMap[selected];
-        return await ListTasksForHU(orgUrl, project, huId);
+            var huId = displayMap[selected];
+            await ListTasksForHU(orgUrl, project, huId);
+        }
     }
 
     private static async Task<int> AddLinkToRepo(string orgUrl, string project, string workItemId)
@@ -2178,13 +2193,13 @@ Generate the pull request description in Markdown:";
             return 1;
         }
 
-        var success = await RunAzPassthrough(
-            $"boards work-item relation add --id {workItemId} --relation-type Hyperlink --url \"{artifactUrl}\" --organization {orgUrl} --output none");
+        var (result, linkError) = await RunAzCaptureWithError(
+            $"boards work-item relation add --id {workItemId} --relation-type Hyperlink --target-url \"{artifactUrl}\" --organization {orgUrl} --output json");
 
-        if (success)
+        if (result != null)
             AnsiConsole.MarkupLine($"[green]Link added.[/]");
         else
-            AnsiConsole.MarkupLine($"[red]Failed to add link.[/]");
+            AnsiConsole.MarkupLine($"[red]Failed to add link.[/] [dim]{Markup.Escape(linkError?.Trim() ?? "")}[/]");
 
         return 0;
     }

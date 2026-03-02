@@ -16,7 +16,7 @@ yitpush commit --confirm
 - **⚡ One-Command Workflow**: Replaces `git add . && git commit -m "..." && git push`
 - **🔀 Branch Checkout**: Interactive branch switcher with `yitpush checkout`
 - **📝 PR Descriptions**: AI-generated pull request descriptions with `yitpush pr`
-- **☁️ Azure DevOps**: Create/clone repos and browse variable groups
+- **☁️ Azure DevOps**: Create/clone repos, manage User Stories, create tasks, and link work items
 - **🪟 Windows Support**: Full compatibility — detects `az.cmd` automatically on Windows
 - **🌍 Cross-Platform**: macOS, Linux, and Windows with full Unicode/emoji support
 
@@ -162,31 +162,36 @@ Manage Azure DevOps resources. Requires [Azure CLI](https://docs.microsoft.com/e
 | `repo new` | Create a new repository interactively |
 | `repo checkout` | Clone a repository interactively |
 | `variable-group list` | List and inspect variable groups |
-| `hu list` | List your User Stories and manage them (create tasks, branches) |
+| `hu task` | Create tasks for a User Story |
+| `hu task <org> <proj> <hu-id>` | Create tasks directly (skip menus) |
+| `hu list` | List tasks of a User Story |
+| `hu list <org> <proj> <hu-id>` | List tasks directly (skip menus) |
+| `link` | Add link (branch/commit/PR) to a work item |
+| `link <org> <proj> <wi-id>` | Add link directly (skip menus) |
 
 **Examples:**
 ```bash
-# Create a new repo
+# Interactive mode (menus)
 yitpush azure-devops repo new
-
-# Clone an existing repo
 yitpush azure-devops repo checkout
-
-# Browse variable groups
 yitpush azure-devops variable-group list
-
-# Browse and manage your User Stories
+yitpush azure-devops hu task
 yitpush azure-devops hu list
+yitpush azure-devops link
+
+# Quick mode (skip menus)
+yitpush azure-devops hu task MyOrg MyProject 12345
+yitpush azure-devops hu list MyOrg MyProject 12345
+yitpush azure-devops link MyOrg MyProject 12345
 ```
 
 **Features:**
 - Auto-detects Azure DevOps organizations; falls back to manual entry if needed
 - Installs the `azure-devops` CLI extension automatically if missing
-- Smart defaults: suggests current directory name as repo name
-- Handles existing remotes (choose between `azure`, `origin`, or custom)
+- Quick mode commands skip all interactive menus for fast scripting
+- Links support branch, commit, and pull request types
 - Full `← Back` navigation at every step
 - **Windows**: automatically uses `cmd.exe /c az` to find `az.cmd`
-- **User Stories**: Lists your assigned HUs by date, allowing you to create standard tasks, branches, or update status.
 
 ---
 
