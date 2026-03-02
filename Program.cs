@@ -13,7 +13,7 @@ namespace YitPush;
 class Program
 {
     private const string DeepSeekApiUrl = "https://api.deepseek.com/v1/chat/completions";
-    private const string DeepSeekModel = "deepseek-reasoner";
+    private const string DeepSeekModel = "deepseek-chat";
     private const string BackOption = "← Back";
     private const int BackToMenu = 100;
 
@@ -100,7 +100,7 @@ class Program
 
             if (hasChanges)
             {
-                Console.WriteLine($"🤖 Generating commit message with DeepSeek Reasoning...{(detailed ? " (detailed mode)" : "")}");
+                Console.WriteLine($"🤖 Generating commit message with DeepSeek...{(detailed ? " (detailed mode)" : "")}");
                 commitMessage = await GenerateCommitMessage(apiKey, diff, detailed, language);
 
                 if (string.IsNullOrWhiteSpace(commitMessage))
@@ -1294,7 +1294,7 @@ Generate the pull request description in Markdown:";
         AnsiConsole.MarkupLine($"Found differences ({diff.Length} characters)\n");
 
         // Generate PR description
-        AnsiConsole.MarkupLine($"🤖 Generating PR description with DeepSeek Reasoning...{(detailed ? " (detailed mode)" : "")}");
+        AnsiConsole.MarkupLine($"🤖 Generating PR description with DeepSeek...{(detailed ? " (detailed mode)" : "")}");
         var description = await GeneratePrDescriptionContent(apiKey, diff, detailed, language);
 
         if (string.IsNullOrWhiteSpace(description))

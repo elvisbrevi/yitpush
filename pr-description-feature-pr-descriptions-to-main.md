@@ -1,7 +1,7 @@
 ## feat: añade generación de descripción de PRs vía DeepSeek API
 
 ## Resumen
-Este PR introduce una nueva funcionalidad para generar automáticamente descripciones de pull requests en formato Markdown, comparando dos ramas de Git y utilizando la API de DeepSeek Reasoning. La función se activa con el nuevo flag `--pr-description` y puede combinarse con opciones de idioma y modo detallado.
+Este PR introduce una nueva funcionalidad para generar automáticamente descripciones de pull requests en formato Markdown, comparando dos ramas de Git y utilizando la API de DeepSeek. La función se activa con el nuevo flag `--pr-description` y puede combinarse con opciones de idioma y modo detallado.
 
 ## Cambios
 - **Nueva opción `--pr-description`**: Añadido flag para activar el modo generador de descripciones de PR
