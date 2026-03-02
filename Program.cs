@@ -15,6 +15,7 @@ class Program
     private const string DeepSeekApiUrl = "https://api.deepseek.com/v1/chat/completions";
     private const string DeepSeekModel = "deepseek-reasoner";
     private const string BackOption = "← Back";
+    private const int BackToMenu = 100;
 
     static async Task<int> Main(string[] args)
     {
@@ -1686,7 +1687,7 @@ Generate the pull request description in Markdown:";
             var action = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
                     .Title("What would you like to do?")
-                    .AddChoices("Create standard tasks", "Create branch for this HU", "Mark as In Progress", BackOption));
+                    .AddChoices("Create standard tasks", "Create branch for this HU", "Mark as In Progress", "Add link to repo", BackOption));
 
             if (action == BackOption) continue;
 
@@ -1712,6 +1713,10 @@ Generate the pull request description in Markdown:";
                 if (success)
                     AnsiConsole.MarkupLine($"[green]✅ Status updated.[/]");
             }
+            else if (action == "Add link to repo")
+            {
+                await AddLinkToRepo(orgUrl, project, selectedHu.Id);
+            }
         }
     }
 
@@ -1726,12 +1731,28 @@ Generate the pull request description in Markdown:";
         string[] meses = { "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre" };
         string currentMonth = meses[DateTime.Now.Month - 1];
 
+        // Get current user for assignment
+        var userEmail = await GetCurrentUserEmail();
+        string assignedField = "";
+        if (!string.IsNullOrEmpty(userEmail))
+        {
+            assignedField = $" \"System.AssignedTo={userEmail}\"";
+        }
+
+        // Ask for estimated effort
+        var effortHours = AnsiConsole.Prompt(
+            new TextPrompt<string>("Estimated effort in hours (default: 1):")
+                .DefaultValue("1")
+                .AllowEmpty());
+
+        if (string.IsNullOrWhiteSpace(effortHours)) effortHours = "1";
+
         foreach (var title in titles)
         {
             AnsiConsole.MarkupLine($"\n🔄 Creating task: [cyan]{Markup.Escape(title)}[/]...");
             
             // Initial fields based on SAG project requirements
-            var fields = $"\"Microsoft.VSTS.Scheduling.RemainingWork=0\" \"Custom.EsfuerzoEstimadoHH=1\" \"Custom.Mes={currentMonth}\"";
+            var fields = $"\"Microsoft.VSTS.Scheduling.RemainingWork=0\" \"Custom.EsfuerzoEstimadoHH={effortHours}\" \"Custom.Mes={currentMonth}\"{assignedField}";
             
             string? createJson = null;
             string? createError = null;
@@ -1823,6 +1844,156 @@ Generate the pull request description in Markdown:";
                 }
             }
         }
+
+        return 0;
+    }
+
+    private static async Task<int> AddLinkToRepo(string orgUrl, string project, string workItemId)
+    {
+        AnsiConsole.MarkupLine($"[bold blue]🔗 Add link to repository for work item {workItemId}[/]\n");
+
+        // Fetch repositories
+        AnsiConsole.MarkupLine("📋 Fetching repositories...");
+        var repos = await FetchAzureRepos(orgUrl, project);
+        if (repos.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[red]❌ No repositories found in this project.[/]");
+            return 1;
+        }
+
+        repos.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name));
+        var repoChoices = new List<string>(repos.Select(r => r.Name)) { BackOption };
+        var selectedRepoName = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("📋 Select [green]repository[/]:\n[dim](Select ← Back to return)[/]")
+                .PageSize(15)
+                .HighlightStyle(new Style(Color.Cyan1))
+                .AddChoices(repoChoices));
+
+        if (selectedRepoName == BackOption) return 0;
+
+        var selectedRepo = repos.First(r => r.Name == selectedRepoName);
+        AnsiConsole.MarkupLine($"\n[green]✅ Repository:[/] {selectedRepo.Name}");
+
+        // Ask for link type
+        var linkType = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("Select [green]link type[/]:")
+                .AddChoices("Branch", "Commit", "Pull Request", "New Branch", BackOption));
+
+        if (linkType == BackOption) return 0;
+
+        string artifactUrl = "";
+        if (linkType == "Branch")
+        {
+            // Try to fetch branches
+            var branchesJson = await RunAzCapture($"repos ref list --repository \"{selectedRepo.Name}\" --organization {orgUrl} --project \"{project}\" --output json");
+            var branches = new List<string>();
+            if (branchesJson != null)
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(branchesJson);
+                    JsonElement items;
+                    if (doc.RootElement.ValueKind == JsonValueKind.Array)
+                        items = doc.RootElement;
+                    else if (doc.RootElement.TryGetProperty("value", out var valueProp))
+                        items = valueProp;
+                    else
+                        items = default;
+
+                    if (items.ValueKind != JsonValueKind.Undefined && items.ValueKind != JsonValueKind.Null)
+                    {
+                        foreach (var branch in items.EnumerateArray())
+                        {
+                            if (branch.TryGetProperty("name", out var nameProp))
+                            {
+                                var name = nameProp.GetString();
+                                if (name != null && name.StartsWith("refs/heads/"))
+                                    branches.Add(name["refs/heads/".Length..]);
+                            }
+                        }
+                    }
+                }
+                catch { }
+            }
+
+            if (branches.Count > 0)
+            {
+                branches.Sort();
+                var branchChoices = new List<string>(branches) { BackOption, "Enter custom branch name" };
+                var selectedBranch = AnsiConsole.Prompt(
+                    new SelectionPrompt<string>()
+                        .Title("Select [green]branch[/]:")
+                        .PageSize(15)
+                        .AddChoices(branchChoices));
+
+                if (selectedBranch == BackOption) return 0;
+                if (selectedBranch == "Enter custom branch name")
+                {
+                    var customBranch = AnsiConsole.Prompt(
+                        new TextPrompt<string>("Enter branch name (without refs/heads/):")
+                            .DefaultValue("main"));
+                    artifactUrl = $"{orgUrl}/{project}/_git/{selectedRepo.Name}?version=GB{customBranch}";
+                }
+                else
+                {
+                    artifactUrl = $"{orgUrl}/{project}/_git/{selectedRepo.Name}?version=GB{selectedBranch}";
+                }
+            }
+            else
+            {
+                // No branches found or error, ask for branch name
+                var branchName = AnsiConsole.Prompt(
+                    new TextPrompt<string>("Enter branch name (without refs/heads/):")
+                        .DefaultValue("main"));
+                artifactUrl = $"{orgUrl}/{project}/_git/{selectedRepo.Name}?version=GB{branchName}";
+            }
+        }
+        else if (linkType == "Commit")
+        {
+            var commitHash = AnsiConsole.Prompt(
+                new TextPrompt<string>("Enter commit hash (full or short):")
+                    .ValidationErrorMessage("Commit hash is required")
+                    .Validate(hash => !string.IsNullOrWhiteSpace(hash)));
+            
+            artifactUrl = $"{orgUrl}/{project}/_git/{selectedRepo.Name}/commit/{commitHash}";
+        }
+        else if (linkType == "Pull Request")
+        {
+            var prId = AnsiConsole.Prompt(
+                new TextPrompt<string>("Enter Pull Request ID:")
+                    .ValidationErrorMessage("PR ID is required")
+                    .Validate(id => int.TryParse(id, out _)));
+            
+            artifactUrl = $"{orgUrl}/{project}/_git/{selectedRepo.Name}/pullrequest/{prId}";
+        }
+        else if (linkType == "New Branch")
+        {
+            var newBranchName = AnsiConsole.Prompt(
+                new TextPrompt<string>("Enter new branch name (without refs/heads/):")
+                    .ValidationErrorMessage("Branch name is required"));
+            
+            // Optionally create the branch? For now just generate link
+            artifactUrl = $"{orgUrl}/{project}/_git/{selectedRepo.Name}?version=GB{newBranchName}";
+            AnsiConsole.MarkupLine($"[yellow]⚠️  Note: Branch not created, only link generated.[/]");
+        }
+
+        if (string.IsNullOrEmpty(artifactUrl))
+        {
+            AnsiConsole.MarkupLine("[red]❌ Could not build artifact URL.[/]");
+            return 1;
+        }
+
+        AnsiConsole.MarkupLine($"[dim]🔗 URL:[/] {artifactUrl}");
+        AnsiConsole.MarkupLine($"\n🔗 Adding link to work item...");
+        var success = await RunAzPassthrough(
+            $"boards work-item relation add --id {workItemId} --relation-type Hyperlink --url \"{artifactUrl}\" --organization {orgUrl} --output none");
+
+        if (success)
+            AnsiConsole.MarkupLine($"[green]✅ Link added successfully.[/]");
+        else
+            AnsiConsole.MarkupLine($"[red]❌ Failed to add link.[/]");
 
         return 0;
     }
@@ -2297,6 +2468,25 @@ Generate the pull request description in Markdown:";
     }
 
     // ─── Process helpers ──────────────────────────────────────────────────────
+
+    private static async Task<string?> GetCurrentUserEmail()
+    {
+        var accountJson = await RunAzCapture("account show --output json");
+        if (accountJson != null)
+        {
+            try
+            {
+                using var doc = JsonDocument.Parse(accountJson);
+                if (doc.RootElement.TryGetProperty("user", out var userProp) &&
+                    userProp.TryGetProperty("name", out var nameProp))
+                {
+                    return nameProp.GetString();
+                }
+            }
+            catch { }
+        }
+        return null;
+    }
 
     private static Task<string?> RunAzCapture(string arguments)
     {
