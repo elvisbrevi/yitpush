@@ -263,6 +263,32 @@ class Program
         var resource = args[0];
         var action = args[1];
 
+        // Flag parsing
+        string? description = null;
+        string? effort = null;
+        string? repo = null;
+        string? branch = null;
+
+        for (int i = 0; i < args.Length; i++)
+        {
+            if ((args[i] == "--description" || args[i] == "-d") && i + 1 < args.Length)
+            {
+                description = args[i + 1];
+            }
+            if ((args[i] == "--effort" || args[i] == "-e") && i + 1 < args.Length)
+            {
+                effort = args[i + 1];
+            }
+            if (args[i] == "--repo" && i + 1 < args.Length)
+            {
+                repo = args[i + 1];
+            }
+            if (args[i] == "--branch" && i + 1 < args.Length)
+            {
+                branch = args[i + 1];
+            }
+        }
+
         if (resource == "repo" && action == "new")
         {
             var remote = await CreateAzureDevOpsRepo();
@@ -280,16 +306,31 @@ class Program
         }
         else if (resource == "hu" && action == "task")
         {
-            // Quick mode: yitpush azure-devops hu task <org> <project> <hu-id>
-            if (args.Length >= 5)
+            // Quick mode: yitpush azure-devops hu task <org> <project> <hu-id> [--description "desc"] [--effort "5"]
+            if (args.Length >= 5 && !args[2].StartsWith("-"))
             {
                 var org = args[2];
                 var proj = args[3];
                 var huId = args[4];
                 var orgUrl = $"https://dev.azure.com/{org}";
-                return await CreateTasksDirectForHU(orgUrl, proj, huId);
+                return await CreateTasksDirectForHU(orgUrl, proj, huId, description, effort);
             }
-            var result = await ListAzureUserStories();
+            var result = await ListAzureUserStories(description, effort);
+            return result == BackToMenu ? 0 : result;
+        }
+        else if (resource == "hu" && action == "link")
+        {
+            // Quick mode: yitpush azure-devops hu link <org> <project> <hu-id> --repo <repo> --branch <branch>
+            if (args.Length >= 5 && !args[2].StartsWith("-"))
+            {
+                var org = args[2];
+                var proj = args[3];
+                var huId = args[4];
+                var orgUrl = $"https://dev.azure.com/{org}";
+                return await AddLinkToRepo(orgUrl, proj, huId, repo, branch);
+            }
+            
+            var result = await ListAzureUserStoriesForLinking();
             return result == BackToMenu ? 0 : result;
         }
         else if (resource == "hu" && action == "list")
@@ -442,7 +483,7 @@ class Program
         azTable.AddRow("repo checkout", "Clone a repository interactively");
         azTable.AddRow("variable-group list", "List and inspect variable groups");
         azTable.AddRow("hu task", "Create tasks for a User Story");
-        azTable.AddRow("hu task <org> <proj> <hu-id>", "Create tasks (skip menus)");
+        azTable.AddRow("hu task <org> <proj> <hu-id> [--description \"...\"]", "Create tasks (skip menus)");
         azTable.AddRow("hu list", "List tasks of a User Story");
         azTable.AddRow("hu list <org> <proj> <hu-id>", "List tasks (skip menus)");
         azTable.AddRow("link", "Add link (branch/commit/PR) to work item");
@@ -457,6 +498,7 @@ class Program
         AnsiConsole.MarkupLine("  yitpush pr                                      [dim]# Generate PR description[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops hu task                    [dim]# Create tasks interactively[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops hu task MyOrg MyProj 12345 [dim]# Create tasks (quick)[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops hu task MyOrg MyProj 12345 --description \"Desc\" [dim]# Quick with desc[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops hu list MyOrg MyProj 12345 [dim]# List tasks of HU[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops link MyOrg MyProj 12345    [dim]# Add link to work item[/]");
         Console.WriteLine();
@@ -478,7 +520,7 @@ class Program
         table.AddRow("repo checkout", "Clone a repository interactively");
         table.AddRow("variable-group list", "List and inspect variable groups");
         table.AddRow("hu task", "Create tasks for a User Story");
-        table.AddRow("hu task <org> <proj> <hu-id>", "Create tasks (skip menus)");
+        table.AddRow("hu task <org> <proj> <hu-id> [--description \"...\"]", "Create tasks (skip menus)");
         table.AddRow("hu list", "List tasks of a User Story");
         table.AddRow("hu list <org> <proj> <hu-id>", "List tasks (skip menus)");
         table.AddRow("link", "Add link (branch/commit/PR) to work item");
@@ -488,6 +530,7 @@ class Program
 
         AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops hu task MyOrg MyProj 123 [dim]# Create tasks (quick)[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops hu task MyOrg MyProj 123 --description \"Fix bugs\" [dim]# Quick with desc[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops hu list MyOrg MyProj 123 [dim]# List tasks of HU[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops link MyOrg MyProj 123    [dim]# Add link to work item[/]");
         Console.WriteLine();
@@ -1705,7 +1748,7 @@ Generate the pull request description in Markdown:";
         return 0;
     }
 
-    private static async Task<int> ListAzureUserStories()
+    private static async Task<int> ListAzureUserStories(string? description = null)
     {
 
         var setup = await EnsureAzureDevOpsSetup();
@@ -1755,7 +1798,7 @@ Generate the pull request description in Markdown:";
 
             if (action == "Create standard tasks")
             {
-                await CreateTasksForUserStory(orgUrl, project, selectedHu.Id, selectedHu.Area, selectedHu.Iteration);
+                await CreateTasksForUserStory(orgUrl, project, selectedHu.Id, selectedHu.Area, selectedHu.Iteration, description);
             }
             else if (action == "Create branch for this HU")
             {
@@ -1780,7 +1823,7 @@ Generate the pull request description in Markdown:";
         }
     }
 
-    private static async Task<int> CreateTasksForUserStory(string orgUrl, string project, string huId, string areaPath, string iterationPath)
+    private static async Task<int> CreateTasksForUserStory(string orgUrl, string project, string huId, string areaPath, string iterationPath, string? fixedDescription = null)
     {
         var taskTitles = AnsiConsole.Prompt(
             new TextPrompt<string>("Enter task titles (comma separated):")
@@ -1809,11 +1852,27 @@ Generate the pull request description in Markdown:";
 
         foreach (var title in titles)
         {
+            var description = fixedDescription;
+            if (description == null)
+            {
+                description = AnsiConsole.Prompt(
+                    new TextPrompt<string>($"Description for [cyan]{Markup.Escape(title)}[/] (optional):")
+                        .AllowEmpty());
+            }
+
             AnsiConsole.Markup($"[dim]{Markup.Escape(title)}...[/] ");
             
             // Initial fields based on SAG project requirements
             var fields = $"\"Microsoft.VSTS.Scheduling.RemainingWork=0\" \"Custom.EsfuerzoEstimadoHH={effortHours}\" \"Custom.Mes={currentMonth}\"{assignedField}";
             
+            if (!string.IsNullOrEmpty(description))
+            {
+                // Escape description for AZ CLI fields - it needs careful quoting
+                // Azure CLI fields take "Field=Value" and we already wrap the whole thing in quotes
+                var escapedDescription = description.Replace("\"", "\\\"");
+                fields += $" \"System.Description={escapedDescription}\"";
+            }
+
             string? createJson = null;
             string? createError = null;
             bool success = false;
@@ -1907,7 +1966,7 @@ Generate the pull request description in Markdown:";
         return 0;
     }
 
-    private static async Task<int> CreateTasksDirectForHU(string orgUrl, string project, string huId)
+    private static async Task<int> CreateTasksDirectForHU(string orgUrl, string project, string huId, string? description = null)
     {
         var setup = await EnsureAzureDevOpsReady();
         if (setup == null) return 1;
@@ -1932,7 +1991,7 @@ Generate the pull request description in Markdown:";
         }
         catch { }
 
-        return await CreateTasksForUserStory(orgUrl, project, huId, areaPath, iterationPath);
+        return await CreateTasksForUserStory(orgUrl, project, huId, areaPath, iterationPath, description);
     }
 
     private static async Task<int> ListTasksForHU(string orgUrl, string project, string huId)
