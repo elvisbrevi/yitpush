@@ -8,15 +8,13 @@
 
     <!-- Package as Tool -->
     <PackAsTool>true</PackAsTool>
-    <ToolCommandName>yitpush</ToolCommandName>
+    <ToolCommandName>yp</ToolCommandName>
 
     <!-- Package Metadata -->
     <PackageId>YitPush</PackageId>
-    <Version>1.3.3</Version>
+    <Version>1.4.0</Version>
     <Authors>Elvis Brevi</Authors>
-    <Description>AI-powered git commit automation tool. Analyzes code changes with DeepSeek
-      AI and generates meaningful commit messages. Run 'yitpush' to automatically stage,
-      commit, and push changes with intelligent commit messages.</Description>
+    <Description>AI-powered git commit automation tool. Now with full Azure DevOps Task management and shorter 'yp' command.</Description>
 
     <!-- URLs and Repository -->
     <PackageProjectUrl>https://github.com/elvisbrevi/yitpush</PackageProjectUrl>
@@ -35,14 +33,13 @@
 
     <!-- Additional Metadata -->
     <Copyright>Copyright (c) 2026 Elvis Brevi</Copyright>
-    <PackageReleaseNotes>Breaking: CLI restructured to subcommand style (commit, checkout, pr,
-      azure-devops)
-      New: Running yitpush with no args shows help, like traditional CLI tools
-      New: yitpush commit replaces the default flag-based commit flow
-      New: yitpush checkout replaces --check flag
-      New: yitpush pr replaces --pr-description flag
-      Fix: Windows support for Azure CLI - automatically uses cmd.exe /c az to find az.cmd
-      Fix: Azure DevOps organization fallback - prompts for manual entry when auto-detection fails</PackageReleaseNotes>
+    <PackageReleaseNotes>New: Command shortened to 'yp' for faster usage (yitpush still works via alias).
+New: Full Azure DevOps Task Management (hu list, task show, task update).
+New: Interactive and direct updates for Effort, Esfuerzo Real HH, Remaining Work, State and Comments.
+New: Smart state validation and selection menus for Azure DevOps.
+New: Integrated 'List all fields' tool for debugging work item technical names.
+Improved: Faster navigation with 'Back' support in all interactive menus.
+Improved: Sorting by ID descending (recency first) in all Azure DevOps lists.</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>

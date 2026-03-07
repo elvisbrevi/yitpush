@@ -1,6 +1,6 @@
-# 🚀 YitPush
+# 🚀 yp (YitPush)
 
-AI-Powered Git Commit and Azure DevOps Management Tool.
+AI-Powered Git Commit and Azure DevOps Management Tool. Now with a shorter, faster command!
 
 ## 🛠️ Installation
 
@@ -11,7 +11,15 @@ cd yitpush
 
 # Build and install globally
 dotnet pack -c Release
-dotnet tool install --global --add-source ./nupkg yitpush
+dotnet tool install --global --add-source ./nupkg YitPush
+```
+
+> **Note:** The command is now **`yp`**. If you've previously installed it as `yitpush`, you should uninstall it first: `dotnet tool uninstall -g YitPush`.
+
+### 💡 Alias Support (Optional)
+If you want both `yp` and `yitpush` to work, add this to your `.bashrc` or `.zshrc`:
+```bash
+alias yitpush='yp'
 ```
 
 ## 🔑 Configuration
@@ -26,27 +34,27 @@ export DEEPSEEK_API_KEY='your-api-key-here'
 ### Git Commands
 | Command | Description |
 |---------|-------------|
-| `commit` | Stage, commit and push changes with an AI-generated message |
-| `checkout` | Interactive branch checkout |
-| `pr` | Generate a pull request description |
+| `yp commit` | Stage, commit and push changes with an AI-generated message |
+| `yp checkout` | Interactive branch checkout |
+| `yp pr` | Generate a pull request description |
 
 ### Azure DevOps Commands
 | Command | Description |
 |---------|-------------|
-| `azure-devops` | Enter interactive Azure DevOps menu |
-| `repo new` | Create a new repository |
-| `repo checkout`| Clone/Checkout a repository |
-| `hu task` | Create tasks for a User Story |
-| `hu list` | List tasks of a User Story and manage them |
-| `hu show` | Show details of a User Story (title, effort, links) |
-| `task show` | Show details of a Task (effort, remaining, description) |
-| `task update`| Update task fields (effort, state, comments) |
-| `hu link` | Link a repository branch to a User Story |
+| `yp azure-devops` | Enter interactive Azure DevOps menu |
+| `yp repo new` | Create a new repository |
+| `yp repo checkout`| Clone/Checkout a repository |
+| `yp hu task` | Create tasks for a User Story |
+| `yp hu list` | List tasks of a User Story and manage them |
+| `yp hu show` | Show details of a User Story (title, effort, links) |
+| `yp task show` | Show details of a Task (effort, remaining, description) |
+| `yp task update`| Update task fields (effort, state, comments) |
+| `yp hu link` | Link a repository branch to a User Story |
 
 ## 🚀 Detailed Features
 
 ### 📝 Smart Commits
-`yitpush commit` analyzes your staged changes and generates a professional commit message using DeepSeek AI.
+`yp commit` analyzes your staged changes and generates a professional commit message using DeepSeek AI.
 - `--confirm`: Review the message before committing.
 - `--detailed`: Generate title and body.
 - `--language <lang>`: Output in your preferred language.
@@ -54,7 +62,7 @@ export DEEPSEEK_API_KEY='your-api-key-here'
 ### 🔷 Azure DevOps Integration
 
 #### 📋 Task Management
-- **List & Update**: Use `yitpush azure-devops hu list` to see all tasks of a HU. Select a task to:
+- **List & Update**: Use `yp azure-devops hu list` to see all tasks of a HU. Select a task to:
     - View full **Description**.
     - See **Effort (HH)**, **Esfuerzo Real (HH)** and **Remaining Work**.
     - Inspect **Links** (Branches, Commits, PRs).
@@ -64,19 +72,19 @@ export DEEPSEEK_API_KEY='your-api-key-here'
 Update work items directly from your terminal:
 ```bash
 # Update multiple fields
-yitpush azure-devops task update <org> <id> --state "Active" --effort-real "5" --remaining "2"
+yp azure-devops task update <org> <id> --state "Active" --effort-real "5" --remaining "2"
 
 # Add a comment
-yitpush azure-devops task update <org> <id> --comment "Progress update: logic refactored"
+yp azure-devops task update <org> <id> --comment "Progress update: logic refactored"
 
 # Create tasks with info
-yitpush azure-devops hu task <org> <proj> <hu-id> --description "Task info" --effort "4"
+yp azure-devops hu task <org> <proj> <hu-id> --description "Task info" --effort "4"
 ```
 
 #### 🔗 Deep Linking
 Link your local branch to an Azure DevOps work item natively:
 ```bash
-yitpush azure-devops hu link <org> <proj> <id> --repo <name> --branch <name>
+yp azure-devops hu link <org> <proj> <id> --repo <name> --branch <name>
 ```
 This uses `ArtifactLink`, making the branch appear in the **Development** section of the Azure Boards UI.
 
