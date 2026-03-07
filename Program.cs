@@ -272,6 +272,7 @@ class Program
         string? remaining = null;
         string? state = null;
         string? comment = null;
+        string? effortReal = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -282,6 +283,10 @@ class Program
             if ((args[i] == "--effort" || args[i] == "-e") && i + 1 < args.Length)
             {
                 effort = args[i + 1];
+            }
+            if ((args[i] == "--effort-real" || args[i] == "-er") && i + 1 < args.Length)
+            {
+                effortReal = args[i + 1];
             }
             if (args[i] == "--repo" && i + 1 < args.Length)
             {
@@ -391,13 +396,14 @@ class Program
         }
         else if ((resource == "hu" || resource == "task" || resource == "wi") && action == "update")
         {
-            // Quick mode: yitpush azure-devops wi update <org> <id> [--effort "val"] [--remaining "val"] [--state "val"] [--comment "val"]
+            // Quick mode: yitpush azure-devops task update <org> <id> [--effort "val"] [--remaining "val"] [--state "val"] [--comment "val"]
             if (args.Length >= 4 && !args[2].StartsWith("-"))
             {
                 var orgForUpdate = args[2];
                 var idForUpdate = args[3];
                 var orgUrlForUpdate = $"https://dev.azure.com/{orgForUpdate}";
-                return await UpdateWorkItem(orgUrlForUpdate, idForUpdate, effort, remaining, state, comment);
+                // Ensure all flags (effort, remaining, state, comment, effortReal) are passed from the outer scope parsing
+                return await UpdateWorkItem(orgUrlForUpdate, idForUpdate, effort, remaining, state, comment, effortReal);
             }
             
             // Interactive mode: select work item first
@@ -552,8 +558,8 @@ class Program
         azTable.AddRow("hu link <org> <proj> <hu-id> --repo <repo> --branch <branch>", "Link branch (skip menus)");
         azTable.AddRow("hu list", "List tasks of a User Story");
         azTable.AddRow("hu list <org> <proj> <hu-id>", "List tasks (skip menus)");
-        azTable.AddRow("wi update", "Update effort, remaining, state or comment");
-        azTable.AddRow("wi update <org> <id> [[--effort \"5\"]] [[--state \"Doing\"]]", "Update directly");
+        azTable.AddRow("task update", "Update effort, remaining, state or comment");
+        azTable.AddRow("task update <org> <id> [[--effort <e>]] [[--effort-real <er>]] [[--remaining <r>]] [[--state <s>]] [[--comment <c>]]", "Update directly");
         azTable.AddRow("link", "Add link (branch/commit/PR) to work item");
         azTable.AddRow("link <org> <proj> <wi-id>", "Add link (skip menus)");
 
@@ -599,8 +605,8 @@ class Program
         table.AddRow("hu link <org> <proj> <hu-id> --repo <repo> --branch <branch>", "Link branch (skip menus)");
         table.AddRow("hu list", "List tasks of a User Story");
         table.AddRow("hu list <org> <proj> <hu-id>", "List tasks (skip menus)");
-        table.AddRow("wi update", "Update effort, remaining, state or comment");
-        table.AddRow("wi update <org> <id> [[--effort \"5\"]] [[--state \"Doing\"]]", "Update directly");
+        table.AddRow("task update", "Update effort, remaining, state or comment");
+        table.AddRow("task update <org> <id> [[--effort <e>]] [[--effort-real <er>]] [[--remaining <r>]] [[--state <s>]] [[--comment <c>]]", "Update directly");
         table.AddRow("link", "Add link (branch/commit/PR) to work item");
         table.AddRow("link <org> <proj> <wi-id>", "Add link (skip menus)");
 
@@ -609,8 +615,8 @@ class Program
         AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops hu show MyOrg 12345      [dim]# Show HU info[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops task show MyOrg 67890    [dim]# Show Task info[/]");
-        AnsiConsole.MarkupLine("  yitpush azure-devops wi update MyOrg 67890 --effort \"8\" --state \"Doing\" [dim]# Update task[/]");
-        AnsiConsole.MarkupLine("  yitpush azure-devops wi update MyOrg 67890 --comment \"Fixed the bug\"    [dim]# Add comment[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops task update MyOrg 67890 --effort \"8\" --state \"Doing\" [dim]# Update task[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops task update MyOrg 67890 --comment \"Fixed the bug\"    [dim]# Add comment[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops hu task MyOrg MyProj 123 --effort \"8\" [dim]# Quick task with effort[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops hu link MyOrg MyProj 123 --repo Repo --branch main [dim]# Quick link[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops hu list MyOrg MyProj 123 [dim]# List tasks of HU[/]");
@@ -3046,6 +3052,7 @@ Generate the pull request description in Markdown:";
             
             // Custom fields
             var effort = fields.TryGetProperty("Custom.EsfuerzoEstimadoHH", out var effortProp) ? effortProp.ToString() : "-";
+            var effortReal = fields.TryGetProperty("Custom.EsfuerzoRealHH", out var effortRealProp) ? effortRealProp.ToString() : "-";
             var mes = fields.TryGetProperty("Custom.Mes", out var mesProp) ? mesProp.GetString() : "-";
             var urlCommit = fields.TryGetProperty("Custom.URLCommit", out var urlProp) ? urlProp.GetString() : "-";
             var remaining = fields.TryGetProperty("Microsoft.VSTS.Scheduling.RemainingWork", out var remProp) ? remProp.ToString() : "-";
@@ -3066,6 +3073,7 @@ Generate the pull request description in Markdown:";
             panel.AddRow("[bold]Area[/]", Markup.Escape(area ?? ""));
             panel.AddRow("[bold]Iteration[/]", Markup.Escape(iteration ?? ""));
             panel.AddRow("[bold]Effort (HH)[/]", effort ?? "");
+            panel.AddRow("[bold]Esfuerzo Real (HH)[/]", effortReal ?? "");
             panel.AddRow("[bold]Remaining[/]", remaining ?? "");
             panel.AddRow("[bold]Month[/]", mes ?? "");
             panel.AddRow("[bold]URL Commit[/]", $"[blue]{Markup.Escape(urlCommit ?? "")}[/]");
@@ -3127,11 +3135,21 @@ Generate the pull request description in Markdown:";
             var next = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
                     .Title("Actions:")
-                    .AddChoices("Update", BackOption));
+                    .AddChoices("Update", "List all fields", BackOption));
 
             if (next == "Update")
             {
                 await UpdateWorkItemInteractive(orgUrl, id);
+            }
+            else if (next == "List all fields")
+            {
+                var table = new Table().Border(TableBorder.Rounded).AddColumn("Internal Name").AddColumn("Value");
+                foreach (var field in fields.EnumerateObject())
+                {
+                    table.AddRow(Markup.Escape(field.Name), Markup.Escape(field.Value.ToString()));
+                }
+                AnsiConsole.Write(table);
+                AnsiConsole.Prompt(new TextPrompt<string>("Press Enter to continue...").AllowEmpty());
             }
         }
         catch (Exception ex)
@@ -3244,12 +3262,29 @@ Generate the pull request description in Markdown:";
         }
     }
 
-    private static async Task<int> UpdateWorkItem(string orgUrl, string id, string? effort, string? remaining, string? state, string? comment)
+    private static readonly string[] ValidAzureStates = { "To Do", "Doing", "Active", "In Progress", "Resolved", "Done", "Closed", "Removed" };
+
+    private static async Task<int> UpdateWorkItem(string orgUrl, string id, string? effort, string? remaining, string? state, string? comment, string? effortReal = null)
     {
         var fieldsList = new List<string>();
         if (!string.IsNullOrEmpty(effort)) fieldsList.Add($"Custom.EsfuerzoEstimadoHH={effort}");
+        if (!string.IsNullOrEmpty(effortReal)) 
+        {
+            fieldsList.Add($"Custom.EsfuerzoRealHH={effortReal}");
+            // Also try standard field name just in case
+            fieldsList.Add($"Microsoft.VSTS.Scheduling.CompletedWork={effortReal}");
+        }
         if (!string.IsNullOrEmpty(remaining)) fieldsList.Add($"Microsoft.VSTS.Scheduling.RemainingWork={remaining}");
-        if (!string.IsNullOrEmpty(state)) fieldsList.Add($"System.State={state}");
+        
+        if (!string.IsNullOrEmpty(state))
+        {
+            if (!ValidAzureStates.Contains(state, StringComparer.OrdinalIgnoreCase))
+            {
+                AnsiConsole.MarkupLine($"[yellow]⚠️  Warning: '{state}' may not be a valid state.[/]");
+                AnsiConsole.MarkupLine($"Common states: [cyan]{string.Join(", ", ValidAzureStates)}[/]");
+            }
+            fieldsList.Add($"System.State={state}");
+        }
 
         bool anySuccess = false;
 
@@ -3280,7 +3315,7 @@ Generate the pull request description in Markdown:";
 
         if (!anySuccess && fieldsList.Count == 0 && string.IsNullOrEmpty(comment))
         {
-            AnsiConsole.MarkupLine("[yellow]No updates provided (use --effort, --remaining, --state, or --comment).[/]");
+            AnsiConsole.MarkupLine("[yellow]No updates provided (use --effort, --effort-real, --remaining, --state, or --comment).[/]");
             return 1;
         }
 
@@ -3294,19 +3329,32 @@ Generate the pull request description in Markdown:";
             var field = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
                     .Title($"[bold]Update work item #{id}[/]")
-                    .AddChoices("State", "Effort (HH)", "Remaining Work", "Add Comment", BackOption));
+                    .AddChoices("State", "Effort (HH)", "Esfuerzo Real HH", "Remaining Work", "Add Comment", BackOption));
 
             if (field == BackOption) return 0;
 
-            string? effort = null, remaining = null, state = null, comment = null;
+            string? effort = null, remaining = null, state = null, comment = null, effortReal = null;
 
             if (field == "State")
             {
-                state = AnsiConsole.Prompt(new TextPrompt<string>("Enter new state (e.g. Active, Closed, Doing):"));
+                state = AnsiConsole.Prompt(
+                    new SelectionPrompt<string>()
+                        .Title("Select new state:")
+                        .AddChoices(ValidAzureStates)
+                        .AddChoices("Other..."));
+                
+                if (state == "Other...")
+                {
+                    state = AnsiConsole.Prompt(new TextPrompt<string>("Enter custom state:"));
+                }
             }
             else if (field == "Effort (HH)")
             {
                 effort = AnsiConsole.Prompt(new TextPrompt<string>("Enter Effort (HH):"));
+            }
+            else if (field == "Esfuerzo Real HH")
+            {
+                effortReal = AnsiConsole.Prompt(new TextPrompt<string>("Enter Esfuerzo Real HH:"));
             }
             else if (field == "Remaining Work")
             {
@@ -3317,7 +3365,7 @@ Generate the pull request description in Markdown:";
                 comment = AnsiConsole.Prompt(new TextPrompt<string>("Enter comment:"));
             }
 
-            await UpdateWorkItem(orgUrl, id, effort, remaining, state, comment);
+            await UpdateWorkItem(orgUrl, id, effort, remaining, state, comment, effortReal);
         }
     }
 }
