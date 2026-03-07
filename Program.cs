@@ -269,6 +269,9 @@ class Program
         string? effort = null;
         string? repo = null;
         string? branch = null;
+        string? remaining = null;
+        string? state = null;
+        string? comment = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -287,6 +290,18 @@ class Program
             if (args[i] == "--branch" && i + 1 < args.Length)
             {
                 branch = args[i + 1];
+            }
+            if ((args[i] == "--remaining" || args[i] == "-r") && i + 1 < args.Length)
+            {
+                remaining = args[i + 1];
+            }
+            if ((args[i] == "--state" || args[i] == "-s") && i + 1 < args.Length)
+            {
+                state = args[i + 1];
+            }
+            if ((args[i] == "--comment" || args[i] == "-c") && i + 1 < args.Length)
+            {
+                comment = args[i + 1];
             }
         }
 
@@ -373,6 +388,25 @@ class Program
             // Interactive mode: select HU first, then list tasks
             var result = await ListAzureUserStoriesForTaskList();
             return result == BackToMenu ? 0 : result;
+        }
+        else if ((resource == "hu" || resource == "task" || resource == "wi") && action == "update")
+        {
+            // Quick mode: yitpush azure-devops wi update <org> <id> [--effort "val"] [--remaining "val"] [--state "val"] [--comment "val"]
+            if (args.Length >= 4 && !args[2].StartsWith("-"))
+            {
+                var org = args[2];
+                var id = args[3];
+                var orgUrl = $"https://dev.azure.com/{org}";
+                return await UpdateWorkItem(orgUrl, id, effort, remaining, state, comment);
+            }
+            
+            // Interactive mode: select work item first
+            var setup = await EnsureAzureDevOpsSetup();
+            if (setup == null) return 1;
+            var (orgUrl, projectName, projectId) = setup.Value;
+            
+            var id = AnsiConsole.Prompt(new TextPrompt<string>("Work item ID:"));
+            return await UpdateWorkItemInteractive(orgUrl, id);
         }
         else
         {
@@ -509,7 +543,7 @@ class Program
         azTable.AddRow("repo checkout", "Clone a repository interactively");
         azTable.AddRow("variable-group list", "List and inspect variable groups");
         azTable.AddRow("hu task", "Create tasks for a User Story");
-        azTable.AddRow("hu task <org> <proj> <hu-id> [--description \"...\"] [--effort \"...\"]", "Create tasks (skip menus)");
+        azTable.AddRow("hu task <org> <proj> <hu-id> [[--description \"...\"]] [[--effort \"...\"]]", "Create tasks (skip menus)");
         azTable.AddRow("hu show", "Show User Story details");
         azTable.AddRow("hu show <org> <hu-id>", "Show details (skip menus)");
         azTable.AddRow("task show", "Show task details");
@@ -518,6 +552,8 @@ class Program
         azTable.AddRow("hu link <org> <proj> <hu-id> --repo <repo> --branch <branch>", "Link branch (skip menus)");
         azTable.AddRow("hu list", "List tasks of a User Story");
         azTable.AddRow("hu list <org> <proj> <hu-id>", "List tasks (skip menus)");
+        azTable.AddRow("wi update", "Update effort, remaining, state or comment");
+        azTable.AddRow("wi update <org> <id> [[--effort \"5\"]] [[--state \"Doing\"]]", "Update directly");
         azTable.AddRow("link", "Add link (branch/commit/PR) to work item");
         azTable.AddRow("link <org> <proj> <wi-id>", "Add link (skip menus)");
 
@@ -554,7 +590,7 @@ class Program
         table.AddRow("repo checkout", "Clone a repository interactively");
         table.AddRow("variable-group list", "List and inspect variable groups");
         table.AddRow("hu task", "Create tasks for a User Story");
-        table.AddRow("hu task <org> <proj> <hu-id> [--description \"...\"] [--effort \"...\"]", "Create tasks (skip menus)");
+        table.AddRow("hu task <org> <proj> <hu-id> [[--description \"...\"]] [[--effort \"...\"]]", "Create tasks (skip menus)");
         table.AddRow("hu show", "Show User Story details");
         table.AddRow("hu show <org> <hu-id>", "Show details (skip menus)");
         table.AddRow("task show", "Show task details");
@@ -563,6 +599,8 @@ class Program
         table.AddRow("hu link <org> <proj> <hu-id> --repo <repo> --branch <branch>", "Link branch (skip menus)");
         table.AddRow("hu list", "List tasks of a User Story");
         table.AddRow("hu list <org> <proj> <hu-id>", "List tasks (skip menus)");
+        table.AddRow("wi update", "Update effort, remaining, state or comment");
+        table.AddRow("wi update <org> <id> [[--effort \"5\"]] [[--state \"Doing\"]]", "Update directly");
         table.AddRow("link", "Add link (branch/commit/PR) to work item");
         table.AddRow("link <org> <proj> <wi-id>", "Add link (skip menus)");
 
@@ -571,6 +609,8 @@ class Program
         AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops hu show MyOrg 12345      [dim]# Show HU info[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops task show MyOrg 67890    [dim]# Show Task info[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops wi update MyOrg 67890 --effort \"8\" --state \"Doing\" [dim]# Update task[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops wi update MyOrg 67890 --comment \"Fixed the bug\"    [dim]# Add comment[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops hu task MyOrg MyProj 123 --effort \"8\" [dim]# Quick task with effort[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops hu link MyOrg MyProj 123 --repo Repo --branch main [dim]# Quick link[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops hu list MyOrg MyProj 123 [dim]# List tasks of HU[/]");
@@ -2163,13 +2203,17 @@ Generate the pull request description in Markdown:";
             var action = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
                     .Title("What would you like to do?")
-                    .AddChoices("Show details", "Add link to repo", BackOption));
+                    .AddChoices("Show details", "Update work item", "Add link to repo", BackOption));
 
             if (action == BackOption) continue;
 
             if (action == "Show details")
             {
                 await ShowWorkItemDetails(orgUrl, taskId);
+            }
+            else if (action == "Update work item")
+            {
+                await UpdateWorkItemInteractive(orgUrl, taskId);
             }
             else if (action == "Add link to repo")
             {
@@ -3079,6 +3123,16 @@ Generate the pull request description in Markdown:";
             }
             
             AnsiConsole.WriteLine();
+
+            var next = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("Actions:")
+                    .AddChoices("Update", BackOption));
+
+            if (next == "Update")
+            {
+                await UpdateWorkItemInteractive(orgUrl, id);
+            }
         }
         catch (Exception ex)
         {
@@ -3187,6 +3241,83 @@ Generate the pull request description in Markdown:";
         catch
         {
             return false;
+        }
+    }
+
+    private static async Task<int> UpdateWorkItem(string orgUrl, string id, string? effort, string? remaining, string? state, string? comment)
+    {
+        var fieldsList = new List<string>();
+        if (!string.IsNullOrEmpty(effort)) fieldsList.Add($"Custom.EsfuerzoEstimadoHH={effort}");
+        if (!string.IsNullOrEmpty(remaining)) fieldsList.Add($"Microsoft.VSTS.Scheduling.RemainingWork={remaining}");
+        if (!string.IsNullOrEmpty(state)) fieldsList.Add($"System.State={state}");
+
+        bool anySuccess = false;
+
+        if (fieldsList.Count > 0)
+        {
+            var fieldsArg = string.Join(" ", fieldsList.Select(f => $"\"{f}\""));
+            AnsiConsole.MarkupLine($"[dim]Updating fields for work item {id}...[/]");
+            var success = await RunAzPassthrough(
+                $"boards work-item update --id {id} --organization {orgUrl} --fields {fieldsArg} --output none");
+            if (success)
+            {
+                AnsiConsole.MarkupLine($"[green]✅ Fields updated successfully.[/]");
+                anySuccess = true;
+            }
+        }
+
+        if (!string.IsNullOrEmpty(comment))
+        {
+            AnsiConsole.MarkupLine($"[dim]Adding comment to work item {id}...[/]");
+            var success = await RunAzPassthrough(
+                $"boards work-item update --id {id} --organization {orgUrl} --discussion \"{comment}\" --output none");
+            if (success)
+            {
+                AnsiConsole.MarkupLine($"[green]✅ Comment added successfully.[/]");
+                anySuccess = true;
+            }
+        }
+
+        if (!anySuccess && fieldsList.Count == 0 && string.IsNullOrEmpty(comment))
+        {
+            AnsiConsole.MarkupLine("[yellow]No updates provided (use --effort, --remaining, --state, or --comment).[/]");
+            return 1;
+        }
+
+        return anySuccess ? 0 : 1;
+    }
+
+    private static async Task<int> UpdateWorkItemInteractive(string orgUrl, string id)
+    {
+        while (true)
+        {
+            var field = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title($"[bold]Update work item #{id}[/]")
+                    .AddChoices("State", "Effort (HH)", "Remaining Work", "Add Comment", BackOption));
+
+            if (field == BackOption) return 0;
+
+            string? effort = null, remaining = null, state = null, comment = null;
+
+            if (field == "State")
+            {
+                state = AnsiConsole.Prompt(new TextPrompt<string>("Enter new state (e.g. Active, Closed, Doing):"));
+            }
+            else if (field == "Effort (HH)")
+            {
+                effort = AnsiConsole.Prompt(new TextPrompt<string>("Enter Effort (HH):"));
+            }
+            else if (field == "Remaining Work")
+            {
+                remaining = AnsiConsole.Prompt(new TextPrompt<string>("Enter Remaining Work:"));
+            }
+            else if (field == "Add Comment")
+            {
+                comment = AnsiConsole.Prompt(new TextPrompt<string>("Enter comment:"));
+            }
+
+            await UpdateWorkItem(orgUrl, id, effort, remaining, state, comment);
         }
     }
 }
