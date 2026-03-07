@@ -394,19 +394,19 @@ class Program
             // Quick mode: yitpush azure-devops wi update <org> <id> [--effort "val"] [--remaining "val"] [--state "val"] [--comment "val"]
             if (args.Length >= 4 && !args[2].StartsWith("-"))
             {
-                var org = args[2];
-                var id = args[3];
-                var orgUrl = $"https://dev.azure.com/{org}";
-                return await UpdateWorkItem(orgUrl, id, effort, remaining, state, comment);
+                var orgForUpdate = args[2];
+                var idForUpdate = args[3];
+                var orgUrlForUpdate = $"https://dev.azure.com/{orgForUpdate}";
+                return await UpdateWorkItem(orgUrlForUpdate, idForUpdate, effort, remaining, state, comment);
             }
             
             // Interactive mode: select work item first
             var setup = await EnsureAzureDevOpsSetup();
             if (setup == null) return 1;
-            var (orgUrl, projectName, projectId) = setup.Value;
+            var (orgUrlS, projectName, projectId) = setup.Value;
             
-            var id = AnsiConsole.Prompt(new TextPrompt<string>("Work item ID:"));
-            return await UpdateWorkItemInteractive(orgUrl, id);
+            var idPrompt = AnsiConsole.Prompt(new TextPrompt<string>("Work item ID:"));
+            return await UpdateWorkItemInteractive(orgUrlS, idPrompt);
         }
         else
         {
