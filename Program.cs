@@ -248,10 +248,10 @@ class Program
             }
             var setup = await EnsureAzureDevOpsSetup();
             if (setup == null) return 1;
-            var (oUrl, project) = setup.Value;
+            var (oUrl, project, projectId) = setup.Value;
             var workItemId = AnsiConsole.Prompt(
                 new TextPrompt<string>("Work item ID:"));
-            return await AddLinkToRepo(oUrl, project, workItemId);
+            return await AddLinkToRepo(oUrl, projectId, workItemId);
         }
 
         if (args.Length < 2)
@@ -318,6 +318,31 @@ class Program
             var result = await ListAzureUserStories(description, effort);
             return result == BackToMenu ? 0 : result;
         }
+        else if (resource == "hu" && action == "show")
+        {
+            // Quick mode: yitpush azure-devops hu show <org> <hu-id>
+            if (args.Length >= 4)
+            {
+                var orgUrl = $"https://dev.azure.com/{args[2]}";
+                return await ShowWorkItemDetails(orgUrl, args[3]);
+            }
+            
+            var result = await ListAzureUserStoriesForTaskList(); // Reuse list for selecting HU to show
+            return result == BackToMenu ? 0 : result;
+        }
+        else if (resource == "task" && action == "show")
+        {
+            // Quick mode: yitpush azure-devops task show <org> <id>
+            if (args.Length >= 4)
+            {
+                var orgUrl = $"https://dev.azure.com/{args[2]}";
+                return await ShowWorkItemDetails(orgUrl, args[3]);
+            }
+            
+            // For tasks, we usually go through HUs
+            var result = await ListAzureUserStoriesForTaskList();
+            return result == BackToMenu ? 0 : result;
+        }
         else if (resource == "hu" && action == "link")
         {
             // Quick mode: yitpush azure-devops hu link <org> <project> <hu-id> --repo <repo> --branch <branch>
@@ -342,7 +367,7 @@ class Program
                 var proj = args[3];
                 var huId = args[4];
                 var orgUrl = $"https://dev.azure.com/{org}";
-                return await ListTasksForHU(orgUrl, proj, huId);
+                return await ListTasksForHU(orgUrl, proj, proj, huId);
             }
             // Interactive mode: select HU first, then list tasks
             var result = await ListAzureUserStoriesForTaskList();
@@ -405,10 +430,10 @@ class Program
                 var setup = await EnsureAzureDevOpsSetup();
                 if (setup != null)
                 {
-                    var (oUrl, proj) = setup.Value;
+                    var (oUrl, proj, projId) = setup.Value;
                     var workItemId = AnsiConsole.Prompt(
                         new TextPrompt<string>("Work item ID:"));
-                    result = await AddLinkToRepo(oUrl, proj, workItemId);
+                    result = await AddLinkToRepo(oUrl, projId, workItemId);
                 }
             }
 
@@ -483,7 +508,13 @@ class Program
         azTable.AddRow("repo checkout", "Clone a repository interactively");
         azTable.AddRow("variable-group list", "List and inspect variable groups");
         azTable.AddRow("hu task", "Create tasks for a User Story");
-        azTable.AddRow("hu task <org> <proj> <hu-id> [--description \"...\"]", "Create tasks (skip menus)");
+        azTable.AddRow("hu task <org> <proj> <hu-id> [--description \"...\"] [--effort \"...\"]", "Create tasks (skip menus)");
+        azTable.AddRow("hu show", "Show User Story details");
+        azTable.AddRow("hu show <org> <hu-id>", "Show details (skip menus)");
+        azTable.AddRow("task show", "Show task details");
+        azTable.AddRow("task show <org> <id>", "Show details (skip menus)");
+        azTable.AddRow("hu link", "Link a repository branch to a User Story");
+        azTable.AddRow("hu link <org> <proj> <hu-id> --repo <repo> --branch <branch>", "Link branch (skip menus)");
         azTable.AddRow("hu list", "List tasks of a User Story");
         azTable.AddRow("hu list <org> <proj> <hu-id>", "List tasks (skip menus)");
         azTable.AddRow("link", "Add link (branch/commit/PR) to work item");
@@ -497,8 +528,10 @@ class Program
         AnsiConsole.MarkupLine("  yitpush checkout                                [dim]# Switch branch interactively[/]");
         AnsiConsole.MarkupLine("  yitpush pr                                      [dim]# Generate PR description[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops hu task                    [dim]# Create tasks interactively[/]");
-        AnsiConsole.MarkupLine("  yitpush azure-devops hu task MyOrg MyProj 12345 [dim]# Create tasks (quick)[/]");
-        AnsiConsole.MarkupLine("  yitpush azure-devops hu task MyOrg MyProj 12345 --description \"Desc\" [dim]# Quick with desc[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops hu show MyOrg 12345        [dim]# Show HU details[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops task show MyOrg 67890      [dim]# Show Task details[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops hu task MyOrg MyProj 12345 --effort \"5\" [dim]# Quick with effort[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops hu link MyOrg MyProj 12345 --repo MyRepo --branch feature/abc [dim]# Quick link[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops hu list MyOrg MyProj 12345 [dim]# List tasks of HU[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops link MyOrg MyProj 12345    [dim]# Add link to work item[/]");
         Console.WriteLine();
@@ -520,7 +553,13 @@ class Program
         table.AddRow("repo checkout", "Clone a repository interactively");
         table.AddRow("variable-group list", "List and inspect variable groups");
         table.AddRow("hu task", "Create tasks for a User Story");
-        table.AddRow("hu task <org> <proj> <hu-id> [--description \"...\"]", "Create tasks (skip menus)");
+        table.AddRow("hu task <org> <proj> <hu-id> [--description \"...\"] [--effort \"...\"]", "Create tasks (skip menus)");
+        table.AddRow("hu show", "Show User Story details");
+        table.AddRow("hu show <org> <hu-id>", "Show details (skip menus)");
+        table.AddRow("task show", "Show task details");
+        table.AddRow("task show <org> <id>", "Show details (skip menus)");
+        table.AddRow("hu link", "Link a repository branch to a User Story");
+        table.AddRow("hu link <org> <proj> <hu-id> --repo <repo> --branch <branch>", "Link branch (skip menus)");
         table.AddRow("hu list", "List tasks of a User Story");
         table.AddRow("hu list <org> <proj> <hu-id>", "List tasks (skip menus)");
         table.AddRow("link", "Add link (branch/commit/PR) to work item");
@@ -529,8 +568,10 @@ class Program
         AnsiConsole.Write(table);
 
         AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
-        AnsiConsole.MarkupLine("  yitpush azure-devops hu task MyOrg MyProj 123 [dim]# Create tasks (quick)[/]");
-        AnsiConsole.MarkupLine("  yitpush azure-devops hu task MyOrg MyProj 123 --description \"Fix bugs\" [dim]# Quick with desc[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops hu show MyOrg 12345      [dim]# Show HU info[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops task show MyOrg 67890    [dim]# Show Task info[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops hu task MyOrg MyProj 123 --effort \"8\" [dim]# Quick task with effort[/]");
+        AnsiConsole.MarkupLine("  yitpush azure-devops hu link MyOrg MyProj 123 --repo Repo --branch main [dim]# Quick link[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops hu list MyOrg MyProj 123 [dim]# List tasks of HU[/]");
         AnsiConsole.MarkupLine("  yitpush azure-devops link MyOrg MyProj 123    [dim]# Add link to work item[/]");
         Console.WriteLine();
@@ -1516,7 +1557,7 @@ Generate the pull request description in Markdown:";
         return true;
     }
 
-    private static async Task<(string OrgUrl, string Project)?> EnsureAzureDevOpsSetup()
+    private static async Task<(string OrgUrl, string ProjectName, string ProjectId)?> EnsureAzureDevOpsSetup()
     {
         var ready = await EnsureAzureDevOpsReady();
         if (ready == null) return null;
@@ -1559,18 +1600,19 @@ Generate the pull request description in Markdown:";
                 return null;
             }
 
-            projects.Sort(StringComparer.OrdinalIgnoreCase);
-            var projectChoices = new List<string>(projects) { BackOption };
-            var selectedProject = AnsiConsole.Prompt(
+            // Projects are already sorted by ID DESC in FetchAzureProjects
+            var projectChoices = new List<string>(projects.Select(p => p.Name)) { BackOption };
+            var selectedProjectName = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
                     .Title("Project:")
                     .PageSize(10)
                     .HighlightStyle(new Style(Color.Cyan1))
                     .AddChoices(projectChoices));
 
-            if (selectedProject == BackOption) continue;
+            if (selectedProjectName == BackOption) continue;
 
-            return (orgUrl, selectedProject);
+            var project = projects.First(p => p.Name == selectedProjectName);
+            return (orgUrl, project.Name, project.Id);
         }
     }
 
@@ -1580,7 +1622,7 @@ Generate the pull request description in Markdown:";
         var setup = await EnsureAzureDevOpsSetup();
         if (setup == null) return null;
 
-        var (orgUrl, selectedProject) = setup.Value;
+        var (orgUrl, selectedProject, selectedProjectId) = setup.Value;
 
         while (true)
         {
@@ -1593,7 +1635,7 @@ Generate the pull request description in Markdown:";
 
             // 7. Check if repo already exists
             var existingRepoJson = await RunAzCapture(
-                $"repos show --repository \"{repoName}\" --organization {orgUrl} --project \"{selectedProject}\" --output json");
+                $"repos show --repository \"{repoName}\" --organization {orgUrl} --project \"{selectedProjectId}\" --output json");
 
             string? remoteUrl = null;
 
@@ -1629,7 +1671,7 @@ Generate the pull request description in Markdown:";
                 // Create repository
                 AnsiConsole.MarkupLine($"🔨 Creating repository '[cyan]{repoName}[/]'...");
                 var createJson = await RunAzCapture(
-                    $"repos create --name \"{repoName}\" --organization {orgUrl} --project \"{selectedProject}\" --output json");
+                    $"repos create --name \"{repoName}\" --organization {orgUrl} --project \"{selectedProjectId}\" --output json");
 
                 if (createJson == null)
                 {
@@ -1707,9 +1749,9 @@ Generate the pull request description in Markdown:";
         var setup = await EnsureAzureDevOpsSetup();
         if (setup == null) return 1;
 
-        var (orgUrl, selectedProject) = setup.Value;
+        var (orgUrl, selectedProject, selectedProjectId) = setup.Value;
 
-        var repos = await FetchAzureRepos(orgUrl, selectedProject);
+        var repos = await FetchAzureRepos(orgUrl, selectedProjectId);
 
         if (repos.Count == 0)
         {
@@ -1717,8 +1759,7 @@ Generate the pull request description in Markdown:";
             return 1;
         }
 
-        repos.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name));
-
+        // Repos are already sorted by ID DESC in FetchAzureRepos
         var repoChoices = new List<string>(repos.Select(r => r.Name)) { BackOption };
         var selectedRepoName = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
@@ -1748,15 +1789,15 @@ Generate the pull request description in Markdown:";
         return 0;
     }
 
-    private static async Task<int> ListAzureUserStories(string? description = null)
+    private static async Task<int> ListAzureUserStories(string? description = null, string? effort = null)
     {
 
         var setup = await EnsureAzureDevOpsSetup();
         if (setup == null) return 1;
 
-        var (orgUrl, project) = setup.Value;
+        var (orgUrl, projectName, projectId) = setup.Value;
 
-        var hus = await FetchAzureUserStories(orgUrl, project);
+        var hus = await FetchAzureUserStories(orgUrl, projectName);
 
         if (hus.Count == 0)
         {
@@ -1764,11 +1805,14 @@ Generate the pull request description in Markdown:";
             return 0;
         }
 
-        var maxIdLen = hus.Max(h => h.Id.Length);
+        // Final sort by ID DESC
+        var sortedHus = hus.OrderByDescending(h => int.TryParse(h.Id, out var id) ? id : 0).ToList();
+
+        var maxIdLen = sortedHus.Max(h => h.Id.Length);
         var displayMap = new Dictionary<string, (string Id, string Title, string State, string Date, string Area, string Iteration)>();
         var displayList = new List<string>();
 
-        foreach (var hu in hus)
+        foreach (var hu in sortedHus)
         {
             var display = $"[grey]{hu.Date}[/] [cyan]{hu.Id.PadRight(maxIdLen + 1)}[/] {Markup.Escape(hu.Title)} [dim]({Markup.Escape(hu.State)})[/]";
             displayMap[display] = hu;
@@ -1792,13 +1836,17 @@ Generate the pull request description in Markdown:";
             var action = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
                     .Title("What would you like to do?")
-                    .AddChoices("Create standard tasks", "Create branch for this HU", "Mark as In Progress", "Add link to repo", BackOption));
+                    .AddChoices("Show details", "Create standard tasks", "Create branch for this HU", "Mark as In Progress", "Add link to repo", BackOption));
 
             if (action == BackOption) continue;
 
-            if (action == "Create standard tasks")
+            if (action == "Show details")
             {
-                await CreateTasksForUserStory(orgUrl, project, selectedHu.Id, selectedHu.Area, selectedHu.Iteration, description);
+                await ShowWorkItemDetails(orgUrl, selectedHu.Id);
+            }
+            else if (action == "Create standard tasks")
+            {
+                await CreateTasksForUserStory(orgUrl, projectName, selectedHu.Id, selectedHu.Area, selectedHu.Iteration, description, effort);
             }
             else if (action == "Create branch for this HU")
             {
@@ -1818,12 +1866,12 @@ Generate the pull request description in Markdown:";
             }
             else if (action == "Add link to repo")
             {
-                await AddLinkToRepo(orgUrl, project, selectedHu.Id);
+                await AddLinkToRepo(orgUrl, projectId, selectedHu.Id);
             }
         }
     }
 
-    private static async Task<int> CreateTasksForUserStory(string orgUrl, string project, string huId, string areaPath, string iterationPath, string? fixedDescription = null)
+    private static async Task<int> CreateTasksForUserStory(string orgUrl, string project, string huId, string areaPath, string iterationPath, string? fixedDescription = null, string? fixedEffort = null)
     {
         var taskTitles = AnsiConsole.Prompt(
             new TextPrompt<string>("Enter task titles (comma separated):")
@@ -1842,13 +1890,19 @@ Generate the pull request description in Markdown:";
             assignedField = $" \"System.AssignedTo={userEmail}\"";
         }
 
-        // Ask for estimated effort
-        var effortHours = AnsiConsole.Prompt(
-            new TextPrompt<string>("Estimated effort in hours (default: 1):")
-                .DefaultValue("1")
-                .AllowEmpty());
+        // Ask for estimated effort if not fixed
+        var effortHours = fixedEffort;
+        if (string.IsNullOrEmpty(effortHours))
+        {
+            effortHours = AnsiConsole.Prompt(
+                new TextPrompt<string>("Estimated effort in hours (default: 1):")
+                    .DefaultValue("1")
+                    .AllowEmpty());
+        }
 
         if (string.IsNullOrWhiteSpace(effortHours)) effortHours = "1";
+
+        var createdTaskIds = new List<string>();
 
         foreach (var title in titles)
         {
@@ -1950,6 +2004,7 @@ Generate the pull request description in Markdown:";
 
                 if (taskId != null)
                 {
+                    createdTaskIds.Add(taskId);
                     AnsiConsole.Markup($"[green]#{taskId}[/] ");
                     
                     var linkSuccess = await RunAzPassthrough(
@@ -1963,10 +2018,19 @@ Generate the pull request description in Markdown:";
             }
         }
 
+        if (createdTaskIds.Count > 0 && AnsiConsole.Confirm("Would you like to link a [cyan]branch[/] to these tasks?"))
+        {
+            foreach (var taskId in createdTaskIds)
+            {
+                AnsiConsole.MarkupLine($"\n[bold]Linking to task #{taskId}...[/]");
+                await AddLinkToRepo(orgUrl, project, taskId);
+            }
+        }
+
         return 0;
     }
 
-    private static async Task<int> CreateTasksDirectForHU(string orgUrl, string project, string huId, string? description = null)
+    private static async Task<int> CreateTasksDirectForHU(string orgUrl, string project, string huId, string? description = null, string? effort = null)
     {
         var setup = await EnsureAzureDevOpsReady();
         if (setup == null) return 1;
@@ -1991,11 +2055,20 @@ Generate the pull request description in Markdown:";
         }
         catch { }
 
-        return await CreateTasksForUserStory(orgUrl, project, huId, areaPath, iterationPath, description);
+        return await CreateTasksForUserStory(orgUrl, project, huId, areaPath, iterationPath, description, effort);
     }
 
-    private static async Task<int> ListTasksForHU(string orgUrl, string project, string huId)
+    private static async Task<int> ListTasksForHU(string orgUrl, string projectName, string projectId, string huId)
     {
+        string finalProjectId = projectId;
+        // If projectId is not a UUID, fetch it
+        if (!finalProjectId.Contains("-"))
+        {
+            var projects = await FetchAzureProjects(orgUrl);
+            var p = projects.FirstOrDefault(p => string.Equals(p.Name, projectName, StringComparison.OrdinalIgnoreCase));
+            if (p.Id != null) finalProjectId = p.Id;
+        }
+
         var setup = await EnsureAzureDevOpsReady();
         if (setup == null) return 1;
 
@@ -2038,19 +2111,19 @@ Generate the pull request description in Markdown:";
         {
             var detailJson = await RunAzCapture(
                 $"boards work-item show --id {id} --organization {orgUrl} --output json");
-            string title = id, state = "";
+            string taskTitle = id, state = "";
             if (detailJson != null)
             {
                 try
                 {
                     using var detailDoc = JsonDocument.Parse(detailJson);
                     var fields = detailDoc.RootElement.GetProperty("fields");
-                    title = fields.TryGetProperty("System.Title", out var tp) ? tp.GetString() ?? id : id;
+                    taskTitle = fields.TryGetProperty("System.Title", out var tp) ? tp.GetString() ?? id : id;
                     state = fields.TryGetProperty("System.State", out var sp) ? sp.GetString() ?? "" : "";
                 }
                 catch { }
             }
-            tasks.Add((id, title, state));
+            tasks.Add((id, taskTitle, state));
         }
 
         if (tasks.Count == 0)
@@ -2059,7 +2132,10 @@ Generate the pull request description in Markdown:";
             return 0;
         }
 
-        foreach (var t in tasks)
+        // Sort tasks by ID DESC
+        var sortedTasks = tasks.OrderByDescending(t => int.TryParse(t.Id, out var id) ? id : 0).ToList();
+
+        foreach (var t in sortedTasks)
         {
             var stateColor = t.State switch
             {
@@ -2072,29 +2148,43 @@ Generate the pull request description in Markdown:";
 
         while (true)
         {
-            var taskChoices = tasks.Select(t => $"{t.Id} - {t.Title}").ToList();
+            var taskChoices = sortedTasks.Select(t => $"{t.Id} - {t.Title}").ToList();
             taskChoices.Add(BackOption);
             var selected = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
-                    .Title("Add link to task:")
-                    .PageSize(15)
-                    .HighlightStyle(new Style(Color.Cyan1))
+                    .Title("Select task to manage:")
                     .AddChoices(taskChoices));
 
             if (selected == BackOption) return 0;
 
             var taskId = selected.Split(" - ")[0].Trim();
-            await AddLinkToRepo(orgUrl, project, taskId);
+
+            var action = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("What would you like to do?")
+                    .AddChoices("Show details", "Add link to repo", BackOption));
+
+            if (action == BackOption) continue;
+
+            if (action == "Show details")
+            {
+                await ShowWorkItemDetails(orgUrl, taskId);
+            }
+            else if (action == "Add link to repo")
+            {
+                await AddLinkToRepo(orgUrl, projectId, taskId);
+            }
         }
     }
+
 
     private static async Task<int> ListAzureUserStoriesForTaskList()
     {
         var setup = await EnsureAzureDevOpsSetup();
         if (setup == null) return 1;
 
-        var (orgUrl, project) = setup.Value;
-        var hus = await FetchAzureUserStories(orgUrl, project);
+        var (orgUrl, projectName, projectId) = setup.Value;
+        var hus = await FetchAzureUserStories(orgUrl, projectName);
 
         if (hus.Count == 0)
         {
@@ -2102,13 +2192,16 @@ Generate the pull request description in Markdown:";
             return 0;
         }
 
-        var maxIdLen = hus.Max(h => h.Id.Length);
+        // Final sort by ID DESC
+        var sortedHus = hus.OrderByDescending(h => int.TryParse(h.Id, out var id) ? id : 0).ToList();
+
+        var maxIdLen = sortedHus.Max(h => h.Id.Length);
         var displayMap = new Dictionary<string, string>();
         var displayList = new List<string>();
 
-        foreach (var hu in hus)
+        foreach (var hu in sortedHus)
         {
-            var display = $"[cyan]{hu.Id.PadRight(maxIdLen + 1)}[/] {Markup.Escape(hu.Title)} [dim]({Markup.Escape(hu.State)})[/]";
+            var display = $"[grey]{hu.Date}[/] [cyan]{hu.Id.PadRight(maxIdLen + 1)}[/] {Markup.Escape(hu.Title)} [dim]({Markup.Escape(hu.State)})[/]";
             displayMap[display] = hu.Id;
             displayList.Add(display);
         }
@@ -2126,139 +2219,279 @@ Generate the pull request description in Markdown:";
             if (selected == BackOption) return BackToMenu;
 
             var huId = displayMap[selected];
-            await ListTasksForHU(orgUrl, project, huId);
+            await ListTasksForHU(orgUrl, projectName, projectId, huId);
         }
     }
 
-    private static async Task<int> AddLinkToRepo(string orgUrl, string project, string workItemId)
+    private static async Task<int> ListAzureUserStoriesForLinking()
     {
+        var setup = await EnsureAzureDevOpsSetup();
+        if (setup == null) return 1;
+        var (orgUrl, projectName, projectId) = setup.Value;
+
+        var hus = await FetchAzureUserStories(orgUrl, projectName);
+        if (hus.Count == 0)
+        {
+            AnsiConsole.MarkupLine("[yellow]No User Stories found.[/]");
+            return 0;
+        }
+
+        // Final sort by ID DESC
+        var sortedHus = hus.OrderByDescending(h => int.TryParse(h.Id, out var id) ? id : 0).ToList();
+
+        var maxIdLen = sortedHus.Max(h => h.Id.Length);
+        var displayMap = new Dictionary<string, string>();
+        var choices = new List<string>();
+
+        foreach (var hu in sortedHus)
+        {
+            var display = $"[grey]{hu.Date}[/] [cyan]{hu.Id.PadRight(maxIdLen + 1)}[/] {Markup.Escape(hu.Title)} [dim]({Markup.Escape(hu.State)})[/]";
+            displayMap[display] = hu.Id;
+            choices.Add(display);
+        }
+        choices.Add(BackOption);
+
+        while (true)
+        {
+            var selected = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("Select [cyan]User Story[/] to link:")
+                    .PageSize(15)
+                    .HighlightStyle(new Style(Color.Cyan1))
+                    .AddChoices(choices));
+
+            if (selected == BackOption) return BackToMenu;
+
+            var huId = displayMap[selected];
+            await AddLinkToRepo(orgUrl, projectId, huId);
+        }
+    }
+
+    private static Dictionary<string, string>? _relationTypeCache = null;
+    private static async Task<string> ResolveArtifactRelationType(string orgUrl, string preferredType)
+    {
+        if (_relationTypeCache == null)
+        {
+            _relationTypeCache = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            var json = await RunAzCapture($"boards work-item relation list-type --organization {orgUrl} --output json");
+            if (json != null)
+            {
+                try
+                {
+                    using var doc = JsonDocument.Parse(json);
+                    foreach (var item in doc.RootElement.EnumerateArray())
+                    {
+                        var name = item.TryGetProperty("name", out var n) ? n.GetString() : null;
+                        var refName = item.TryGetProperty("referenceName", out var r) ? r.GetString() : null;
+                        
+                        if (name != null && refName != null)
+                        {
+                            // Store mapping: ReferenceName -> Name (the one CLI expects)
+                            if (!_relationTypeCache.ContainsKey(refName)) _relationTypeCache[refName] = name;
+                            if (!_relationTypeCache.ContainsKey(name)) _relationTypeCache[name] = name;
+                        }
+                    }
+                }
+                catch { }
+            }
+        }
+
+        bool isArtifactHint = preferredType is "Branch" or "Commit" or "Pull Request";
+
+        if (isArtifactHint)
+        {
+            // For technical links, the standard reference name is "ArtifactLink"
+            if (_relationTypeCache.TryGetValue("ArtifactLink", out var resolved)) return resolved;
+            
+            // Try fuzzy match for anything containing "Artifact"
+            var artifactKey = _relationTypeCache.Keys.FirstOrDefault(k => k.Contains("Artifact", StringComparison.OrdinalIgnoreCase));
+            if (artifactKey != null) return _relationTypeCache[artifactKey];
+            
+            return "Artifact Link"; // System default name for technical links
+        }
+
+        if (_relationTypeCache.TryGetValue(preferredType, out var res)) return res;
+
+        return preferredType; 
+    }
+
+    private static async Task<int> AddLinkToRepo(string orgUrl, string projectHint, string workItemId, string? fixedRepo = null, string? fixedBranch = null)
+    {
+        string finalProjectId = projectHint;
+        string finalProjectName = projectHint;
+        
+        var projects = await FetchAzureProjects(orgUrl);
+        var p = projects.FirstOrDefault(pr => string.Equals(pr.Name, projectHint, StringComparison.OrdinalIgnoreCase) || string.Equals(pr.Id, projectHint, StringComparison.OrdinalIgnoreCase));
+        if (p.Name != null) 
+        {
+            finalProjectId = p.Id;
+            finalProjectName = p.Name;
+        }
 
         // Fetch repositories
-        var repos = await FetchAzureRepos(orgUrl, project);
+        var repos = await FetchAzureRepos(orgUrl, finalProjectId);
         if (repos.Count == 0)
         {
             AnsiConsole.MarkupLine("[red]❌ No repositories found in this project.[/]");
             return 1;
         }
 
-        repos.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name));
-        var repoChoices = new List<string>(repos.Select(r => r.Name)) { BackOption };
-        var selectedRepoName = AnsiConsole.Prompt(
-            new SelectionPrompt<string>()
-                .Title("📋 Select [green]repository[/]:\n[dim](Select ← Back to return)[/]")
-                .PageSize(15)
-                .HighlightStyle(new Style(Color.Cyan1))
-                .AddChoices(repoChoices));
+        (string Name, string RemoteUrl, string Id)? selectedRepo = null;
+        if (!string.IsNullOrEmpty(fixedRepo))
+        {
+            selectedRepo = repos.FirstOrDefault(r => string.Equals(r.Name, fixedRepo, StringComparison.OrdinalIgnoreCase));
+            if (selectedRepo == null)
+            {
+                AnsiConsole.MarkupLine($"[red]❌ Repository '{fixedRepo}' not found.[/]");
+                return 1;
+            }
+        }
+        else
+        {
+            var repoChoices = new List<string>(repos.Select(r => r.Name)) { BackOption };
+            var selectedRepoName = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("📋 Select [green]repository[/]:\n[dim](Select ← Back to return)[/]")
+                    .PageSize(15)
+                    .HighlightStyle(new Style(Color.Cyan1))
+                    .AddChoices(repoChoices));
 
-        if (selectedRepoName == BackOption) return 0;
-
-        var selectedRepo = repos.First(r => r.Name == selectedRepoName);
-        // Ask for link type
-        var linkType = AnsiConsole.Prompt(
-            new SelectionPrompt<string>()
-                .Title("Link type:")
-                .AddChoices("Branch", "Commit", "Pull Request", BackOption));
-
-        if (linkType == BackOption) return 0;
+            if (selectedRepoName == BackOption) return 0;
+            selectedRepo = repos.First(r => r.Name == selectedRepoName);
+        }
 
         string artifactUrl = "";
-        if (linkType == "Branch")
+        string webUrl = "";
+        string relationTypeHint = "Hyperlink";
+        string branchToLink = fixedBranch ?? "";
+        
+        if (!string.IsNullOrEmpty(fixedBranch))
         {
-            // Try to fetch branches
-            var branchesJson = await RunAzCapture($"repos ref list --repository \"{selectedRepo.Name}\" --organization {orgUrl} --project \"{project}\" --output json");
-            var branches = new List<string>();
-            if (branchesJson != null)
-            {
-                try
-                {
-                    using var doc = JsonDocument.Parse(branchesJson);
-                    JsonElement items;
-                    if (doc.RootElement.ValueKind == JsonValueKind.Array)
-                        items = doc.RootElement;
-                    else if (doc.RootElement.TryGetProperty("value", out var valueProp))
-                        items = valueProp;
-                    else
-                        items = default;
+            relationTypeHint = "Branch";
+            artifactUrl = $"vstfs:///Git/Ref/{finalProjectId}/{selectedRepo.Value.Id}/GB{Uri.EscapeDataString(fixedBranch)}";
+            webUrl = $"{orgUrl}/{Uri.EscapeDataString(finalProjectName)}/_git/{Uri.EscapeDataString(selectedRepo.Value.Name)}?version=GB{Uri.EscapeDataString(fixedBranch)}";
+        }
+        else
+        {
+            var linkType = AnsiConsole.Prompt(
+                new SelectionPrompt<string>()
+                    .Title("Link type:")
+                    .AddChoices("Branch", "Commit", "Pull Request", BackOption));
 
-                    if (items.ValueKind != JsonValueKind.Undefined && items.ValueKind != JsonValueKind.Null)
+            if (linkType == BackOption) return 0;
+
+            if (linkType == "Branch")
+            {
+                relationTypeHint = "Branch";
+                var branchesJson = await RunAzCapture($"repos ref list --repository \"{selectedRepo.Value.Name}\" --organization {orgUrl} --project \"{finalProjectId}\" --output json");
+                var branches = new List<string>();
+                if (branchesJson != null)
+                {
+                    try
                     {
-                        foreach (var branch in items.EnumerateArray())
+                        using var doc = JsonDocument.Parse(branchesJson);
+                        JsonElement items = doc.RootElement.ValueKind == JsonValueKind.Array ? doc.RootElement : (doc.RootElement.TryGetProperty("value", out var v) ? v : default);
+                        if (items.ValueKind == JsonValueKind.Array)
                         {
-                            if (branch.TryGetProperty("name", out var nameProp))
+                            foreach (var b in items.EnumerateArray())
                             {
-                                var name = nameProp.GetString();
-                                if (name != null && name.StartsWith("refs/heads/"))
-                                    branches.Add(name["refs/heads/".Length..]);
+                                if (b.TryGetProperty("name", out var n))
+                                {
+                                    var name = n.GetString();
+                                    if (name != null && name.StartsWith("refs/heads/"))
+                                        branches.Add(name["refs/heads/".Length..]);
+                                }
                             }
                         }
                     }
+                    catch { }
                 }
-                catch { }
-            }
 
-            if (branches.Count > 0)
-            {
-                branches.Sort();
-                var branchChoices = new List<string>(branches) { BackOption, "Enter custom branch name" };
-                var selectedBranch = AnsiConsole.Prompt(
-                    new SelectionPrompt<string>()
-                        .Title("Select [green]branch[/]:")
-                        .PageSize(15)
-                        .AddChoices(branchChoices));
-
-                if (selectedBranch == BackOption) return 0;
-                if (selectedBranch == "Enter custom branch name")
+                if (branches.Count > 0)
                 {
-                    var customBranch = AnsiConsole.Prompt(
-                        new TextPrompt<string>("Enter branch name (without refs/heads/):")
-                            .DefaultValue("main"));
-                    artifactUrl = $"{orgUrl}/{Uri.EscapeDataString(project)}/_git/{Uri.EscapeDataString(selectedRepo.Name)}?version=GB{Uri.EscapeDataString(customBranch)}";
+                    branches.Sort();
+                    var branchChoices = new List<string>(branches) { BackOption, "Enter custom branch name" };
+                    var selectedBranch = AnsiConsole.Prompt(new SelectionPrompt<string>().Title("Select [green]branch[/]:").AddChoices(branchChoices));
+                    if (selectedBranch == BackOption) return 0;
+                    branchToLink = selectedBranch == "Enter custom branch name" ? AnsiConsole.Prompt(new TextPrompt<string>("Enter branch name:").DefaultValue("main")) : selectedBranch;
                 }
                 else
                 {
-                    artifactUrl = $"{orgUrl}/{Uri.EscapeDataString(project)}/_git/{Uri.EscapeDataString(selectedRepo.Name)}?version=GB{Uri.EscapeDataString(selectedBranch)}";
+                    branchToLink = AnsiConsole.Prompt(new TextPrompt<string>("Enter branch name:").DefaultValue("main"));
                 }
+                artifactUrl = $"vstfs:///Git/Ref/{finalProjectId}/{selectedRepo.Value.Id}/GB{Uri.EscapeDataString(branchToLink)}";
+                webUrl = $"{orgUrl}/{Uri.EscapeDataString(finalProjectName)}/_git/{Uri.EscapeDataString(selectedRepo.Value.Name)}?version=GB{Uri.EscapeDataString(branchToLink)}";
             }
+            else if (linkType == "Commit")
+            {
+                relationTypeHint = "Commit";
+                var commitHash = AnsiConsole.Prompt(new TextPrompt<string>("Enter commit hash:").Validate(h => !string.IsNullOrWhiteSpace(h)));
+                artifactUrl = $"vstfs:///Git/Commit/{finalProjectId}/{selectedRepo.Value.Id}/{commitHash}";
+                webUrl = $"{orgUrl}/{Uri.EscapeDataString(finalProjectName)}/_git/{Uri.EscapeDataString(selectedRepo.Value.Name)}/commit/{commitHash}";
+            }
+            else if (linkType == "Pull Request")
+            {
+                relationTypeHint = "Pull Request";
+                var prId = AnsiConsole.Prompt(new TextPrompt<string>("Enter PR ID:").Validate(id => int.TryParse(id, out _)));
+                artifactUrl = $"vstfs:///Git/PullRequestId/{finalProjectId}/{selectedRepo.Value.Id}/{prId}";
+                webUrl = $"{orgUrl}/{Uri.EscapeDataString(finalProjectName)}/_git/{Uri.EscapeDataString(selectedRepo.Value.Name)}/pullrequest/{prId}";
+            }
+        }
+        
+        if (string.IsNullOrEmpty(artifactUrl)) return 1;
+
+        // Primary goal: Update the specific 'URL Commit' field in Details
+        AnsiConsole.MarkupLine($"[dim]Updating 'URL Commit' field...[/]");
+        var updateSuccess = await RunAzPassthrough(
+            $"boards work-item update --id {workItemId} --organization {orgUrl} --fields \"Custom.URLCommit={webUrl}\" --output none");
+        
+        if (updateSuccess)
+            AnsiConsole.MarkupLine($"[green]Field 'URL Commit' updated.[/]");
+        else
+            AnsiConsole.MarkupLine($"[yellow]Could not update 'URL Commit' field (it may not exist or name is different).[/]");
+
+        // Secondary: Also add the technical/hyperlink relation for the Links tab
+        var relationType = await ResolveArtifactRelationType(orgUrl, relationTypeHint);
+
+        // Advanced: Use 'az rest' to add ArtifactLink with the required 'name' attribute
+        // This is what makes it appear in the 'Development' section
+        AnsiConsole.MarkupLine($"[dim]Linking to Development section...[/]");
+        
+        // Extract org name from orgUrl (https://dev.azure.com/org)
+        var orgName = orgUrl.Split('/').Last();
+        var restUri = $"{orgUrl}/{Uri.EscapeDataString(finalProjectId)}/_apis/wit/workitems/{workItemId}?api-version=6.0";
+        
+        // JSON Patch body to add the relation with the 'name' attribute
+        // The name attribute MUST be "Branch", "Commit", or "Pull Request" for the UI to categorize it
+        var body = $"[{{\\\"op\\\": \\\"add\\\", \\\"path\\\": \\\"/relations/-\\\", \\\"value\\\": {{\\\"rel\\\": \\\"ArtifactLink\\\", \\\"url\\\": \\\"{artifactUrl}\\\", \\\"attributes\\\": {{\\\"name\\\": \\\"{relationTypeHint}\\\"}} }} }}]";
+        
+        var (restResult, restError) = await RunAzCaptureWithError(
+            $"rest --method patch --uri \"{restUri}\" --headers \"Content-Type=application/json-patch+json\" --body \"{body}\"");
+
+        if (restResult != null)
+        {
+            AnsiConsole.MarkupLine($"[green]Link added to Development section.[/]");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine($"[yellow]Technical link via API failed, trying standard CLI...[/]");
+            // Fallback to standard CLI (which might show in Links tab but not Development section)
+            var (result, linkError) = await RunAzCaptureWithError(
+                $"boards work-item relation add --id {workItemId} --relation-type \"{relationType}\" --target-url \"{artifactUrl}\" --organization {orgUrl} --comment \"{branchToLink}\" --output json");
+
+            if (result != null)
+                AnsiConsole.MarkupLine($"[green]Link added to Links tab.[/]");
             else
             {
-                // No branches found or error, ask for branch name
-                var branchName = AnsiConsole.Prompt(
-                    new TextPrompt<string>("Enter branch name (without refs/heads/):")
-                        .DefaultValue("main"));
-                artifactUrl = $"{orgUrl}/{Uri.EscapeDataString(project)}/_git/{Uri.EscapeDataString(selectedRepo.Name)}?version=GB{Uri.EscapeDataString(branchName)}";
+                AnsiConsole.MarkupLine($"[yellow]Retrying with functional Web Hyperlink...[/]");
+                var (retryResult, retryError) = await RunAzCaptureWithError(
+                    $"boards work-item relation add --id {workItemId} --relation-type Hyperlink --target-url \"{webUrl}\" --organization {orgUrl} --output json");
+                if (retryResult != null)
+                    AnsiConsole.MarkupLine($"[green]Link added as functional Hyperlink.[/]");
+                else
+                    AnsiConsole.MarkupLine($"[red]Failed to add link.[/] [dim]{Markup.Escape(retryError?.Trim() ?? "")}[/]");
             }
         }
-        else if (linkType == "Commit")
-        {
-            var commitHash = AnsiConsole.Prompt(
-                new TextPrompt<string>("Enter commit hash (full or short):")
-                    .ValidationErrorMessage("Commit hash is required")
-                    .Validate(hash => !string.IsNullOrWhiteSpace(hash)));
-            
-            artifactUrl = $"{orgUrl}/{Uri.EscapeDataString(project)}/_git/{Uri.EscapeDataString(selectedRepo.Name)}/commit/{commitHash}";
-        }
-        else if (linkType == "Pull Request")
-        {
-            var prId = AnsiConsole.Prompt(
-                new TextPrompt<string>("Enter Pull Request ID:")
-                    .ValidationErrorMessage("PR ID is required")
-                    .Validate(id => int.TryParse(id, out _)));
-            
-            artifactUrl = $"{orgUrl}/{Uri.EscapeDataString(project)}/_git/{Uri.EscapeDataString(selectedRepo.Name)}/pullrequest/{prId}";
-        }
-        if (string.IsNullOrEmpty(artifactUrl))
-        {
-            AnsiConsole.MarkupLine("[red]❌ Could not build artifact URL.[/]");
-            return 1;
-        }
-
-        var (result, linkError) = await RunAzCaptureWithError(
-            $"boards work-item relation add --id {workItemId} --relation-type Hyperlink --target-url \"{artifactUrl}\" --organization {orgUrl} --output json");
-
-        if (result != null)
-            AnsiConsole.MarkupLine($"[green]Link added.[/]");
-        else
-            AnsiConsole.MarkupLine($"[red]Failed to add link.[/] [dim]{Markup.Escape(linkError?.Trim() ?? "")}[/]");
 
         return 0;
     }
@@ -2269,10 +2502,10 @@ Generate the pull request description in Markdown:";
         var setup = await EnsureAzureDevOpsSetup();
         if (setup == null) return 1;
 
-        var (orgUrl, project) = setup.Value;
+        var (orgUrl, projectName, projectId) = setup.Value;
 
         var json = await RunAzCapture(
-            $"pipelines variable-group list --organization {orgUrl} --project \"{project}\" --output json");
+            $"pipelines variable-group list --organization {orgUrl} --project \"{projectId}\" --output json");
 
         if (json == null)
         {
@@ -2532,9 +2765,9 @@ Generate the pull request description in Markdown:";
         return organizations;
     }
 
-    private static async Task<List<string>> FetchAzureProjects(string orgUrl)
+    private static async Task<List<(string Name, string Id)>> FetchAzureProjects(string orgUrl)
     {
-        var projects = new List<string>();
+        var projects = new List<(string Name, string Id)>();
         var projectsJson = await RunAzCapture($"devops project list --organization {orgUrl} --output json");
 
         if (projectsJson == null)
@@ -2562,20 +2795,23 @@ Generate the pull request description in Markdown:";
             foreach (var project in items.EnumerateArray())
             {
                 var name = project.TryGetProperty("name", out var nameProp) ? nameProp.GetString() : null;
-                if (name != null)
+                var id = project.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
+                if (name != null && id != null)
                 {
-                    projects.Add(name);
+                    projects.Add((name, id));
                 }
             }
         }
         catch { }
 
+        // Sort alphabetically by name
+        projects.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(a.Name, b.Name));
         return projects;
     }
 
-    private static async Task<List<(string Name, string RemoteUrl)>> FetchAzureRepos(string orgUrl, string project)
+    private static async Task<List<(string Name, string RemoteUrl, string Id)>> FetchAzureRepos(string orgUrl, string project)
     {
-        var repos = new List<(string Name, string RemoteUrl)>();
+        var repos = new List<(string Name, string RemoteUrl, string Id)>();
         var reposJson = await RunAzCapture(
             $"repos list --organization {orgUrl} --project \"{project}\" --output json");
 
@@ -2596,12 +2832,15 @@ Generate the pull request description in Markdown:";
             {
                 var name = repo.TryGetProperty("name", out var nameProp) ? nameProp.GetString() : null;
                 var remoteUrl = repo.TryGetProperty("remoteUrl", out var urlProp) ? urlProp.GetString() : null;
-                if (name != null && remoteUrl != null)
-                    repos.Add((name, remoteUrl));
+                var id = repo.TryGetProperty("id", out var idProp) ? idProp.GetString() : null;
+                if (name != null && remoteUrl != null && id != null)
+                    repos.Add((name, remoteUrl, id));
             }
         }
         catch { }
 
+        // Sort by ID DESC as proxy for date
+        repos.Sort((a, b) => StringComparer.OrdinalIgnoreCase.Compare(b.Id, a.Id));
         return repos;
     }
 
@@ -2666,7 +2905,8 @@ Generate the pull request description in Markdown:";
              stories = await ExecuteWiqlQuery(orgUrl, project, recentQuery);
         }
 
-        return stories;
+        // Final sort by ID DESC
+        return stories.OrderByDescending(s => int.TryParse(s.Id, out var id) ? id : 0).ToList();
     }
 
     private static async Task<List<(string Id, string Title, string State, string Date, string Area, string Iteration)>> ExecuteWiqlQuery(string orgUrl, string project, string wiql, bool silent = false)
@@ -2728,6 +2968,124 @@ Generate the pull request description in Markdown:";
     }
 
     // ─── Process helpers ──────────────────────────────────────────────────────
+
+    private static async Task<int> ShowWorkItemDetails(string orgUrl, string id)
+    {
+        var (json, error) = await RunAzCaptureWithError(
+            $"boards work-item show --id {id} --expand relations --organization {orgUrl} --output json");
+
+        if (json == null)
+        {
+            AnsiConsole.MarkupLine($"[red]❌ Work item {id} not found.[/]");
+            if (!string.IsNullOrEmpty(error))
+                AnsiConsole.MarkupLine($"[dim]{Markup.Escape(error)}[/]");
+            return 1;
+        }
+
+        try
+        {
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+            var fields = root.GetProperty("fields");
+            
+            var type = fields.TryGetProperty("System.WorkItemType", out var typeProp) ? typeProp.GetString() : "Work Item";
+            var title = fields.TryGetProperty("System.Title", out var titleProp) ? titleProp.GetString() : "No Title";
+            var state = fields.TryGetProperty("System.State", out var stateProp) ? stateProp.GetString() : "Unknown";
+            var assignedTo = fields.TryGetProperty("System.AssignedTo", out var assignedProp) ? 
+                (assignedProp.ValueKind == JsonValueKind.Object && assignedProp.TryGetProperty("displayName", out var dp) ? dp.GetString() : assignedProp.ToString()) : "-";
+            
+            var createdDate = fields.TryGetProperty("System.CreatedDate", out var dateProp) ? dateProp.GetString() : "-";
+            var area = fields.TryGetProperty("System.AreaPath", out var areaProp) ? areaProp.GetString() : "-";
+            var iteration = fields.TryGetProperty("System.IterationPath", out var iterProp) ? iterProp.GetString() : "-";
+            
+            // Custom fields
+            var effort = fields.TryGetProperty("Custom.EsfuerzoEstimadoHH", out var effortProp) ? effortProp.ToString() : "-";
+            var mes = fields.TryGetProperty("Custom.Mes", out var mesProp) ? mesProp.GetString() : "-";
+            var urlCommit = fields.TryGetProperty("Custom.URLCommit", out var urlProp) ? urlProp.GetString() : "-";
+            var remaining = fields.TryGetProperty("Microsoft.VSTS.Scheduling.RemainingWork", out var remProp) ? remProp.ToString() : "-";
+            var description = fields.TryGetProperty("System.Description", out var descProp) ? descProp.GetString() : "";
+
+            // Display
+            var panel = new Table()
+                .Border(TableBorder.Rounded)
+                .BorderColor(Color.Cyan1)
+                .Title($"[bold cyan]{type} #{id}[/]")
+                .AddColumn("Field")
+                .AddColumn("Value");
+
+            panel.AddRow("[bold]Title[/]", Markup.Escape(title ?? ""));
+            panel.AddRow("[bold]State[/]", $"[yellow]{state}[/]");
+            panel.AddRow("[bold]Assigned[/]", $"[green]{Markup.Escape(assignedTo ?? "")}[/]");
+            panel.AddRow("[bold]Created[/]", createdDate ?? "");
+            panel.AddRow("[bold]Area[/]", Markup.Escape(area ?? ""));
+            panel.AddRow("[bold]Iteration[/]", Markup.Escape(iteration ?? ""));
+            panel.AddRow("[bold]Effort (HH)[/]", effort ?? "");
+            panel.AddRow("[bold]Remaining[/]", remaining ?? "");
+            panel.AddRow("[bold]Month[/]", mes ?? "");
+            panel.AddRow("[bold]URL Commit[/]", $"[blue]{Markup.Escape(urlCommit ?? "")}[/]");
+
+            AnsiConsole.Write(panel);
+
+            if (!string.IsNullOrEmpty(description))
+            {
+                AnsiConsole.MarkupLine("\n[bold cyan]Description:[/]");
+                // Description often contains HTML from Azure Boards, let's do a simple strip or just show it
+                var plainDesc = Regex.Replace(description, "<.*?>", string.Empty);
+                AnsiConsole.MarkupLine(Markup.Escape(plainDesc.Trim()));
+            }
+
+            // Relations (Links and Children)
+            if (root.TryGetProperty("relations", out var relations) && relations.ValueKind == JsonValueKind.Array)
+            {
+                var relTable = new Table()
+                    .Border(TableBorder.None)
+                    .AddColumn("[bold]Type[/]")
+                    .AddColumn("[bold]Target[/]");
+
+                bool hasRel = false;
+                foreach (var rel in relations.EnumerateArray())
+                {
+                    var relType = rel.TryGetProperty("rel", out var rp) ? rp.GetString() : "";
+                    var url = rel.TryGetProperty("url", out var up) ? up.GetString() : "";
+                    
+                    if (string.IsNullOrEmpty(relType) || string.IsNullOrEmpty(url)) continue;
+
+                    string displayType = relType switch {
+                        "System.LinkTypes.Hierarchy-Forward" => "Child Task",
+                        "System.LinkTypes.Hierarchy-Reverse" => "Parent HU",
+                        "ArtifactLink" => "Branch/Commit/PR",
+                        "Hyperlink" => "External Link",
+                        _ => relType
+                    };
+
+                    string target = url;
+                    if (relType.Contains("Hierarchy"))
+                    {
+                        var lastSlash = url.LastIndexOf('/');
+                        if (lastSlash >= 0) target = "#" + url[(lastSlash + 1)..];
+                    }
+                    
+                    relTable.AddRow(displayType, Markup.Escape(target));
+                    hasRel = true;
+                }
+
+                if (hasRel)
+                {
+                    AnsiConsole.MarkupLine("\n[bold cyan]Relations:[/]");
+                    AnsiConsole.Write(relTable);
+                }
+            }
+            
+            AnsiConsole.WriteLine();
+        }
+        catch (Exception ex)
+        {
+            AnsiConsole.MarkupLine($"[red]Error parsing details:[/] {Markup.Escape(ex.Message)}");
+            return 1;
+        }
+
+        return 0;
+    }
 
     private static async Task<string?> GetCurrentUserEmail()
     {

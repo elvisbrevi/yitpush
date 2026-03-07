@@ -163,35 +163,41 @@ Manage Azure DevOps resources. Requires [Azure CLI](https://docs.microsoft.com/e
 | `repo checkout` | Clone a repository interactively |
 | `variable-group list` | List and inspect variable groups |
 | `hu task` | Create tasks for a User Story |
-| `hu task <org> <proj> <hu-id>` | Create tasks directly (skip menus) |
+| `hu task <org> <proj> <hu-id> [--description "..." --effort "HH"]` | Create tasks directly (skip menus) |
+| `hu show` | Show details of a User Story (title, assigned, description, links) |
+| `hu show <org> <hu-id>` | Show HU details directly |
+| `task show` | Show details of a Task |
+| `task show <org> <id>` | Show Task details directly |
+| `hu link` | Link a repository branch to a User Story or Task |
+| `hu link <org> <proj> <id> --repo <repo> --branch <branch>` | Link branch directly |
 | `hu list` | List tasks of a User Story |
-| `hu list <org> <proj> <hu-id>` | List tasks directly (skip menus) |
+| `hu list <org> <proj> <hu-id>` | List tasks directly |
 | `link` | Add link (branch/commit/PR) to a work item |
-| `link <org> <proj> <wi-id>` | Add link directly (skip menus) |
 
 **Examples:**
 ```bash
 # Interactive mode (menus)
 yitpush azure-devops repo new
-yitpush azure-devops repo checkout
-yitpush azure-devops variable-group list
 yitpush azure-devops hu task
-yitpush azure-devops hu list
-yitpush azure-devops link
+yitpush azure-devops hu show
+yitpush azure-devops task show
+yitpush azure-devops hu link
 
 # Quick mode (skip menus)
-yitpush azure-devops hu task MyOrg MyProject 12345
-yitpush azure-devops hu list MyOrg MyProject 12345
-yitpush azure-devops link MyOrg MyProject 12345
+yitpush azure-devops hu task MyOrg MyProject 12345 --description "Fix bugs" --effort "4"
+yitpush azure-devops hu show MyOrg 12345
+yitpush azure-devops task show MyOrg 67890
+yitpush azure-devops hu link MyOrg MyProject 12345 --repo MyRepo --branch feature/abc
 ```
 
 **Features:**
-- Auto-detects Azure DevOps organizations; falls back to manual entry if needed
-- Installs the `azure-devops` CLI extension automatically if missing
-- Quick mode commands skip all interactive menus for fast scripting
-- Links support branch, commit, and pull request types
-- Full `← Back` navigation at every step
-- **Windows**: automatically uses `cmd.exe /c az` to find `az.cmd`
+- **Recency first**: All lists (HUs, Tasks, Projects, Repos) are sorted by ID descending.
+- **Deep Integration**: Uses `ArtifactLink` for native branch/commit linking in Azure DevOps UI.
+- **Interactive Details**: View full descriptions, assigned users, and effort directly in console.
+- **Auto-detection**: Auto-detects Azure DevOps organizations; falls back to manual entry if needed.
+- **CLI Management**: Installs the `azure-devops` CLI extension automatically if missing.
+- **Scripting Friendly**: Quick mode commands skip all interactive menus.
+- **Navigation**: Full `← Back` navigation at every step.
 
 ---
 
