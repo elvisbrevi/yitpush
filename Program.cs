@@ -12,6 +12,7 @@ namespace YitPush;
 
 class Program
 {
+    private const string AzDevOpsResource = "499b84ac-1321-427f-aa17-267ca6975798";
     private const string DeepSeekApiUrl = "https://api.deepseek.com/v1/chat/completions";
     private const string DeepSeekModel = "deepseek-chat";
     private const string BackOption = "← Back";
@@ -182,7 +183,7 @@ class Program
                 }
 
                 Console.WriteLine("   git commit");
-                if (!await ExecuteGitCommitWithMessage(commitMessage))
+                if (!await ExecuteGitCommitWithMessage(commitMessage!))
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
                     Console.WriteLine("❌ Error: git commit failed.");
@@ -2454,19 +2455,19 @@ Generate the pull request description in Markdown:";
         var relationType = await ResolveArtifactRelationType(orgUrl, relationTypeHint);
 
         // Advanced: Use 'az rest' to add ArtifactLink with the required 'name' attribute
-        // This is what makes it appear in the 'Development' section
         AnsiConsole.MarkupLine($"[dim]Linking to Development section...[/]");
         
-        // Extract org name from orgUrl (https://dev.azure.com/org)
-        var orgName = orgUrl.Split('/').Last();
-        var restUri = $"{orgUrl}/{Uri.EscapeDataString(finalProjectId)}/_apis/wit/workitems/{workItemId}?api-version=6.0";
+        // Use organization-level URI for work items (more robust)
+        var restUri = string.Format("{0}/_apis/wit/workitems/{1}?api-version=6.0", orgUrl, workItemId);
         
-        // JSON Patch body to add the relation with the 'name' attribute
-        // The name attribute MUST be "Branch", "Commit", or "Pull Request" for the UI to categorize it
-        var body = $"[{{\\\"op\\\": \\\"add\\\", \\\"path\\\": \\\"/relations/-\\\", \\\"value\\\": {{\\\"rel\\\": \\\"ArtifactLink\\\", \\\"url\\\": \\\"{artifactUrl}\\\", \\\"attributes\\\": {{\\\"name\\\": \\\"{relationTypeHint}\\\"}} }} }}]";
+        // Build JSON Patch body. Note: name attribute is REQUIRED for technical links to show in 'Development'
+        var body = string.Format("[{{\"op\": \"add\", \"path\": \"/relations/-\", \"value\": {{\"rel\": \"ArtifactLink\", \"url\": \"{0}\", \"attributes\": {{\"name\": \"{1}\"}} }} }}]", artifactUrl, relationTypeHint);
+        
+        // For 'az rest', the body needs to be escaped for the shell
+        var escapedBodyForShell = body.Replace("\"", "\\\"");
         
         var (restResult, restError) = await RunAzCaptureWithError(
-            $"rest --method patch --uri \"{restUri}\" --headers \"Content-Type=application/json-patch+json\" --body \"{body}\"");
+            string.Format("rest --method patch --resource {2} --uri \"{0}\" --headers \"Content-Type=application/json-patch+json\" --body \"{1}\"", restUri, escapedBodyForShell, AzDevOpsResource));
 
         if (restResult != null)
         {
@@ -2474,8 +2475,10 @@ Generate the pull request description in Markdown:";
         }
         else
         {
-            AnsiConsole.MarkupLine($"[yellow]Technical link via API failed, trying standard CLI...[/]");
-            // Fallback to standard CLI (which might show in Links tab but not Development section)
+            AnsiConsole.MarkupLine($"[yellow]Technical link via API failed:[/] [dim]{Markup.Escape(restError?.Trim() ?? "Unknown API error")}[/]");
+            AnsiConsole.MarkupLine($"[dim]Trying standard CLI fallback...[/]");
+            
+            // Fallback to standard CLI
             var (result, linkError) = await RunAzCaptureWithError(
                 $"boards work-item relation add --id {workItemId} --relation-type \"{relationType}\" --target-url \"{artifactUrl}\" --organization {orgUrl} --comment \"{branchToLink}\" --output json");
 
@@ -2675,18 +2678,17 @@ Generate the pull request description in Markdown:";
     private static async Task<List<string>> FetchAzureOrganizations()
     {
         var organizations = new List<string>();
-        const string azDevOpsResource = "499b84ac-1321-427f-aa17-267ca6975798";
 
         // Get user profile to obtain memberId
         var (profileJson, profileError) = await RunAzCaptureWithError(
-            $"rest --method get --resource {azDevOpsResource} --url https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=7.0");
+            $"rest --method get --resource {AzDevOpsResource} --url https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=7.0");
 
         if (profileJson == null && IsAzureAuthError(profileError))
         {
             if (!await HandleAzureReLogin()) return organizations;
 
             (profileJson, profileError) = await RunAzCaptureWithError(
-                $"rest --method get --resource {azDevOpsResource} --url https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=7.0");
+                $"rest --method get --resource {AzDevOpsResource} --url https://app.vssps.visualstudio.com/_apis/profile/profiles/me?api-version=7.0");
         }
 
         string? memberId = null;
@@ -2714,14 +2716,14 @@ Generate the pull request description in Markdown:";
 
         // List organizations for this member
         var (orgsJson, orgsError) = await RunAzCaptureWithError(
-            $"rest --method get --resource {azDevOpsResource} --url \"https://app.vssps.visualstudio.com/_apis/accounts?memberId={memberId}&api-version=7.0\"");
+            $"rest --method get --resource {AzDevOpsResource} --url \"https://app.vssps.visualstudio.com/_apis/accounts?memberId={memberId}&api-version=7.0\"");
 
         if (orgsJson == null && IsAzureAuthError(orgsError))
         {
             if (!await HandleAzureReLogin()) return organizations;
 
             (orgsJson, orgsError) = await RunAzCaptureWithError(
-                $"rest --method get --resource {azDevOpsResource} --url \"https://app.vssps.visualstudio.com/_apis/accounts?memberId={memberId}&api-version=7.0\"");
+                $"rest --method get --resource {AzDevOpsResource} --url \"https://app.vssps.visualstudio.com/_apis/accounts?memberId={memberId}&api-version=7.0\"");
         }
 
         if (orgsJson == null)
