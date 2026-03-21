@@ -20,8 +20,14 @@ After installing, run `yp setup` to configure your AI provider. The setup wizard
 
 ### Install as an Agent Skill
 
-If you use Claude Code, Cursor, Gemini CLI, or any [Agent Skills](https://agentskills.io)-compatible agent, you can install `yp` as a skill so your agent knows how to use it automatically:
+If you use Claude Code, Cursor, Gemini CLI, or any [Agent Skills](https://agentskills.io)-compatible agent, install the `yp` skill so your agent knows how to use it automatically.
 
+Via `yp` (recommended — also offered during `yp setup`):
+```bash
+yp skill
+```
+
+Or directly with the skills CLI:
 ```bash
 npx skills add elvisbrevi/yitpush
 ```
@@ -64,6 +70,7 @@ export OPENROUTER_API_KEY='...'
 | Command | Description |
 |---------|-------------|
 | `yp setup` | Configure your AI provider interactively |
+| `yp skill` | Install the yp skill for your AI agent |
 | `yp commit` | Stage, commit and push with an AI-generated message |
 | `yp checkout` | Interactive branch checkout |
 | `yp pr` | Generate a pull request description between two branches |

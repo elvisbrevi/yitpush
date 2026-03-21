@@ -55,6 +55,8 @@ partial class Program
                 result = await PrCommand(args.Skip(1).ToArray()); break;
             case "setup":
                 result = await SetupCommand(); break;
+            case "skill":
+                result = await InstallSkillCommand(); break;
             case "azure-devops":
                 result = await AzureDevOpsCommand(args.Skip(1).ToArray()); break;
             default:
@@ -85,6 +87,7 @@ partial class Program
         commandsTable.AddRow("pr", "Generate a pull request description between two branches");
         commandsTable.AddRow("checkout", "Interactive branch checkout");
         commandsTable.AddRow("azure-devops", "Manage Azure DevOps resources");
+        commandsTable.AddRow("skill", "Install the yp skill for your AI agent (Claude Code, Cursor, Gemini CLI...)");
 
         AnsiConsole.Write(commandsTable);
 
@@ -144,6 +147,7 @@ partial class Program
 
         AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
         AnsiConsole.MarkupLine("  yp setup                                        [dim]# Configure AI provider[/]");
+        AnsiConsole.MarkupLine("  yp skill                                        [dim]# Install skill for your AI agent[/]");
         AnsiConsole.MarkupLine("  yp commit                                       [dim]# Auto commit and push[/]");
         AnsiConsole.MarkupLine("  yp commit --confirm                             [dim]# Review before committing[/]");
         AnsiConsole.MarkupLine("  yp commit --detailed -l spanish                 [dim]# Detailed commit in Spanish[/]");
