@@ -1,0 +1,39 @@
+# yp (YitPush)
+
+> AI-powered CLI tool for Git commit automation and Azure DevOps management.
+> Supports multiple AI providers: OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter.
+
+## Project
+
+- Version: 2.0.0
+- Language: C# / .NET 10
+- Install: `dotnet tool install -g YitPush`
+- Command: `yp`
+- Repository: https://github.com/elvisbrevi/yitpush
+
+## Commands
+
+- `yp setup` — interactive wizard to configure AI provider and API key
+- `yp commit` — stage, commit and push with an AI-generated message
+- `yp pr` — generate a pull request description between two branches
+- `yp checkout` — interactive branch checkout
+- `yp azure-devops` — Azure DevOps management (repos, user stories, tasks, links)
+
+## Key flags
+
+- `--language <lang>`, `--lang`, `-l` — output language for commit/PR (default: english)
+- `--detailed` — generate a detailed commit or PR description with full body
+- `--confirm` — require confirmation before committing (commit only)
+- `--save` — save output to a markdown file
+
+## Configuration
+
+Config file: `~/.yitpush/config.json`
+Supported providers: OpenAI, Anthropic, Google, DeepSeek, OpenRouter
+
+## Documentation
+
+- README: /README.md
+- Changelog: /CHANGELOG.md
+- Quickstart: /QUICKSTART.md
+- Full docs: /llms-full.txt

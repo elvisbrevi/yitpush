@@ -101,6 +101,21 @@ partial class Program
         // Offer to install the yitpush alias
         InstallAlias();
 
+        // Offer to install the agent skill
+        AnsiConsole.WriteLine();
+        var installSkill = AnsiConsole.Prompt(
+            new ConfirmationPrompt("Install the yp skill for your AI agent? (Claude Code, Cursor, Gemini CLI, etc.)")
+            { DefaultValue = true });
+
+        if (installSkill)
+        {
+            await InstallSkillCommand();
+        }
+        else
+        {
+            AnsiConsole.MarkupLine("\n[dim]You can install the skill later with:[/] [cyan]yp skill[/]");
+        }
+
         Console.WriteLine();
         return 0;
     }

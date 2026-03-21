@@ -18,6 +18,16 @@ dotnet tool install --global --add-source ./nupkg YitPush
 
 After installing, run `yp setup` to configure your AI provider. The setup wizard will also offer to add the `yitpush` alias to your shell automatically (`.zshrc`, `.bashrc`, or `.profile` depending on your OS).
 
+### Install as an Agent Skill
+
+If you use Claude Code, Cursor, Gemini CLI, or any [Agent Skills](https://agentskills.io)-compatible agent, you can install `yp` as a skill so your agent knows how to use it automatically:
+
+```bash
+npx skills add elvisbrevi/yitpush
+```
+
+Listed on [skills.sh/elvisbrevi/yitpush](https://skills.sh/elvisbrevi/yitpush).
+
 ## 🔑 Configuration
 
 ### Interactive Setup (Recommended)

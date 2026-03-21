@@ -94,11 +94,12 @@ To ensure AI agents like Gemini CLI, Cursor, and Claude can use `yp` effectively
 - [ ] Add logic to force setup if no provider is configured.
 
 ### Phase 4: AI-Friendly Features
-- [ ] Generate `llms.txt` with project summary and key command reference.
-- [ ] Generate `llms-full.txt` (concatenated README, QUICKSTART, and key docs).
-- [ ] Create `SKILL.md` specifically for Gemini CLI skills system.
-- [ ] Create `.cursorrules` for repository-wide AI guidance.
-- [ ] Create `PROJECT_CONTEXT.md` for Claude Projects.
+- [x] Generate `llms.txt` with project summary and key command reference.
+- [x] Generate `llms-full.txt` (concatenated README, QUICKSTART, and key docs).
+- [x] Create `SKILL.md` specifically for Gemini CLI skills system.
+- [x] Publish skill to skills.sh standard (`skills/yp/SKILL.md`) — install via `npx skills add elvisbrevi/yitpush`.
+- [x] Create `.cursorrules` for repository-wide AI guidance.
+- [x] Create `PROJECT_CONTEXT.md` for Claude Projects.
 
 ### Phase 5: Testing & Documentation
 - [ ] Test setup flow for each provider.
