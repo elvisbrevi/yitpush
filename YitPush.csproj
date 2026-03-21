@@ -14,7 +14,7 @@
     <PackageId>YitPush</PackageId>
     <Version>2.0.0</Version>
     <Authors>Elvis Brevi</Authors>
-    <Description>AI-powered git commit automation tool. Now with full Azure DevOps Task management and shorter 'yp' command.</Description>
+    <Description>AI-powered git commit and PR description tool with multi-provider support (OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter) and full Azure DevOps management.</Description>
 
     <!-- URLs and Repository -->
     <PackageProjectUrl>https://github.com/elvisbrevi/yitpush</PackageProjectUrl>
@@ -23,7 +23,7 @@
 
     <!-- Tags for discoverability -->
     <PackageTags>
-      git;commit;ai;deepseek;automation;cli;tool;dotnet-tool;conventional-commits;chat;developer-tools</PackageTags>
+      git;commit;ai;openai;anthropic;gemini;deepseek;openrouter;azure-devops;automation;cli;tool;dotnet-tool;conventional-commits;pull-request;developer-tools</PackageTags>
 
     <!-- License -->
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
@@ -33,13 +33,15 @@
 
     <!-- Additional Metadata -->
     <Copyright>Copyright (c) 2026 Elvis Brevi</Copyright>
-    <PackageReleaseNotes>New: Command shortened to 'yp' for faster usage (yitpush still works via alias).
-New: Full Azure DevOps Task Management (hu list, task show, task update).
-New: Interactive and direct updates for Effort, Esfuerzo Real HH, Remaining Work, State and Comments.
-New: Smart state validation and selection menus for Azure DevOps.
-New: Integrated 'List all fields' tool for debugging work item technical names.
-Improved: Faster navigation with 'Back' support in all interactive menus.
-Improved: Sorting by ID descending (recency first) in all Azure DevOps lists.</PackageReleaseNotes>
+    <PackageReleaseNotes>BREAKING: Multi-provider AI support — configure via 'yp setup' (OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter).
+New: 'yp setup' interactive wizard — provider, API key, model selection, alias + skill installation.
+New: 'yp skill' command — install the yp agent skill for Claude Code, Cursor, Gemini CLI and others.
+New: -l short flag for --language in both commit and pr commands.
+New: Automatic update notifications — checks NuGet once per day and shows upgrade command.
+New: Automatic shell alias setup (yitpush → yp) during 'yp setup'.
+Improved: Provider-aware progress messages show active provider name and model.
+Improved: Backward compatible — DEEPSEEK_API_KEY env var still works without any config file.
+Full changelog: https://github.com/elvisbrevi/yitpush/blob/main/CHANGELOG.md</PackageReleaseNotes>
   </PropertyGroup>
 
   <ItemGroup>
