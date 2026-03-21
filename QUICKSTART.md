@@ -1,117 +1,57 @@
-# YitPush - Quick Start Guide
+# yp (YitPush) — Quick Start
 
-Get up and running with YitPush in under 2 minutes.
+Get up and running in under 2 minutes.
 
-## 1. Install the Tool
-
-```bash
-dotnet tool install --global YitPush
-```
-
-## 2. Set Your API Key
-
-Get your DeepSeek API key from https://platform.deepseek.com/
-
-**Linux/macOS:**
-```bash
-export DEEPSEEK_API_KEY='your-api-key-here'
-echo 'export DEEPSEEK_API_KEY="your-api-key-here"' >> ~/.zshrc
-```
-
-**Windows (PowerShell):**
-```powershell
-$env:DEEPSEEK_API_KEY='your-api-key-here'
-[System.Environment]::SetEnvironmentVariable('DEEPSEEK_API_KEY', 'your-api-key-here', 'User')
-```
-
-## 3. Use It!
-
-Navigate to any git repository. Run `yitpush` to see all available commands:
-
-```
-Usage: yitpush <command> [options]
-```
-
-### Commit and push your changes
+## 1. Install
 
 ```bash
-yitpush commit
+dotnet tool install -g YitPush
 ```
 
-YitPush will:
-- ✅ Analyze your staged, unstaged and untracked changes
-- ✅ Generate a smart conventional commit message with DeepSeek AI
-- ✅ Run `git add .`, `git commit` and `git push` automatically
-- ✅ Copy the commit message to your clipboard
-
-### Review before committing
+## 2. Configure your AI provider
 
 ```bash
-yitpush commit --confirm
+yp setup
 ```
 
-### Switch branches interactively
+The wizard will ask you to pick a provider (OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter), enter your API key, and select a model. Config is saved to `~/.yitpush/config.json`.
+
+> **Backward compatible**: if you already have `DEEPSEEK_API_KEY` set in your environment, `yp` will use it automatically without needing `yp setup`.
+
+## 3. Use it!
+
+Navigate to any git repository:
 
 ```bash
-yitpush checkout
+yp commit                   # auto commit and push
+yp commit --confirm         # review message before committing
+yp commit --detailed        # commit with title + body
+yp commit -l spanish        # commit message in Spanish
+yp pr                       # generate PR description
+yp pr --detailed -l french  # detailed PR in French
+yp checkout                 # switch branch interactively
 ```
 
-### Generate a PR description
+## Azure DevOps
 
 ```bash
-yitpush pr
+yp azure-devops hu show MyOrg 12345
+yp azure-devops hu list MyOrg MyProj 12345
+yp azure-devops task update MyOrg 67890 --state "Doing" --effort-real "3"
+yp azure-devops hu link MyOrg MyProj 12345 --repo MyRepo --branch feature/abc
 ```
-
-## Example
-
-```
-$ yitpush commit
-🚀 YitPush - AI-Powered Git Commit Tool
-
-📊 Analyzing git changes...
-Found changes (1234 characters)
-
-🤖 Generating commit message with DeepSeek...
-
-📝 Generated commit message:
-   "feat: add user authentication with JWT tokens"
-
-⏩ Proceeding automatically (use --confirm to review)...
-
-⚙️  Executing git commands...
-   git add .
-   git commit -m "feat: add user authentication with JWT tokens"
-   git push
-
-✅ Successfully committed and pushed changes!
-```
-
-## Useful Options
-
-| Command | Description |
-|---------|-------------|
-| `yitpush commit --confirm` | Review commit message before proceeding |
-| `yitpush commit --detailed` | Generate commit with title + body |
-| `yitpush commit --lang es` | Commit message in Spanish |
-| `yitpush commit --save` | Save commit message to a markdown file |
-| `yitpush checkout` | Interactive branch switcher |
-| `yitpush pr` | Generate AI pull request description |
-| `yitpush pr --detailed --save` | Detailed PR description, saved to file |
-| `yitpush azure-devops repo new` | Create an Azure DevOps repository |
-| `yitpush azure-devops repo checkout` | Clone an Azure DevOps repository |
-| `yitpush azure-devops hu list` | List and manage your User Stories |
 
 ## Troubleshooting
 
-**"DEEPSEEK_API_KEY not found"**
-- Make sure you've set the environment variable and restarted your terminal
+| Problem | Solution |
+|---------|----------|
+| No AI provider configured | Run `yp setup` |
+| Not a git repository | Run from inside a git repo |
+| API key invalid | Re-run `yp setup` |
+| git push failed | Check remote and credentials |
 
-**"Not a git repository"**
-- Run the command from inside a git repository
+## More
 
-**"git push failed"**
-- Make sure you have a remote configured and valid credentials
-
-## More Information
-
-See the full [README.md](README.md) for detailed documentation.
+- Full docs: `README.md`
+- All commands and flags: `yp --help`
+- AI agent docs: `llms.txt` / `llms-full.txt`

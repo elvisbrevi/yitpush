@@ -1,0 +1,239 @@
+# yp (YitPush) — Full Documentation Bundle
+
+Version: 2.0.0 | Command: `yp` | Language: C# / .NET 10
+
+---
+
+## INSTALL
+
+```bash
+dotnet tool install -g YitPush
+yp setup        # configure AI provider interactively
+```
+
+Update:
+```bash
+dotnet tool update -g YitPush
+```
+
+---
+
+## SETUP
+
+Run `yp setup` to configure your AI provider. The wizard will:
+1. Let you pick a provider: OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter
+2. Enter your API key (masked)
+3. Select a model from a curated list or enter a custom one
+4. Validate the key with a test call
+5. Optionally add the `yitpush` alias to your shell config
+6. Save config to `~/.yitpush/config.json`
+
+### Config file format (~/.yitpush/config.json)
+```json
+{
+  "defaultProvider": "Anthropic",
+  "providers": {
+    "Anthropic": {
+      "apiKey": "sk-ant-...",
+      "model": "claude-sonnet-4-6",
+      "isActive": true
+    },
+    "OpenAI": {
+      "apiKey": "sk-...",
+      "model": "gpt-4o",
+      "isActive": false
+    },
+    "OpenRouter": {
+      "apiKey": "sk-or-...",
+      "model": "google/gemini-2.0-flash-exp:free",
+      "isActive": false,
+      "baseUrl": "https://openrouter.ai/api/v1/chat/completions"
+    }
+  }
+}
+```
+
+### Environment variable overrides (backward compatible)
+```bash
+export DEEPSEEK_API_KEY='...'     # used if no config file exists
+export OPENAI_API_KEY='...'       # overrides stored key for OpenAI
+export ANTHROPIC_API_KEY='...'    # overrides stored key for Anthropic
+export GOOGLE_API_KEY='...'       # overrides stored key for Google
+export OPENROUTER_API_KEY='...'   # overrides stored key for OpenRouter
+```
+
+---
+
+## COMMANDS
+
+### yp commit
+
+Stage all changes, generate an AI commit message, and push.
+
+```
+yp commit [--confirm] [--detailed] [--language <lang>] [--save]
+```
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--confirm` | | Ask for confirmation before committing |
+| `--detailed` | | Generate commit with title + body |
+| `--language <lang>` | `--lang`, `-l` | Output language (default: english) |
+| `--save` | | Save commit message to a .md file |
+
+Examples:
+```bash
+yp commit
+yp commit --confirm
+yp commit --detailed
+yp commit -l spanish
+yp commit --detailed -l french --save
+```
+
+### yp pr
+
+Interactively select two branches, generate a PR description and copy to clipboard.
+
+```
+yp pr [--detailed] [--language <lang>] [--save]
+```
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--detailed` | | Detailed description with testing notes and file list |
+| `--language <lang>` | `--lang`, `-l` | Output language (default: english) |
+| `--save` | | Save to pr-description-<from>-to-<to>.md |
+
+Examples:
+```bash
+yp pr
+yp pr --detailed
+yp pr -l spanish
+yp pr --detailed --save
+```
+
+### yp checkout
+
+Interactive branch selector with search and back navigation.
+
+```bash
+yp checkout
+```
+
+### yp setup
+
+Configure AI provider interactively.
+
+```bash
+yp setup
+```
+
+Reconfigures even if a provider is already set (asks for confirmation).
+
+### yp azure-devops
+
+Manage Azure DevOps resources. Can be run interactively (no args) or with subcommands.
+
+```
+yp azure-devops [subcommand] [args] [flags]
+```
+
+#### Subcommands
+
+| Subcommand | Description |
+|-----------|-------------|
+| `repo new` | Create a new repository |
+| `repo checkout` | Clone a repository interactively |
+| `variable-group list` | List variable groups |
+| `hu task [<org> <proj> <hu-id>]` | Create tasks for a User Story |
+| `hu show [<org> <hu-id>]` | Show User Story details |
+| `hu list [<org> <proj> <hu-id>]` | List tasks of a User Story |
+| `hu link [<org> <proj> <hu-id>]` | Link a branch to a User Story |
+| `task show [<org> <id>]` | Show task details |
+| `task update [<org> <id>]` | Update task fields |
+| `link [<org> <proj> <wi-id>]` | Add a link to a work item |
+
+#### task update flags
+
+| Flag | Short | Description |
+|------|-------|-------------|
+| `--effort <val>` | `-e` | Set Effort (HH) |
+| `--effort-real <val>` | `-er` | Set Esfuerzo Real HH |
+| `--remaining <val>` | `-r` | Set Remaining Work |
+| `--state <val>` | `-s` | Set state (To Do, Doing, Done, ...) |
+| `--comment <val>` | `-c` | Add a comment |
+
+#### hu link / hu task flags
+
+| Flag | Description |
+|------|-------------|
+| `--repo <name>` | Repository name |
+| `--branch <name>` | Branch name |
+| `--description <text>` | Task description |
+| `--effort <val>` | Effort estimate |
+
+Examples:
+```bash
+yp azure-devops hu show MyOrg 12345
+yp azure-devops hu list MyOrg MyProj 12345
+yp azure-devops task update MyOrg 67890 --state "Doing" --effort-real "3"
+yp azure-devops task update MyOrg 67890 --comment "Fixed the issue"
+yp azure-devops hu link MyOrg MyProj 12345 --repo MyRepo --branch feature/abc
+yp azure-devops hu task MyOrg MyProj 12345 --description "Backend task" --effort "4"
+```
+
+---
+
+## PROVIDERS
+
+| Provider | Models | Auth header |
+|----------|--------|-------------|
+| OpenAI | gpt-4o, gpt-4o-mini, o1, o1-mini | Bearer |
+| Anthropic | claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5 | x-api-key |
+| Google Gemini | gemini-2.0-flash, gemini-1.5-pro | query param |
+| DeepSeek | deepseek-chat, deepseek-reasoner | Bearer |
+| OpenRouter | 100+ models | Bearer + HTTP-Referer |
+
+---
+
+## PROJECT STRUCTURE
+
+```
+YitPush/
+├── Program.cs                      # Main entry point, routing, ShowHelp, version check
+├── Models.cs                       # Data models (AppConfig, ProviderConfig, etc.)
+├── Commands/
+│   ├── CommitCommand.cs            # yp commit
+│   ├── PrCommand.cs                # yp pr
+│   ├── SetupCommand.cs             # yp setup + alias installation
+│   └── CheckoutCommand.cs          # yp checkout
+├── Providers/
+│   └── AiProviders.cs              # ConfigManager + all AI provider HTTP calls
+├── Git/
+│   └── GitHelpers.cs               # All git operations
+└── AzureDevOps/
+    ├── AzureDevOpsCommand.cs       # Routing + interactive menu + help
+    └── AzureDevOpsHelpers.cs       # All Azure REST API calls and logic
+```
+
+---
+
+## VERSION CHECK
+
+On every run, `yp` silently checks NuGet for a newer version (cached for 24h in `~/.yitpush/version-check.json`). If a newer version is found, a notice is shown after the command output.
+
+---
+
+## TROUBLESHOOTING
+
+**No AI provider configured**
+Run `yp setup` or set `DEEPSEEK_API_KEY` env var.
+
+**Not a git repository**
+Run from inside a git repo.
+
+**API key invalid**
+Re-run `yp setup` and enter the correct key.
+
+**git push failed**
+Ensure a remote is configured and credentials are valid.

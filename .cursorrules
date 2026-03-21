@@ -1,0 +1,78 @@
+# Cursor / Windsurf Rules — YitPush (yp)
+
+## Project Overview
+
+`yp` (YitPush) is a .NET 10 global CLI tool for AI-powered Git commits and Azure DevOps management. It supports multiple AI providers: OpenAI, Anthropic, Google Gemini, DeepSeek, and OpenRouter.
+
+## Architecture
+
+The codebase uses a single `partial class Program` split across multiple files by feature:
+
+```
+Program.cs              — Main(), ShowHelp(), CheckForUpdates(), all constants
+Models.cs               — Data model classes (outside Program class)
+Commands/
+  CommitCommand.cs      — yp commit logic
+  PrCommand.cs          — yp pr logic
+  SetupCommand.cs       — yp setup + alias installer
+  CheckoutCommand.cs    — yp checkout logic
+Providers/
+  AiProviders.cs        — ConfigManager + HTTP calls for all AI providers
+Git/
+  GitHelpers.cs         — All git process operations
+AzureDevOps/
+  AzureDevOpsCommand.cs — Routing + interactive menu + help
+  AzureDevOpsHelpers.cs — All Azure REST API calls and work item logic
+```
+
+## Coding Conventions
+
+- All methods are `private static` inside `partial class Program`
+- Use `AnsiConsole` (Spectre.Console) for all user-facing output — never raw `Console.Write` for messages
+- Use `AnsiConsole.Prompt` / `SelectionPrompt` for interactive menus
+- Always include a `← Back` (`BackOption` constant) option in selection menus
+- Prefer `async/await` throughout — no blocking `.Result` or `.Wait()`
+- Git operations go in `Git/GitHelpers.cs`, use `RunGitOutput()` for simple stdout reads
+- AI API calls go in `Providers/AiProviders.cs`
+- Azure DevOps REST calls go in `AzureDevOps/AzureDevOpsHelpers.cs`
+
+## Constants (defined in Program.cs)
+
+```csharp
+ApiMaxTokens = 8000
+ApiTimeoutSeconds = 120
+ApiMaxContextTokens = 131072
+AzFieldEffortHH = "Custom.EsfuerzoEstimadoHH"
+AzFieldEffortRealHH = "Custom.EsfuerzoRealHH"
+AzFieldRemainingWork = "Microsoft.VSTS.Scheduling.RemainingWork"
+```
+
+Always use these constants — never hardcode the values.
+
+## AI Provider Pattern
+
+To add a new AI provider:
+1. Add its base URL to `GetDefaultBaseUrl()` in `AiProviders.cs`
+2. Add its model list to `GetDefaultModelsForProvider()` in `SetupCommand.cs`
+3. If it uses OpenAI-compatible API: route to `CallOpenAiCompatibleApi()` in `CallAiApi()`
+4. If it has a unique API format: add `Call<Name>Api()` and add a case in `CallAiApi()`
+
+## Error Handling
+
+- API calls use a 3-attempt retry with exponential backoff (1s, 2s, 4s)
+- Use `catch { /* Silent */ }` only for truly non-critical background tasks (e.g., `CheckForUpdates`)
+- Show user-friendly errors with `AnsiConsole.MarkupLine("[red]❌ ...[/]")`
+
+## Config
+
+- User config: `~/.yitpush/config.json` (managed by `ConfigManager` in `AiProviders.cs`)
+- Version check cache: `~/.yitpush/version-check.json`
+- Env vars (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.) override stored config keys
+
+## Do Not
+
+- Do not add new top-level files for single methods — put them in the appropriate existing file
+- Do not change method visibility from `private static` without a strong reason
+- Do not use `Console.WriteLine` for user messages — use `AnsiConsole.MarkupLine`
+- Do not hardcode Azure DevOps field names — use `AzField*` constants
+- Do not create new model classes inside `partial class Program` — add them to `Models.cs`
