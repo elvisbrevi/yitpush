@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Linq;
+using System.Reflection;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.Json;
@@ -29,27 +30,37 @@ class Program
 
         Console.WriteLine();
 
+        // Start version check in background — won't block the main command
+        var versionCheckTask = Task.Run(CheckForUpdates);
+
         if (args.Length == 0 || args[0] is "--help" or "-h" or "-help" or "help")
         {
             ShowHelp();
+            await versionCheckTask;
             return 0;
         }
 
+        int result;
         switch (args[0])
         {
             case "commit":
-                return await CommitCommand(args.Skip(1).ToArray());
+                result = await CommitCommand(args.Skip(1).ToArray()); break;
             case "checkout":
-                return await CheckoutBranch();
+                result = await CheckoutBranch(); break;
             case "pr":
-                return await PrCommand(args.Skip(1).ToArray());
+                result = await PrCommand(args.Skip(1).ToArray()); break;
+            case "setup":
+                result = await SetupCommand(); break;
             case "azure-devops":
-                return await AzureDevOpsCommand(args.Skip(1).ToArray());
+                result = await AzureDevOpsCommand(args.Skip(1).ToArray()); break;
             default:
                 AnsiConsole.MarkupLine($"[red]❌ Unknown command:[/] {Markup.Escape(args[0])}\n");
                 ShowHelp();
-                return 1;
+                result = 1; break;
         }
+
+        await versionCheckTask;
+        return result;
     }
 
     // ─── Commands ────────────────────────────────────────────────────────────
@@ -70,14 +81,12 @@ class Program
                 return 1;
             }
 
-            var apiKey = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
-            if (string.IsNullOrWhiteSpace(apiKey))
+            var (aiApiKey, aiModel, aiProviderName, _) = GetAiInfo();
+            if (string.IsNullOrEmpty(aiApiKey))
             {
-                Console.ForegroundColor = ConsoleColor.Red;
-                Console.WriteLine("❌ Error: DEEPSEEK_API_KEY environment variable not found.");
-                Console.ResetColor();
-                Console.WriteLine("\nPlease set your DeepSeek API key:");
-                Console.WriteLine("  export DEEPSEEK_API_KEY='your-api-key-here'");
+                AnsiConsole.MarkupLine("[red]❌ No AI provider configured.[/]");
+                AnsiConsole.MarkupLine("Run [cyan]yp setup[/] to configure your AI provider.");
+                AnsiConsole.MarkupLine("[dim]Or set DEEPSEEK_API_KEY environment variable for DeepSeek (backward compatible).[/]");
                 return 1;
             }
 
@@ -101,8 +110,8 @@ class Program
 
             if (hasChanges)
             {
-                Console.WriteLine($"🤖 Generating commit message with DeepSeek...{(detailed ? " (detailed mode)" : "")}");
-                commitMessage = await GenerateCommitMessage(apiKey, diff, detailed, language);
+                Console.WriteLine($"🤖 Generating commit message with {aiProviderName} ({aiModel})...{(detailed ? " (detailed mode)" : "")}");
+                commitMessage = await GenerateCommitMessage(diff, detailed, language);
 
                 if (string.IsNullOrWhiteSpace(commitMessage))
                 {
@@ -226,6 +235,181 @@ class Program
         }
 
         return await GeneratePrDescription(detailed, language, save);
+    }
+
+    private static async Task<int> SetupCommand()
+    {
+        AnsiConsole.MarkupLine("[bold cyan]🔧 YitPush (yp) Setup[/]\n");
+        AnsiConsole.MarkupLine("Configure your AI provider for commit message and PR description generation.\n");
+
+        var config = ConfigManager.Load();
+        bool hasExistingConfig = !string.IsNullOrEmpty(config.DefaultProvider);
+
+        if (hasExistingConfig)
+        {
+            AnsiConsole.MarkupLine($"[yellow]⚠️  Existing configuration detected. Current provider: [bold]{config.DefaultProvider}[/], Model: [bold]{config.Providers[config.DefaultProvider].Model}[/][/]");
+            var overwrite = AnsiConsole.Prompt(
+                new ConfirmationPrompt("Do you want to reconfigure?") { DefaultValue = false });
+            if (!overwrite)
+            {
+                AnsiConsole.MarkupLine("[green]✅ Configuration unchanged.[/]");
+                return 0;
+            }
+        }
+
+        // Step 1: Select provider
+        var providerChoices = new[] { "OpenAI", "Anthropic", "Google Gemini", "DeepSeek", "OpenRouter" };
+        var selectedProvider = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title("📡 Select your AI provider:")
+                .HighlightStyle(new Style(Color.Cyan1))
+                .AddChoices(providerChoices));
+
+        string providerKey = selectedProvider == "Google Gemini" ? "Google" : selectedProvider;
+
+        // Step 2: Enter API key
+        var apiKey = AnsiConsole.Prompt(
+            new TextPrompt<string>($"🔑 Enter your [cyan]{selectedProvider}[/] API key:")
+                .PromptStyle("green")
+                .Secret());
+
+        // Step 3: Custom base URL (for OpenRouter)
+        string? customBaseUrl = null;
+        if (selectedProvider == "OpenRouter")
+        {
+            AnsiConsole.MarkupLine($"[dim]Default endpoint: {GetDefaultBaseUrl("OpenRouter")}[/]");
+            var useCustomUrl = AnsiConsole.Prompt(
+                new ConfirmationPrompt("Use a custom base URL?") { DefaultValue = false });
+            if (useCustomUrl)
+            {
+                customBaseUrl = AnsiConsole.Prompt(
+                    new TextPrompt<string>("Enter custom base URL (full chat completions endpoint):"));
+            }
+        }
+
+        // Step 4: Select model
+        var defaultModels = GetDefaultModelsForProvider(selectedProvider);
+        defaultModels.Add("[Custom...]");
+
+        var selectedModel = AnsiConsole.Prompt(
+            new SelectionPrompt<string>()
+                .Title($"🧠 Select model for [cyan]{selectedProvider}[/]:")
+                .HighlightStyle(new Style(Color.Cyan1))
+                .AddChoices(defaultModels));
+
+        if (selectedModel == "[Custom...]")
+        {
+            selectedModel = AnsiConsole.Prompt(
+                new TextPrompt<string>("Enter model name:"));
+        }
+
+        // Step 5: Validate API key
+        AnsiConsole.MarkupLine("\n[dim]Testing API connection...[/]");
+        bool isValid = await ValidateApiKey(providerKey, apiKey, selectedModel, customBaseUrl);
+        if (!isValid)
+        {
+            AnsiConsole.MarkupLine("[yellow]⚠️  Could not validate API key. Saving anyway — please verify your key is correct.[/]");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine("[green]✅ API key validated successfully.[/]");
+        }
+
+        // Save config
+        config.DefaultProvider = providerKey;
+        if (!config.Providers.ContainsKey(providerKey))
+            config.Providers[providerKey] = new ProviderConfig();
+
+        config.Providers[providerKey].ApiKey = apiKey;
+        config.Providers[providerKey].Model = selectedModel;
+        config.Providers[providerKey].IsActive = true;
+        if (customBaseUrl != null)
+            config.Providers[providerKey].BaseUrl = customBaseUrl;
+
+        ConfigManager.Save(config);
+        AnsiConsole.MarkupLine($"\n[green]✅ Configuration saved![/] Provider: [bold]{selectedProvider}[/], Model: [bold]{selectedModel}[/]");
+        AnsiConsole.MarkupLine("[dim]Config stored at: ~/.yitpush/config.json[/]");
+
+        // Offer to install the yitpush alias
+        InstallAlias();
+
+        Console.WriteLine();
+        return 0;
+    }
+
+    private static void InstallAlias()
+    {
+        if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+        {
+            AnsiConsole.MarkupLine("\n[dim]ℹ️  Windows detected. To use 'yitpush' as an alias for 'yp', add this to your PowerShell profile:[/]");
+            AnsiConsole.MarkupLine("[dim]   Set-Alias yitpush yp[/]");
+            return;
+        }
+
+        // Detect shell rc file
+        var shell = Environment.GetEnvironmentVariable("SHELL") ?? string.Empty;
+        var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+
+        string rcFile;
+        if (shell.EndsWith("zsh"))
+            rcFile = Path.Combine(home, ".zshrc");
+        else if (shell.EndsWith("bash"))
+            rcFile = Path.Combine(home, ".bashrc");
+        else
+            rcFile = Path.Combine(home, ".profile");
+
+        const string aliasLine = "alias yitpush='yp'";
+
+        // Check if alias already exists
+        if (File.Exists(rcFile))
+        {
+            var existing = File.ReadAllText(rcFile);
+            if (existing.Contains(aliasLine))
+            {
+                AnsiConsole.MarkupLine($"\n[green]✅ Alias 'yitpush' already configured in {rcFile}[/]");
+                return;
+            }
+        }
+
+        AnsiConsole.MarkupLine($"\n[dim]Shell config detected: {rcFile}[/]");
+        var addAlias = AnsiConsole.Prompt(
+            new ConfirmationPrompt("Add 'yitpush' as an alias for 'yp' to your shell config?")
+            { DefaultValue = true });
+
+        if (!addAlias) return;
+
+        File.AppendAllText(rcFile, $"\n# yitpush alias (added by yp setup)\n{aliasLine}\n");
+        AnsiConsole.MarkupLine($"[green]✅ Alias added to {rcFile}[/]");
+        AnsiConsole.MarkupLine($"[dim]Run 'source {rcFile}' or open a new terminal to activate it.[/]");
+    }
+
+    private static List<string> GetDefaultModelsForProvider(string provider) => provider switch
+    {
+        "OpenAI" => new List<string> { "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o1", "o1-mini" },
+        "Anthropic" => new List<string> { "claude-opus-4-6", "claude-sonnet-4-6", "claude-haiku-4-5-20251001" },
+        "Google Gemini" => new List<string> { "gemini-2.0-flash", "gemini-2.0-pro-exp-02-05", "gemini-1.5-pro", "gemini-1.5-flash" },
+        "DeepSeek" => new List<string> { "deepseek-chat", "deepseek-reasoner" },
+        "OpenRouter" => new List<string> { "google/gemini-2.0-flash-exp:free", "anthropic/claude-sonnet-4-6", "openai/gpt-4o", "deepseek/deepseek-chat", "meta-llama/llama-3.3-70b-instruct:free", "qwen/qwen-2.5-72b-instruct:free" },
+        _ => new List<string> { "gpt-4o" }
+    };
+
+    private static async Task<bool> ValidateApiKey(string providerKey, string apiKey, string model, string? baseUrl)
+    {
+        try
+        {
+            var testPrompt = "Reply with exactly one word: ok";
+            string result = providerKey switch
+            {
+                "Anthropic" => await CallAnthropicApi(apiKey, model, testPrompt),
+                "Google" => await CallGeminiApi(apiKey, model, testPrompt),
+                _ => await CallOpenAiCompatibleApi(apiKey, model, baseUrl ?? GetDefaultBaseUrl(providerKey), testPrompt)
+            };
+            return !string.IsNullOrEmpty(result);
+        }
+        catch
+        {
+            return false;
+        }
     }
 
     private static async Task<int> AzureDevOpsCommand(string[] args)
@@ -508,6 +692,7 @@ class Program
         commandsTable.AddRow("checkout", "Interactive branch checkout");
         commandsTable.AddRow("pr", "Generate a pull request description between two branches");
         commandsTable.AddRow("azure-devops", "Manage Azure DevOps resources (repos, variable groups)");
+        commandsTable.AddRow("setup", "Configure AI provider (OpenAI, Anthropic, Google, DeepSeek, OpenRouter)");
 
         AnsiConsole.Write(commandsTable);
 
@@ -520,7 +705,7 @@ class Program
 
         commitTable.AddRow("--confirm", "Ask for confirmation before committing");
         commitTable.AddRow("--detailed", "Generate detailed commit with title + body");
-        commitTable.AddRow("--language <lang>", "Output language (e.g., english, spanish, french)");
+        commitTable.AddRow("--language <lang>, --lang, -l", "Output language (e.g., english, spanish, french)");
         commitTable.AddRow("--save", "Save commit message to a markdown file");
 
         AnsiConsole.Write(commitTable);
@@ -533,7 +718,7 @@ class Program
             .AddColumn(new TableColumn("[bold]Description[/]"));
 
         prTable.AddRow("--detailed", "Generate detailed PR description");
-        prTable.AddRow("--language <lang>", "Output language");
+        prTable.AddRow("--language <lang>, --lang, -l", "Output language (e.g., english, spanish, french)");
         prTable.AddRow("--save", "Save PR description to a markdown file");
 
         AnsiConsole.Write(prTable);
@@ -624,15 +809,114 @@ class Program
         Console.WriteLine();
     }
 
+    // ─── Version check ────────────────────────────────────────────────────────
+
+    private static async Task CheckForUpdates()
+    {
+        try
+        {
+            var home = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            var cacheFile = Path.Combine(home, ".yitpush", "version-check.json");
+
+            string? latestVersion = null;
+
+            // Read cache — check at most once per day
+            if (File.Exists(cacheFile))
+            {
+                var cacheJson = await File.ReadAllTextAsync(cacheFile);
+                var cache = JsonSerializer.Deserialize<VersionCheckCache>(cacheJson,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+
+                if (cache != null && (DateTime.UtcNow - cache.LastCheck).TotalHours < 24)
+                {
+                    latestVersion = cache.LatestVersion;
+                }
+            }
+
+            // Fetch from NuGet if cache is stale or missing
+            if (latestVersion == null)
+            {
+                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+                var json = await http.GetStringAsync(
+                    "https://api.nuget.org/v3-flatcontainer/yitpush/index.json");
+                var doc = JsonDocument.Parse(json);
+                latestVersion = doc.RootElement
+                    .GetProperty("versions")
+                    .EnumerateArray()
+                    .Select(v => v.GetString() ?? "")
+                    .LastOrDefault(v => !string.IsNullOrEmpty(v));
+
+                // Update cache
+                var cacheDir = Path.GetDirectoryName(cacheFile)!;
+                Directory.CreateDirectory(cacheDir);
+                await File.WriteAllTextAsync(cacheFile, JsonSerializer.Serialize(
+                    new VersionCheckCache { LastCheck = DateTime.UtcNow, LatestVersion = latestVersion },
+                    new JsonSerializerOptions { WriteIndented = true }));
+            }
+
+            if (latestVersion == null) return;
+
+            var current = Assembly.GetEntryAssembly()
+                ?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+                ?.InformationalVersion ?? "0.0.0";
+
+            // Strip build metadata (e.g. "2.0.0+abc123" → "2.0.0")
+            current = current.Split('+')[0];
+
+            if (Version.TryParse(latestVersion, out var latest) &&
+                Version.TryParse(current, out var currentVer) &&
+                latest > currentVer)
+            {
+                Console.WriteLine();
+                AnsiConsole.Write(new Panel(
+                    $"[yellow]A new version of yp is available:[/] [bold green]{latestVersion}[/]  [dim](current: {current})[/]\n" +
+                    "Update with: [cyan]dotnet tool update -g YitPush[/]")
+                    .BorderColor(Color.Yellow)
+                    .Padding(1, 0));
+            }
+        }
+        catch { /* Silent — version check is non-critical */ }
+    }
+
+    // ─── Configuration ────────────────────────────────────────────────────────
+
+    private static class ConfigManager
+    {
+        private static string ConfigPath => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".yitpush", "config.json");
+
+        public static AppConfig Load()
+        {
+            try
+            {
+                if (!File.Exists(ConfigPath)) return new AppConfig();
+                var json = File.ReadAllText(ConfigPath);
+                return JsonSerializer.Deserialize<AppConfig>(json,
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                    ?? new AppConfig();
+            }
+            catch { return new AppConfig(); }
+        }
+
+        public static void Save(AppConfig config)
+        {
+            var dir = Path.GetDirectoryName(ConfigPath)!;
+            Directory.CreateDirectory(dir);
+            var json = JsonSerializer.Serialize(config, new JsonSerializerOptions { WriteIndented = true });
+            File.WriteAllText(ConfigPath, json);
+        }
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private static string ParseLanguage(string[] args)
     {
         for (int i = 0; i < args.Length; i++)
         {
-            if ((args[i] == "--language" || args[i] == "--lang") && i + 1 < args.Length && !args[i + 1].StartsWith("--"))
+            if ((args[i] == "--language" || args[i] == "--lang" || args[i] == "-l") && i + 1 < args.Length && !args[i + 1].StartsWith("-"))
                 return args[i + 1];
-            if (args[i].StartsWith("--language=") || args[i].StartsWith("--lang="))
+            if (args[i].StartsWith("--language=") || args[i].StartsWith("--lang=") || args[i].StartsWith("-l="))
                 return args[i].Split('=', 2)[1];
         }
         return "english";
@@ -770,7 +1054,7 @@ class Program
         }
     }
 
-    private static async Task<string> GenerateCommitMessage(string apiKey, string diff, bool detailed = false, string language = "english")
+    private static async Task<string> GenerateCommitMessage(string diff, bool detailed = false, string language = "english")
     {
         const int deepseekMaxContextTokens = 131072;
         const int maxCompletionTokens = 8000;
@@ -832,7 +1116,7 @@ Git diff:
 Generate only the commit message:";
         }
 
-        return await CallDeepSeekApi(apiKey, prompt);
+        return await CallAiApi(prompt);
     }
 
     private static string TruncateDiff(string diff, int maxChars)
@@ -962,6 +1246,280 @@ Generate only the commit message:";
                     continue;
                 }
 
+                return string.Empty;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static (string apiKey, string model, string providerName, string baseUrl) GetAiInfo()
+    {
+        var config = ConfigManager.Load();
+
+        // Try config first
+        if (!string.IsNullOrEmpty(config.DefaultProvider) && config.Providers.ContainsKey(config.DefaultProvider))
+        {
+            var pc = config.Providers[config.DefaultProvider];
+            var apiKey = pc.ApiKey;
+
+            // Env var overrides stored key
+            var envVarName = config.DefaultProvider.ToUpperInvariant().Replace(" ", "_") + "_API_KEY";
+            var envKey = Environment.GetEnvironmentVariable(envVarName);
+            if (!string.IsNullOrEmpty(envKey)) apiKey = envKey;
+
+            var baseUrl = pc.BaseUrl ?? GetDefaultBaseUrl(config.DefaultProvider);
+            return (apiKey, pc.Model, config.DefaultProvider, baseUrl);
+        }
+
+        // Backward compat: try DEEPSEEK_API_KEY
+        var deepseekKey = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
+        if (!string.IsNullOrEmpty(deepseekKey))
+            return (deepseekKey, "deepseek-chat", "DeepSeek", GetDefaultBaseUrl("DeepSeek"));
+
+        return (string.Empty, string.Empty, string.Empty, string.Empty);
+    }
+
+    private static string GetDefaultBaseUrl(string providerName) => providerName switch
+    {
+        "OpenAI" => "https://api.openai.com/v1/chat/completions",
+        "Anthropic" => "https://api.anthropic.com/v1/messages",
+        "Google" => "https://generativelanguage.googleapis.com/v1beta",
+        "DeepSeek" => "https://api.deepseek.com/v1/chat/completions",
+        "OpenRouter" => "https://openrouter.ai/api/v1/chat/completions",
+        _ => "https://api.openai.com/v1/chat/completions"
+    };
+
+    private static async Task<string> CallAiApi(string prompt)
+    {
+        var (apiKey, model, providerName, baseUrl) = GetAiInfo();
+
+        if (string.IsNullOrEmpty(apiKey))
+        {
+            AnsiConsole.MarkupLine("[red]❌ No AI provider configured.[/]");
+            AnsiConsole.MarkupLine("Run [cyan]yp setup[/] to configure your AI provider.");
+            AnsiConsole.MarkupLine("[dim]Or set DEEPSEEK_API_KEY environment variable for DeepSeek (backward compatible).[/]");
+            return string.Empty;
+        }
+
+        return providerName switch
+        {
+            "Anthropic" => await CallAnthropicApi(apiKey, model, prompt),
+            "Google" => await CallGeminiApi(apiKey, model, prompt),
+            _ => await CallOpenAiCompatibleApi(apiKey, model, baseUrl, prompt)
+        };
+    }
+
+    private static async Task<string> CallOpenAiCompatibleApi(string apiKey, string model, string baseUrl, string prompt)
+    {
+        const int maxRetries = 3;
+        const int baseDelayMs = 1000;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
+                httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+                if (baseUrl.Contains("openrouter.ai"))
+                {
+                    httpClient.DefaultRequestHeaders.Add("HTTP-Referer", "https://github.com/elvisbrevi/yitpush");
+                    httpClient.DefaultRequestHeaders.Add("X-Title", "YitPush");
+                }
+
+                var requestBody = new
+                {
+                    model,
+                    messages = new[] { new { role = "user", content = prompt } },
+                    max_tokens = 8000
+                };
+
+                var jsonContent = JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                var response = await httpClient.PostAsync(baseUrl, content);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"API Error (attempt {attempt}/{maxRetries}): {response.StatusCode}");
+
+                    if (attempt < maxRetries && ((int)response.StatusCode == 429 || (int)response.StatusCode >= 500))
+                    {
+                        var delay = baseDelayMs * (int)Math.Pow(2, attempt - 1);
+                        Console.WriteLine($"Retrying in {delay}ms...");
+                        await Task.Delay(delay);
+                        continue;
+                    }
+
+                    return string.Empty;
+                }
+
+                var responseJson = await response.Content.ReadAsStringAsync();
+                var apiResponse = JsonSerializer.Deserialize<DeepSeekResponse>(responseJson);
+
+                if (apiResponse?.Choices == null || apiResponse.Choices.Length == 0)
+                {
+                    if (attempt < maxRetries)
+                    {
+                        await Task.Delay(baseDelayMs * (int)Math.Pow(2, attempt - 1));
+                        continue;
+                    }
+                    return string.Empty;
+                }
+
+                var message = apiResponse.Choices[0].Message?.Content?.Trim() ?? string.Empty;
+                return message.Trim('"', '\'', ' ', '\n', '\r');
+            }
+            catch (TaskCanceledException ex)
+            {
+                Console.WriteLine($"Request timeout (attempt {attempt}/{maxRetries}): {ex.Message}");
+                if (attempt < maxRetries)
+                {
+                    await Task.Delay(baseDelayMs * (int)Math.Pow(2, attempt - 1));
+                    continue;
+                }
+                return string.Empty;
+            }
+            catch (HttpRequestException ex)
+            {
+                Console.WriteLine($"Network error (attempt {attempt}/{maxRetries}): {ex.Message}");
+                if (attempt < maxRetries)
+                {
+                    await Task.Delay(baseDelayMs * (int)Math.Pow(2, attempt - 1));
+                    continue;
+                }
+                return string.Empty;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error calling API (attempt {attempt}/{maxRetries}): {ex.Message}");
+                if (attempt < maxRetries)
+                {
+                    await Task.Delay(baseDelayMs * (int)Math.Pow(2, attempt - 1));
+                    continue;
+                }
+                return string.Empty;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static async Task<string> CallAnthropicApi(string apiKey, string model, string prompt)
+    {
+        const int maxRetries = 3;
+        const int baseDelayMs = 1000;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
+                httpClient.DefaultRequestHeaders.Add("x-api-key", apiKey);
+                httpClient.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+
+                var requestBody = new
+                {
+                    model,
+                    max_tokens = 8000,
+                    messages = new[] { new { role = "user", content = prompt } }
+                };
+
+                var jsonContent = JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                var response = await httpClient.PostAsync("https://api.anthropic.com/v1/messages", content);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    var errorContent = await response.Content.ReadAsStringAsync();
+                    Console.WriteLine($"Anthropic API Error (attempt {attempt}/{maxRetries}): {response.StatusCode}");
+
+                    if (attempt < maxRetries && ((int)response.StatusCode == 429 || (int)response.StatusCode >= 500))
+                    {
+                        var delay = baseDelayMs * (int)Math.Pow(2, attempt - 1);
+                        await Task.Delay(delay);
+                        continue;
+                    }
+
+                    return string.Empty;
+                }
+
+                var responseJson = await response.Content.ReadAsStringAsync();
+                var doc = JsonDocument.Parse(responseJson);
+                var text = doc.RootElement
+                    .GetProperty("content")[0]
+                    .GetProperty("text")
+                    .GetString()?.Trim() ?? string.Empty;
+                return text.Trim('"', '\'', ' ', '\n', '\r');
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error calling Anthropic API (attempt {attempt}/{maxRetries}): {ex.Message}");
+                if (attempt < maxRetries)
+                {
+                    await Task.Delay(baseDelayMs * (int)Math.Pow(2, attempt - 1));
+                    continue;
+                }
+                return string.Empty;
+            }
+        }
+
+        return string.Empty;
+    }
+
+    private static async Task<string> CallGeminiApi(string apiKey, string model, string prompt)
+    {
+        const int maxRetries = 3;
+        const int baseDelayMs = 1000;
+
+        for (int attempt = 1; attempt <= maxRetries; attempt++)
+        {
+            try
+            {
+                using var httpClient = new HttpClient { Timeout = TimeSpan.FromSeconds(120) };
+                var url = $"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={apiKey}";
+
+                var requestBody = new
+                {
+                    contents = new[] { new { parts = new[] { new { text = prompt } } } }
+                };
+
+                var jsonContent = JsonSerializer.Serialize(requestBody);
+                var content = new StringContent(jsonContent, Encoding.UTF8, "application/json");
+                var response = await httpClient.PostAsync(url, content);
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    Console.WriteLine($"Gemini API Error (attempt {attempt}/{maxRetries}): {response.StatusCode}");
+
+                    if (attempt < maxRetries && ((int)response.StatusCode == 429 || (int)response.StatusCode >= 500))
+                    {
+                        var delay = baseDelayMs * (int)Math.Pow(2, attempt - 1);
+                        await Task.Delay(delay);
+                        continue;
+                    }
+
+                    return string.Empty;
+                }
+
+                var responseJson = await response.Content.ReadAsStringAsync();
+                var doc = JsonDocument.Parse(responseJson);
+                var text = doc.RootElement
+                    .GetProperty("candidates")[0]
+                    .GetProperty("content")
+                    .GetProperty("parts")[0]
+                    .GetProperty("text")
+                    .GetString()?.Trim() ?? string.Empty;
+                return text.Trim('"', '\'', ' ', '\n', '\r');
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error calling Gemini API (attempt {attempt}/{maxRetries}): {ex.Message}");
+                if (attempt < maxRetries)
+                {
+                    await Task.Delay(baseDelayMs * (int)Math.Pow(2, attempt - 1));
+                    continue;
+                }
                 return string.Empty;
             }
         }
@@ -1279,7 +1837,7 @@ Generate only the commit message:";
 
     // ─── PR Description ───────────────────────────────────────────────────────
 
-    private static async Task<string> GeneratePrDescriptionContent(string apiKey, string diff, bool detailed, string language)
+    private static async Task<string> GeneratePrDescriptionContent(string diff, bool detailed, string language)
     {
         const int deepseekMaxContextTokens = 131072;
         const int maxCompletionTokens = 8000;
@@ -1339,21 +1897,19 @@ Git diff:
 Generate the pull request description in Markdown:";
         }
 
-        return await CallDeepSeekApi(apiKey, prompt);
+        return await CallAiApi(prompt);
     }
 
     private static async Task<int> GeneratePrDescription(bool detailed, string language, bool save)
     {
 
-        // Get API key
-        var apiKey = Environment.GetEnvironmentVariable("DEEPSEEK_API_KEY");
-        if (string.IsNullOrWhiteSpace(apiKey))
+        // Get AI provider info
+        var (_, aiModel, aiProviderName, _) = GetAiInfo();
+        if (string.IsNullOrEmpty(aiProviderName))
         {
-            Console.ForegroundColor = ConsoleColor.Red;
-            Console.WriteLine("❌ Error: DEEPSEEK_API_KEY environment variable not found.");
-            Console.ResetColor();
-            Console.WriteLine("\nPlease set your DeepSeek API key:");
-            Console.WriteLine("  export DEEPSEEK_API_KEY='your-api-key-here'");
+            AnsiConsole.MarkupLine("[red]❌ No AI provider configured.[/]");
+            AnsiConsole.MarkupLine("Run [cyan]yp setup[/] to configure your AI provider.");
+            AnsiConsole.MarkupLine("[dim]Or set DEEPSEEK_API_KEY environment variable for DeepSeek (backward compatible).[/]");
             return 1;
         }
 
@@ -1425,8 +1981,8 @@ Generate the pull request description in Markdown:";
         AnsiConsole.MarkupLine($"Found differences ({diff.Length} characters)\n");
 
         // Generate PR description
-        AnsiConsole.MarkupLine($"🤖 Generating PR description with DeepSeek...{(detailed ? " (detailed mode)" : "")}");
-        var description = await GeneratePrDescriptionContent(apiKey, diff, detailed, language);
+        AnsiConsole.MarkupLine($"🤖 Generating PR description with {aiProviderName} ({aiModel})...{(detailed ? " (detailed mode)" : "")}");
+        var description = await GeneratePrDescriptionContent(diff, detailed, language);
 
         if (string.IsNullOrWhiteSpace(description))
         {
@@ -3390,4 +3946,38 @@ class Message
 
     [JsonPropertyName("reasoning_content")]
     public string? ReasoningContent { get; set; }
+}
+
+// Config models for multi-provider support
+class ProviderConfig
+{
+    [JsonPropertyName("apiKey")]
+    public string ApiKey { get; set; } = string.Empty;
+
+    [JsonPropertyName("model")]
+    public string Model { get; set; } = string.Empty;
+
+    [JsonPropertyName("isActive")]
+    public bool IsActive { get; set; } = false;
+
+    [JsonPropertyName("baseUrl")]
+    public string? BaseUrl { get; set; }
+}
+
+class AppConfig
+{
+    [JsonPropertyName("defaultProvider")]
+    public string DefaultProvider { get; set; } = string.Empty;
+
+    [JsonPropertyName("providers")]
+    public Dictionary<string, ProviderConfig> Providers { get; set; } = new();
+}
+
+class VersionCheckCache
+{
+    [JsonPropertyName("lastCheck")]
+    public DateTime LastCheck { get; set; }
+
+    [JsonPropertyName("latestVersion")]
+    public string? LatestVersion { get; set; }
 }

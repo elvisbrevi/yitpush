@@ -4,7 +4,7 @@ This document outlines the strategy for upgrading `yitpush` (the `yp` tool) to s
 
 ## 1. Objective
 Transform `yp` from a DeepSeek-only tool into a universal AI-powered Git and DevOps assistant with:
-*   **Multi-Provider Support**: Seamlessly switch between Anthropic, OpenAI, Google Gemini, and DeepSeek.
+*   **Multi-Provider Support**: Seamlessly switch between Anthropic, OpenAI, Google Gemini, DeepSeek, and OpenRouter.
 *   **Interactive Configuration**: User-friendly setup for API keys, models, and provider preferences.
 *   **AI-Friendly Ecosystem**: Implementation of `llms.txt` and specialized skill files for various AI agents.
 *   **Persistent Preferences**: Robust configuration management to avoid repeated setup.
@@ -28,7 +28,8 @@ Transform `yp` from a DeepSeek-only tool into a universal AI-powered Git and Dev
         "OpenAI": { "ApiKey": "...", "Model": "gpt-4o", "IsActive": true },
         "Anthropic": { "ApiKey": "...", "Model": "claude-3-5-sonnet", "IsActive": false },
         "Google": { "ApiKey": "...", "Model": "gemini-1.5-pro", "IsActive": false },
-        "DeepSeek": { "ApiKey": "...", "Model": "deepseek-chat", "IsActive": false }
+        "DeepSeek": { "ApiKey": "...", "Model": "deepseek-chat", "IsActive": false },
+        "OpenRouter": { "ApiKey": "...", "Model": "google/gemini-2.0-flash-exp:free", "IsActive": false, "BaseUrl": "https://openrouter.ai/api/v1/chat/completions" }
       }
     }
     ```
@@ -48,11 +49,12 @@ Transform `yp` from a DeepSeek-only tool into a universal AI-powered Git and Dev
     - `AnthropicProvider`: Uses `x-api-key` and `v1/messages`.
     - `GoogleGeminiProvider`: Uses `x-goog-api-key` or query param and Google's specific JSON structure.
     - `DeepSeekProvider`: Maintains current logic but integrated into the abstraction.
+    - `OpenRouterProvider`: Uses OpenAI-compatible API with `HTTP-Referer` and `X-Title` headers; supports custom base URLs and access to hundreds of models.
 
 ### 3.3. Interactive Setup Flow
 *   **Trigger**: Explicitly via `yp setup` or automatically if no provider is configured.
 *   **Steps**:
-    1. Select Provider (Anthropic, Google, OpenAI, DeepSeek).
+    1. Select Provider (Anthropic, Google, OpenAI, DeepSeek, OpenRouter).
     2. Enter API Key (validated via a simple "List Models" call).
     3. Select Model from a list (fetched from the provider's API).
     4. Set as Default.
@@ -82,6 +84,7 @@ To ensure AI agents like Gemini CLI, Cursor, and Claude can use `yp` effectively
 - [ ] Implement `AnthropicProvider`.
 - [ ] Implement `GoogleGeminiProvider`.
 - [ ] Implement `DeepSeekProvider` (refactored from existing code).
+- [ ] Implement `OpenRouterProvider` with OpenAI-compatible API and custom base URL support.
 - [ ] Add support for "API vs Plan" selection where applicable (e.g., custom endpoints).
 
 ### Phase 3: Interactive CLI
