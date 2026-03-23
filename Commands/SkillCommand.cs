@@ -22,7 +22,7 @@ partial class Program
         }
 
         // Run npx skills add
-        var success = await RunCommandPassthrough("npx", $"skills add {SkillPackage}");
+        var success = await RunCommandPassthrough("npx", $"skills add {SkillPackage} --skill yp --all -y");
 
         if (success)
         {
