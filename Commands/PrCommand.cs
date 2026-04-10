@@ -173,7 +173,7 @@ Generate the pull request description in Markdown:";
         }
 
         AnsiConsole.WriteLine();
-        AnsiConsole.Write(new Panel(description)
+        AnsiConsole.Write(new Panel(new Text(description))
             .Header("PR Description")
             .BorderColor(Color.Cyan1)
             .Padding(1, 0));

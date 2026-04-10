@@ -62,7 +62,7 @@ partial class Program
                 }
 
                 Console.WriteLine("\n📝 Generated commit message:");
-                AnsiConsole.Write(new Panel(commitMessage)
+                AnsiConsole.Write(new Panel(new Text(commitMessage))
                     .Header("Commit Message")
                     .BorderColor(Color.Cyan1)
                     .Padding(1, 0));
