@@ -17,7 +17,7 @@
     <Description>AI-powered git commit and PR description tool with multi-provider support (OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter) and full Azure DevOps management.</Description>
 
     <!-- URLs and Repository -->
-    <PackageProjectUrl>https://github.com/elvisbrevi/yitpush</PackageProjectUrl>
+    <PackageProjectUrl>https://yp.elvisbrevi.cl/</PackageProjectUrl>
     <RepositoryUrl>https://github.com/elvisbrevi/yitpush</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
 
