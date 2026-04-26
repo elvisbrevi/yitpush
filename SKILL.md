@@ -93,6 +93,18 @@ yp checkout
 
 ---
 
+### tool: skill
+
+Installs the `yp` agent skill so any Agent Skills-compatible AI agent (Claude Code, Cursor, Gemini CLI, etc.) knows how to invoke `yp`. Internally runs `npx skills add elvisbrevi/yitpush`.
+
+```
+yp skill
+```
+
+**When to use**: User wants their AI agent to learn how to drive `yp`, or the setup wizard offered to install it later.
+
+---
+
 ### tool: azure-devops
 
 Manages Azure DevOps resources. Run without arguments for interactive menu, or pass subcommands directly.
@@ -105,15 +117,20 @@ yp azure-devops [subcommand] [args] [flags]
 
 | Subcommand | Purpose |
 |-----------|---------|
+| `repo new` | Create a new repository interactively |
+| `repo checkout` | Clone/checkout a repository interactively |
+| `variable-group list` | List and inspect variable groups |
 | `hu show <org> <id>` | Show User Story details |
 | `hu list <org> <proj> <id>` | List tasks of a User Story |
 | `hu task <org> <proj> <id>` | Create tasks for a User Story |
 | `hu link <org> <proj> <id> --repo <r> --branch <b>` | Link a branch to a User Story |
 | `task show <org> <id>` | Show task details |
-| `task update <org> <id> [flags]` | Update task fields |
-| `link <org> <proj> <id>` | Add a link to any work item |
+| `task update <org> <id> [flags]` | Update task fields (alias: `hu update`, `wi update`) |
+| `link <org> <proj> <id>` | Add a link (branch/commit/PR) to any work item |
 
-**task update flags**: `--effort`, `--effort-real`, `--remaining`, `--state`, `--comment`
+**task update flags**: `--effort|-e`, `--effort-real|-er`, `--remaining|-r`, `--state|-s`, `--comment|-c`
+**hu task flags**: `--description|-d`, `--effort|-e`
+**hu link flags**: `--repo`, `--branch`
 
 ---
 
@@ -128,6 +145,11 @@ When the user asks you to:
 - **"show user story 12345"** → run `yp azure-devops hu show <org> 12345`
 - **"update task 67890 state to Doing"** → run `yp azure-devops task update <org> 67890 --state "Doing"`
 - **"configure AI provider"** → run `yp setup`
+- **"install the yp skill"** → run `yp skill`
+- **"list variable groups"** → run `yp azure-devops variable-group list`
+- **"create a new repo"** → run `yp azure-devops repo new`
+- **"clone a repo"** → run `yp azure-devops repo checkout`
+- **"link a branch to work item 67890"** → run `yp azure-devops link <org> <proj> 67890`
 
 ## Notes
 
