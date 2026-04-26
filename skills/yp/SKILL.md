@@ -109,6 +109,15 @@ yp setup
 Supported providers: OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter.
 Config is saved to `~/.yitpush/config.json`.
 
+## Install the agent skill
+
+Install the `yp` skill so any Agent Skills-compatible agent (Claude Code, Cursor, Gemini CLI, etc.) knows how to invoke `yp`:
+```bash
+yp skill
+```
+
+Internally runs `npx skills add elvisbrevi/yitpush`. Requires Node.js (`npx`).
+
 ## Azure DevOps — User Stories
 
 Show User Story details:
@@ -169,6 +178,11 @@ Clone a repository interactively:
 yp azure-devops repo checkout
 ```
 
+List and inspect variable groups:
+```bash
+yp azure-devops variable-group list
+```
+
 ## Decision Guide
 
 | User asks to... | Command |
@@ -179,6 +193,10 @@ yp azure-devops repo checkout
 | Generate a PR description | `yp pr` |
 | Switch branches | `yp checkout` |
 | Set up a new AI provider | `yp setup` |
+| Install the yp agent skill | `yp skill` |
+| List variable groups | `yp azure-devops variable-group list` |
+| Create a new repo | `yp azure-devops repo new` |
+| Clone a repo | `yp azure-devops repo checkout` |
 | Show user story details | `yp azure-devops hu show <org> <id>` |
 | List tasks of a user story | `yp azure-devops hu list <org> <proj> <id>` |
 | Update a task's state | `yp azure-devops task update <org> <id> --state "..."` |

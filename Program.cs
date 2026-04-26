@@ -138,12 +138,14 @@ partial class Program
         azTable.AddRow("hu link <org> <proj> <hu-id> --repo <repo> --branch <branch>", "Link branch (skip menus)");
         azTable.AddRow("task show", "Show task details");
         azTable.AddRow("task show <org> <id>", "Show details (skip menus)");
-        azTable.AddRow("task update", "Update effort, remaining, state or comment");
-        azTable.AddRow("task update <org> <id> [[--effort <e>]] [[--effort-real <er>]] [[--remaining <r>]] [[--state <s>]] [[--comment <c>]]", "Update directly");
+        azTable.AddRow("task update", "Update effort, remaining, state or comment (alias: hu update, wi update)");
+        azTable.AddRow("task update <org> <id> [[--effort|-e <e>]] [[--effort-real|-er <er>]] [[--remaining|-r <r>]] [[--state|-s <s>]] [[--comment|-c <c>]]", "Update directly");
         azTable.AddRow("link", "Add link (branch/commit/PR) to work item");
         azTable.AddRow("link <org> <proj> <wi-id>", "Add link (skip menus)");
 
         AnsiConsole.Write(azTable);
+
+        AnsiConsole.MarkupLine("\n[dim]Short flags for hu task: --description|-d, --effort|-e[/]");
 
         AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
         AnsiConsole.MarkupLine("  yp setup                                        [dim]# Configure AI provider[/]");

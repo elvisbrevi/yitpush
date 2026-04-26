@@ -292,12 +292,14 @@ partial class Program
         table.AddRow("hu link <org> <proj> <hu-id> --repo <repo> --branch <branch>", "Link branch (skip menus)");
         table.AddRow("task show", "Show task details");
         table.AddRow("task show <org> <id>", "Show details (skip menus)");
-        table.AddRow("task update", "Update effort, remaining, state or comment");
-        table.AddRow("task update <org> <id> [[--effort <e>]] [[--effort-real <er>]] [[--remaining <r>]] [[--state <s>]] [[--comment <c>]]", "Update directly");
+        table.AddRow("task update", "Update effort, remaining, state or comment (alias: hu update, wi update)");
+        table.AddRow("task update <org> <id> [[--effort|-e <e>]] [[--effort-real|-er <er>]] [[--remaining|-r <r>]] [[--state|-s <s>]] [[--comment|-c <c>]]", "Update directly");
         table.AddRow("link", "Add link (branch/commit/PR) to work item");
         table.AddRow("link <org> <proj> <wi-id>", "Add link (skip menus)");
 
         AnsiConsole.Write(table);
+
+        AnsiConsole.MarkupLine("\n[dim]Short flags for hu task: --description|-d, --effort|-e[/]");
 
         AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu show MyOrg 12345           [dim]# Show HU info[/]");

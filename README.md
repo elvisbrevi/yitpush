@@ -79,14 +79,16 @@ export OPENROUTER_API_KEY='...'
 | Command | Description |
 |---------|-------------|
 | `yp azure-devops` | Enter interactive Azure DevOps menu |
-| `yp repo new` | Create a new repository |
-| `yp repo checkout` | Clone/Checkout a repository |
-| `yp hu task` | Create tasks for a User Story |
-| `yp hu list` | List tasks of a User Story and manage them |
-| `yp hu show` | Show details of a User Story (title, effort, links) |
-| `yp task show` | Show details of a Task (effort, remaining, description) |
-| `yp task update` | Update task fields (effort, state, comments) |
-| `yp hu link` | Link a repository branch to a User Story |
+| `yp azure-devops repo new` | Create a new repository |
+| `yp azure-devops repo checkout` | Clone/Checkout a repository |
+| `yp azure-devops variable-group list` | List and inspect variable groups |
+| `yp azure-devops hu task` | Create tasks for a User Story |
+| `yp azure-devops hu list` | List tasks of a User Story and manage them |
+| `yp azure-devops hu show` | Show details of a User Story (title, effort, links) |
+| `yp azure-devops task show` | Show details of a Task (effort, remaining, description) |
+| `yp azure-devops task update` | Update task fields (effort, state, comments) |
+| `yp azure-devops hu link` | Link a repository branch to a User Story |
+| `yp azure-devops link` | Add a link (branch/commit/PR) to any work item |
 
 ## 🚀 Detailed Features
 
