@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- **Live model discovery in `yp setup`** — the model selection menu is now populated by querying each provider's `/models` endpoint, so newly released models are picked up without updating the app.
+  - OpenAI / DeepSeek: `GET /v1/models` with `Authorization: Bearer` (filtered to chat-capable model families: `gpt-*`, `o1`, `o3`, `o4`, `chatgpt-*`).
+  - OpenRouter: `GET /api/v1/models` (no auth required); honors the host of any custom base URL configured in setup.
+  - Anthropic: `GET /v1/models?limit=100` with `x-api-key` and `anthropic-version`.
+  - Google Gemini: `GET /v1beta/models?key=…`, filtered to models that support `generateContent`.
+- **Models cache** — fetched lists are stored in `~/.yitpush/models-cache.json` with a 24h TTL, so the menu opens instantly between runs.
+- **Live/defaults indicator** — the model selection title now shows `(live)` or `(defaults)` so it's clear whether the list came from the provider or the built-in fallback.
+- **`CLAUDE.md`** — guidance file for Claude Code with build/run/pack commands, architecture notes, conventions, and pointers to the other AI-agent docs in the repo.
+
+### Changed
+- The model selection menu in `yp setup` now paginates at 15 entries to handle providers like OpenRouter that return 100+ models.
+- `[Custom…]` remains available in every provider's menu as an escape hatch for typing any model ID by hand.
+
+### Notes
+- If the live fetch fails (network issue, invalid key, schema change), `yp setup` falls back silently to the curated `GetDefaultModelsForProvider` list — existing behavior is preserved.
+
+---
+
 ## [2.0.0] - 2026-03-21
 
 ### Added
