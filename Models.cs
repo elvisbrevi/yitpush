@@ -57,3 +57,18 @@ class VersionCheckCache
     [JsonPropertyName("latestVersion")]
     public string? LatestVersion { get; set; }
 }
+
+class ModelsCacheEntry
+{
+    [JsonPropertyName("lastCheck")]
+    public DateTime LastCheck { get; set; }
+
+    [JsonPropertyName("models")]
+    public List<string> Models { get; set; } = new();
+}
+
+class ModelsCache
+{
+    [JsonPropertyName("providers")]
+    public Dictionary<string, ModelsCacheEntry> Providers { get; set; } = new();
+}
