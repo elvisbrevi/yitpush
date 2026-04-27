@@ -283,6 +283,185 @@ partial class Program
         return string.Empty;
     }
 
+    // ─── Live model discovery ─────────────────────────────────────────────────
+
+    private const int ModelsFetchTimeoutSeconds = 8;
+    private const int ModelsCacheTtlHours = 24;
+
+    private static async Task<List<string>> FetchModelsForProvider(string providerKey, string apiKey, string? customBaseUrl = null)
+    {
+        // Cache hit?
+        var cached = ModelsCacheManager.Get(providerKey);
+        if (cached != null) return cached;
+
+        try
+        {
+            var fetched = providerKey switch
+            {
+                "OpenAI" => await FetchOpenAiModels("https://api.openai.com/v1/models", apiKey, m => m.StartsWith("gpt-") || m.StartsWith("o1") || m.StartsWith("o3") || m.StartsWith("o4") || m.StartsWith("chatgpt-")),
+                "DeepSeek" => await FetchOpenAiModels("https://api.deepseek.com/v1/models", apiKey, _ => true),
+                "OpenRouter" => await FetchOpenRouterModels(customBaseUrl),
+                "Anthropic" => await FetchAnthropicModels(apiKey),
+                "Google" => await FetchGeminiModels(apiKey),
+                _ => new List<string>()
+            };
+
+            if (fetched.Count > 0)
+            {
+                ModelsCacheManager.Save(providerKey, fetched);
+                return fetched;
+            }
+        }
+        catch { /* network/auth issue — caller falls back to static list */ }
+
+        return new List<string>();
+    }
+
+    private static async Task<List<string>> FetchOpenAiModels(string url, string apiKey, Func<string, bool> filter)
+    {
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ModelsFetchTimeoutSeconds) };
+        http.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+
+        var response = await http.GetAsync(url);
+        if (!response.IsSuccessStatusCode) return new List<string>();
+
+        var json = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+
+        var ids = doc.RootElement.GetProperty("data")
+            .EnumerateArray()
+            .Select(e => e.TryGetProperty("id", out var id) ? id.GetString() : null)
+            .Where(id => !string.IsNullOrEmpty(id) && filter(id!))
+            .Select(id => id!)
+            .OrderBy(id => id)
+            .ToList();
+
+        return ids;
+    }
+
+    private static async Task<List<string>> FetchOpenRouterModels(string? customBaseUrl)
+    {
+        // OpenRouter exposes /models without auth; use the configured base host if provided
+        var listUrl = "https://openrouter.ai/api/v1/models";
+        if (!string.IsNullOrEmpty(customBaseUrl))
+        {
+            try
+            {
+                var uri = new Uri(customBaseUrl);
+                listUrl = $"{uri.Scheme}://{uri.Host}/api/v1/models";
+            }
+            catch { }
+        }
+
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ModelsFetchTimeoutSeconds) };
+        var response = await http.GetAsync(listUrl);
+        if (!response.IsSuccessStatusCode) return new List<string>();
+
+        var json = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+
+        return doc.RootElement.GetProperty("data")
+            .EnumerateArray()
+            .Select(e => e.TryGetProperty("id", out var id) ? id.GetString() : null)
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Select(id => id!)
+            .OrderBy(id => id)
+            .ToList();
+    }
+
+    private static async Task<List<string>> FetchAnthropicModels(string apiKey)
+    {
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ModelsFetchTimeoutSeconds) };
+        http.DefaultRequestHeaders.Add("x-api-key", apiKey);
+        http.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+
+        var response = await http.GetAsync("https://api.anthropic.com/v1/models?limit=100");
+        if (!response.IsSuccessStatusCode) return new List<string>();
+
+        var json = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+
+        return doc.RootElement.GetProperty("data")
+            .EnumerateArray()
+            .Select(e => e.TryGetProperty("id", out var id) ? id.GetString() : null)
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Select(id => id!)
+            .OrderByDescending(id => id) // newest claude-* first
+            .ToList();
+    }
+
+    private static async Task<List<string>> FetchGeminiModels(string apiKey)
+    {
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ModelsFetchTimeoutSeconds) };
+        var response = await http.GetAsync($"https://generativelanguage.googleapis.com/v1beta/models?key={apiKey}");
+        if (!response.IsSuccessStatusCode) return new List<string>();
+
+        var json = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+
+        return doc.RootElement.GetProperty("models")
+            .EnumerateArray()
+            .Where(e => e.TryGetProperty("supportedGenerationMethods", out var methods)
+                        && methods.EnumerateArray().Any(m => m.GetString() == "generateContent"))
+            .Select(e => e.TryGetProperty("name", out var n) ? n.GetString() : null)
+            .Where(n => !string.IsNullOrEmpty(n))
+            .Select(n => n!.StartsWith("models/") ? n!.Substring("models/".Length) : n!)
+            .OrderBy(id => id)
+            .ToList();
+    }
+
+    private static class ModelsCacheManager
+    {
+        private static string CachePath => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".yitpush", "models-cache.json");
+
+        public static List<string>? Get(string providerKey)
+        {
+            try
+            {
+                if (!File.Exists(CachePath)) return null;
+                var cache = JsonSerializer.Deserialize<ModelsCache>(File.ReadAllText(CachePath),
+                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                if (cache == null || !cache.Providers.TryGetValue(providerKey, out var entry)) return null;
+                if ((DateTime.UtcNow - entry.LastCheck).TotalHours >= ModelsCacheTtlHours) return null;
+                return entry.Models.Count > 0 ? entry.Models : null;
+            }
+            catch { return null; }
+        }
+
+        public static void Save(string providerKey, List<string> models)
+        {
+            try
+            {
+                var dir = Path.GetDirectoryName(CachePath)!;
+                Directory.CreateDirectory(dir);
+
+                ModelsCache cache;
+                if (File.Exists(CachePath))
+                {
+                    cache = JsonSerializer.Deserialize<ModelsCache>(File.ReadAllText(CachePath),
+                        new JsonSerializerOptions { PropertyNameCaseInsensitive = true })
+                        ?? new ModelsCache();
+                }
+                else
+                {
+                    cache = new ModelsCache();
+                }
+
+                cache.Providers[providerKey] = new ModelsCacheEntry
+                {
+                    LastCheck = DateTime.UtcNow,
+                    Models = models
+                };
+
+                File.WriteAllText(CachePath,
+                    JsonSerializer.Serialize(cache, new JsonSerializerOptions { WriteIndented = true }));
+            }
+            catch { /* cache write is non-critical */ }
+        }
+    }
+
     private static class ConfigManager
     {
         private static string ConfigPath => Path.Combine(

@@ -55,15 +55,37 @@ partial class Program
             }
         }
 
-        // Step 4: Select model
-        var defaultModels = GetDefaultModelsForProvider(selectedProvider);
-        defaultModels.Add("[Custom...]");
+        // Step 4: Select model — try live fetch from the provider, fall back to a curated static list
+        List<string> models = new();
+        bool fromLiveApi = false;
+        await AnsiConsole.Status()
+            .Spinner(Spinner.Known.Dots)
+            .StartAsync($"Fetching available models from {selectedProvider}...", async _ =>
+            {
+                models = await FetchModelsForProvider(providerKey, apiKey, customBaseUrl);
+            });
 
-        var selectedModel = AnsiConsole.Prompt(
-            new SelectionPrompt<string>()
-                .Title($"🧠 Select model for [cyan]{selectedProvider}[/]:")
-                .HighlightStyle(new Style(Color.Cyan1))
-                .AddChoices(defaultModels));
+        if (models.Count > 0)
+        {
+            fromLiveApi = true;
+            AnsiConsole.MarkupLine($"[green]✅ Found {models.Count} models from {selectedProvider} API.[/]");
+        }
+        else
+        {
+            models = GetDefaultModelsForProvider(selectedProvider);
+            AnsiConsole.MarkupLine($"[yellow]⚠️  Could not fetch live model list. Using built-in defaults.[/]");
+        }
+
+        models.Add("[Custom...]");
+
+        var modelPrompt = new SelectionPrompt<string>()
+            .Title($"🧠 Select model for [cyan]{selectedProvider}[/]" + (fromLiveApi ? " [dim](live)[/]" : " [dim](defaults)[/]") + ":")
+            .PageSize(15)
+            .MoreChoicesText("[grey](Move up and down to see more models)[/]")
+            .HighlightStyle(new Style(Color.Cyan1))
+            .AddChoices(models);
+
+        var selectedModel = AnsiConsole.Prompt(modelPrompt);
 
         if (selectedModel == "[Custom...]")
         {

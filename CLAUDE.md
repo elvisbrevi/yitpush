@@ -46,7 +46,9 @@ AzureDevOps/AzureDevOpsHelpers.cs Azure REST API calls, work item CRUD, link man
 
 Adding a new top-level command: create `Commands/MyCommand.cs` as `namespace YitPush; partial class Program { private static async Task<int> MyCommand(...) { ... } }`, add a `case` in the switch in `Program.cs`, then add a row to the table in `ShowHelp()`.
 
-Adding a new AI provider: extend `GetDefaultBaseUrl()` in `Providers/AiProviders.cs`, add a model list to `GetDefaultModelsForProvider()` in `Commands/SetupCommand.cs`, then either route to `CallOpenAiCompatibleApi()` (if OpenAI-shaped) or implement `Call<Name>Api()` and dispatch from `CallAiApi()`.
+Adding a new AI provider: extend `GetDefaultBaseUrl()` in `Providers/AiProviders.cs`, add a fallback model list to `GetDefaultModelsForProvider()` in `Commands/SetupCommand.cs`, add a case in `FetchModelsForProvider()` if the provider exposes a `/models` endpoint (otherwise the fallback list is always used), then either route to `CallOpenAiCompatibleApi()` (if OpenAI-shaped) or implement `Call<Name>Api()` and dispatch from `CallAiApi()`.
+
+Model discovery is dynamic: `yp setup` calls `FetchModelsForProvider()` to pull the live model list from the provider, caches it in `~/.yitpush/models-cache.json` for 24h, and only falls back to the static `GetDefaultModelsForProvider()` list on network/auth failure. The `[Custom...]` escape hatch in the menu always lets the user type any model ID by hand.
 
 ## Constants (defined in Program.cs)
 
@@ -78,6 +80,7 @@ AzFieldRemainingWork = "Microsoft.VSTS.Scheduling.RemainingWork"
 |------|---------|
 | `~/.yitpush/config.json` | Active provider, API key, model (managed by `ConfigManager` in `AiProviders.cs`) |
 | `~/.yitpush/version-check.json` | NuGet version-check cache (24h TTL) |
+| `~/.yitpush/models-cache.json` | Per-provider model list cache populated by `yp setup` (24h TTL) |
 
 Environment variables (`OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`) override the stored API key for the matching provider. If no config file exists, the tool falls back to `DEEPSEEK_API_KEY` for backward compatibility — preserve this behavior.
 
