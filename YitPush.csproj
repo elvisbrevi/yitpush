@@ -12,7 +12,7 @@
 
     <!-- Package Metadata -->
     <PackageId>YitPush</PackageId>
-    <Version>2.1.1</Version>
+    <Version>2.1.2</Version>
     <Authors>Elvis Brevi</Authors>
     <Description>AI-powered git commit and PR description tool with multi-provider support (OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter) and full Azure DevOps management.</Description>
 
