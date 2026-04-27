@@ -76,21 +76,35 @@ partial class Program
             AnsiConsole.MarkupLine($"[yellow]⚠️  Could not fetch live model list. Using built-in defaults.[/]");
         }
 
-        models.Add("[Custom...]");
+        const string customOption = "[Custom...]";
+
+        // Escape model names for Spectre.Console markup (model names from live APIs may contain [ ] < > &)
+        var escapedModels = models.ConvertAll(Markup.Escape);
+        escapedModels.Add(customOption);
 
         var modelPrompt = new SelectionPrompt<string>()
             .Title($"🧠 Select model for [cyan]{selectedProvider}[/]" + (fromLiveApi ? " [dim](live)[/]" : " [dim](defaults)[/]") + ":")
             .PageSize(15)
             .MoreChoicesText("[grey](Move up and down to see more models)[/]")
             .HighlightStyle(new Style(Color.Cyan1))
-            .AddChoices(models);
+            .AddChoices(escapedModels);
 
         var selectedModel = AnsiConsole.Prompt(modelPrompt);
 
-        if (selectedModel == "[Custom...]")
+        if (selectedModel == customOption)
         {
             selectedModel = AnsiConsole.Prompt(
                 new TextPrompt<string>("Enter model name:"));
+        }
+        else
+        {
+            // Unescape the selected model name back to its original form
+            selectedModel = selectedModel
+                .Replace("[[", "[")
+                .Replace("[]", "]")
+                .Replace("<<", "<")
+                .Replace(">>", ">")
+                .Replace("&&", "&");
         }
 
         // Step 5: Validate API key
