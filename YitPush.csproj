@@ -12,7 +12,7 @@
 
     <!-- Package Metadata -->
     <PackageId>YitPush</PackageId>
-    <Version>2.0.1</Version>
+    <Version>2.1.0</Version>
     <Authors>Elvis Brevi</Authors>
     <Description>AI-powered git commit and PR description tool with multi-provider support (OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter) and full Azure DevOps management.</Description>
 
@@ -33,14 +33,12 @@
 
     <!-- Additional Metadata -->
     <Copyright>Copyright (c) 2026 Elvis Brevi</Copyright>
-    <PackageReleaseNotes>BREAKING: Multi-provider AI support — configure via 'yp setup' (OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter).
-New: 'yp setup' interactive wizard — provider, API key, model selection, alias + skill installation.
-New: 'yp skill' command — install the yp agent skill for Claude Code, Cursor, Gemini CLI and others.
-New: -l short flag for --language in both commit and pr commands.
-New: Automatic update notifications — checks NuGet once per day and shows upgrade command.
-New: Automatic shell alias setup (yitpush → yp) during 'yp setup'.
-Improved: Provider-aware progress messages show active provider name and model.
-Improved: Backward compatible — DEEPSEEK_API_KEY env var still works without any config file.
+    <PackageReleaseNotes>New: Live model discovery in 'yp setup' — fetches the model list from each provider's /models endpoint, so newly released models show up without an app update.
+New: Models cache at ~/.yitpush/models-cache.json with a 24h TTL for instant menu opens between runs.
+New: (live)/(defaults) indicator in the model selection menu.
+New: CLAUDE.md guidance file for Claude Code with build/run/pack commands and architecture notes.
+Improved: Model menu paginates at 15 entries to handle providers like OpenRouter (100+ models).
+Improved: Falls back silently to the curated static list on network/auth failure — existing behavior preserved.
 Full changelog: https://github.com/elvisbrevi/yitpush/blob/main/CHANGELOG.md</PackageReleaseNotes>
   </PropertyGroup>
 

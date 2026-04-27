@@ -7,7 +7,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## [Unreleased]
+## [2.1.0] - 2026-04-27
 
 ### Added
 - **Live model discovery in `yp setup`** — the model selection menu is now populated by querying each provider's `/models` endpoint, so newly released models are picked up without updating the app.
