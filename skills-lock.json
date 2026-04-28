@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "yp": {
+      "source": "elvisbrevi/yitpush",
+      "sourceType": "github",
+      "skillPath": "skills/yp/SKILL.md",
+      "computedHash": "6725025b858f4868e034e6becad85e2fc11ab99e1a17248594881afb809410c4"
+    }
+  }
+}

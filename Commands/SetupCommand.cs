@@ -77,10 +77,11 @@ partial class Program
         }
 
         const string customOption = "[Custom...]";
+        var escapedCustomOption = Markup.Escape(customOption);
 
         // Escape model names for Spectre.Console markup (model names from live APIs may contain [ ] < > &)
         var escapedModels = models.ConvertAll(Markup.Escape);
-        escapedModels.Add(customOption);
+        escapedModels.Add(escapedCustomOption);
 
         var modelPrompt = new SelectionPrompt<string>()
             .Title($"🧠 Select model for [cyan]{selectedProvider}[/]" + (fromLiveApi ? " [dim](live)[/]" : " [dim](defaults)[/]") + ":")
@@ -91,7 +92,7 @@ partial class Program
 
         var selectedModel = AnsiConsole.Prompt(modelPrompt);
 
-        if (selectedModel == customOption)
+        if (selectedModel == escapedCustomOption)
         {
             selectedModel = AnsiConsole.Prompt(
                 new TextPrompt<string>("Enter model name:"));
