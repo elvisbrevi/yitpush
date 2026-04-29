@@ -30,6 +30,7 @@ partial class Program
         var selectedProvider = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
                 .Title("📡 Select your AI provider:")
+                .EnableSearch()
                 .HighlightStyle(new Style(Color.Cyan1))
                 .AddChoices(providerChoices));
 
@@ -86,6 +87,7 @@ partial class Program
         var modelPrompt = new SelectionPrompt<string>()
             .Title($"🧠 Select model for [cyan]{selectedProvider}[/]" + (fromLiveApi ? " [dim](live)[/]" : " [dim](defaults)[/]") + ":")
             .PageSize(15)
+            .EnableSearch()
             .MoreChoicesText("[grey](Move up and down to see more models)[/]")
             .HighlightStyle(new Style(Color.Cyan1))
             .AddChoices(escapedModels);

@@ -206,6 +206,7 @@ partial class Program
                 new SelectionPrompt<string>()
                     .Title("[bold]Azure DevOps[/]")
                     .PageSize(10)
+                    .EnableSearch()
                     .HighlightStyle(new Style(Color.Cyan1))
                     .AddChoices(
                         "Create new repository",

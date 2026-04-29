@@ -54,6 +54,7 @@ partial class Program
             new SelectionPrompt<string>()
                 .Title("📋 Select branch to checkout:\n[dim](Select ← Back to cancel)[/]")
                 .PageSize(15)
+                .EnableSearch()
                 .HighlightStyle(new Style(Color.Cyan1))
                 .AddChoices(choices));
 

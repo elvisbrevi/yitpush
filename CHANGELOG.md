@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.4] - 2026-04-29
+
+### Added
+- **Interactive Search in Menus** — Enabled instant search/filtering in all significant selection lists. You can now type to quickly find items in:
+  - Azure DevOps: Organizations, Projects, Repositories, User Stories, Tasks, and Variable Groups.
+  - Git: Branch selection for `checkout` and `pr` commands.
+  - Setup: AI Provider and Model selection (including long lists from OpenRouter).
+  - Main menus: Azure DevOps interactive menu.
+
+---
+
 ## [2.1.3] - 2026-04-28
 
 ### Fixed

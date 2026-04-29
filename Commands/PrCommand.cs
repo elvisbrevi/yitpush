@@ -127,6 +127,7 @@ Generate the pull request description in Markdown:";
                 new SelectionPrompt<string>()
                     .Title("📋 Select [green]source[/] branch (branch with changes):\n[dim](Select ← Back to return to previous step)[/]")
                     .PageSize(15)
+                    .EnableSearch()
                     .HighlightStyle(new Style(Color.Cyan1))
                     .AddChoices(sourceChoices));
 
@@ -141,6 +142,7 @@ Generate the pull request description in Markdown:";
                 new SelectionPrompt<string>()
                     .Title("📋 Select [green]target[/] branch (branch to merge into):\n[dim](Select ← Back to return to previous step)[/]")
                     .PageSize(15)
+                    .EnableSearch()
                     .HighlightStyle(new Style(Color.Cyan1))
                     .AddChoices(targetChoices));
 

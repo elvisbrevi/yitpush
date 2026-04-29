@@ -73,6 +73,7 @@ partial class Program
                 new SelectionPrompt<string>()
                     .Title("Organization:")
                     .PageSize(10)
+                    .EnableSearch()
                     .HighlightStyle(new Style(Color.Cyan1))
                     .AddChoices(orgChoices));
 
@@ -93,6 +94,7 @@ partial class Program
                 new SelectionPrompt<string>()
                     .Title("Project:")
                     .PageSize(10)
+                    .EnableSearch()
                     .HighlightStyle(new Style(Color.Cyan1))
                     .AddChoices(projectChoices));
 
@@ -252,6 +254,7 @@ partial class Program
             new SelectionPrompt<string>()
                 .Title("📋 Select [green]repository[/] to clone:\n[dim](Select ← Back to return to previous step)[/]")
                 .PageSize(15)
+                .EnableSearch()
                 .HighlightStyle(new Style(Color.Cyan1))
                 .AddChoices(repoChoices));
 
@@ -313,6 +316,7 @@ partial class Program
                 new SelectionPrompt<string>()
                     .Title("User Story:")
                     .PageSize(15)
+                    .EnableSearch()
                     .HighlightStyle(new Style(Color.Cyan1))
                     .AddChoices(choices));
 
@@ -640,6 +644,7 @@ partial class Program
             var selected = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()
                     .Title("Select task to manage:")
+                    .EnableSearch()
                     .AddChoices(taskChoices));
 
             if (selected == BackOption) return 0;
@@ -704,6 +709,7 @@ partial class Program
                 new SelectionPrompt<string>()
                     .Title("User Story:")
                     .PageSize(15)
+                    .EnableSearch()
                     .HighlightStyle(new Style(Color.Cyan1))
                     .AddChoices(choices));
 
@@ -748,6 +754,7 @@ partial class Program
                 new SelectionPrompt<string>()
                     .Title("Select [cyan]User Story[/] to link:")
                     .PageSize(15)
+                    .EnableSearch()
                     .HighlightStyle(new Style(Color.Cyan1))
                     .AddChoices(choices));
 
@@ -844,6 +851,7 @@ partial class Program
                 new SelectionPrompt<string>()
                     .Title("📋 Select [green]repository[/]:\n[dim](Select ← Back to return)[/]")
                     .PageSize(15)
+                    .EnableSearch()
                     .HighlightStyle(new Style(Color.Cyan1))
                     .AddChoices(repoChoices));
 
@@ -902,7 +910,11 @@ partial class Program
                 {
                     branches.Sort();
                     var branchChoices = new List<string>(branches) { BackOption, "Enter custom branch name" };
-                    var selectedBranch = AnsiConsole.Prompt(new SelectionPrompt<string>().Title("Select [green]branch[/]:").AddChoices(branchChoices));
+                    var selectedBranch = AnsiConsole.Prompt(
+                        new SelectionPrompt<string>()
+                            .Title("Select [green]branch[/]:")
+                            .EnableSearch()
+                            .AddChoices(branchChoices));
                     if (selectedBranch == BackOption) return 0;
                     branchToLink = selectedBranch == "Enter custom branch name" ? AnsiConsole.Prompt(new TextPrompt<string>("Enter branch name:").DefaultValue("main")) : selectedBranch;
                 }
@@ -1071,6 +1083,7 @@ partial class Program
                     new SelectionPrompt<string>()
                         .Title("📋 Select a [green]variable group[/] to view its variables:\n[dim](Select ← Back to return)[/]")
                         .PageSize(15)
+                        .EnableSearch()
                         .HighlightStyle(new Style(Color.Cyan1))
                         .AddChoices(choices));
 
