@@ -398,14 +398,7 @@ partial class Program
 
             AnsiConsole.Markup($"[dim]{Markup.Escape(title)}...[/] ");
 
-            // Initial fields based on SAG project requirements
             var fields = $"\"{AzFieldRemainingWork}=0\" \"{AzFieldEffortHH}={effortHours}\" \"Custom.Mes={currentMonth}\"{assignedField}";
-
-            if (!string.IsNullOrEmpty(description))
-            {
-                var escapedDescription = description.Replace("\"", "\\\"").Replace("\n", " ").Replace("\r", "");
-                fields += $" \"System.Description={escapedDescription}\"";
-            }
 
             string? createJson = null;
             string? createError = null;
@@ -413,8 +406,19 @@ partial class Program
 
             while (!success)
             {
-                (createJson, createError) = await RunAzCaptureWithError(
-                    $"boards work-item create --title \"{title}\" --type Task --project \"{project}\" --area \"{areaPath}\" --iteration \"{iterationPath}\" --fields {fields} --organization {orgUrl} --output json");
+                // Use REST API when description is provided (supports HTML)
+                if (!string.IsNullOrEmpty(description))
+                {
+                    var htmlDescription = MarkdownToSimpleHtml(description);
+                    (createJson, createError) = await CreateWorkItemViaRestApi(
+                        orgUrl, project, "Task", title, areaPath, iterationPath,
+                        fields, htmlDescription);
+                }
+                else
+                {
+                    (createJson, createError) = await RunAzCaptureWithError(
+                        $"boards work-item create --title \"{title}\" --type Task --project \"{project}\" --area \"{areaPath}\" --iteration \"{iterationPath}\" --fields {fields} --organization {orgUrl} --output json");
+                }
 
                 if (createJson != null)
                 {
@@ -461,6 +465,15 @@ partial class Program
                         if (string.IsNullOrEmpty(corrected)) break;
                         fields = corrected;
                     }
+                }
+                else if (createError != null && (createError.Contains("AADSTS50173") || createError.Contains("grant has expired")))
+                {
+                    AnsiConsole.MarkupLine("[red]❌ Authentication expired.[/]");
+                    AnsiConsole.MarkupLine($"[dim]{Markup.Escape(createError.Trim())}[/]");
+                    AnsiConsole.MarkupLine("\n[yellow]Run the following to re-authenticate:[/]");
+                    AnsiConsole.MarkupLine("  az logout");
+                    AnsiConsole.MarkupLine("  az login");
+                    break;
                 }
                 else
                 {
@@ -1815,4 +1828,193 @@ partial class Program
             await UpdateWorkItem(orgUrl, id, effort, remaining, state, comment, effortReal);
         }
     }
+
+    private static string MarkdownToSimpleHtml(string markdown)
+    {
+        var lines = markdown.Split('\n');
+        var html = new List<string>();
+        bool inList = false;
+        bool inOrderedList = false;
+        bool inTable = false;
+        var tableHeader = new List<string>();
+        var tableBody = new List<List<string>>();
+
+        void FlushTable()
+        {
+            if (!inTable) return;
+            html.Add("<table>");
+            if (tableHeader.Count > 0)
+            {
+                html.Add("<thead><tr>");
+                foreach (var cell in tableHeader)
+                    html.Add($"<th>{ProcessInline(cell.Trim())}</th>");
+                html.Add("</tr></thead>");
+            }
+            if (tableBody.Count > 0)
+            {
+                html.Add("<tbody>");
+                foreach (var row in tableBody)
+                {
+                    html.Add("<tr>");
+                    foreach (var cell in row)
+                        html.Add($"<td>{ProcessInline(cell.Trim())}</td>");
+                    html.Add("</tr>");
+                }
+                html.Add("</tbody>");
+            }
+            html.Add("</table>");
+            tableHeader.Clear();
+            tableBody.Clear();
+            inTable = false;
+        }
+
+        void CloseLists()
+        {
+            if (inList) { html.Add("</ul>"); inList = false; }
+            if (inOrderedList) { html.Add("</ol>"); inOrderedList = false; }
+        }
+
+        foreach (var line in lines)
+        {
+            var trimmed = line.Trim();
+            if (string.IsNullOrWhiteSpace(trimmed))
+            {
+                FlushTable();
+                CloseLists();
+                html.Add("<br/>");
+                continue;
+            }
+
+            // Table rows: start/end with |
+            bool isTableLine = trimmed.StartsWith("|") && trimmed.EndsWith("|");
+            if (isTableLine)
+            {
+                // Separator row? e.g. |---|---| or |:---|:---:|
+                if (Regex.IsMatch(trimmed, @"^\|[\s\-:]+(\|[\s\-:]+\|?)+\|?$"))
+                {
+                    // Skip separator — it separates header from body
+                    continue;
+                }
+
+                var cells = trimmed.Trim('|').Split('|');
+                if (!inTable)
+                {
+                    CloseLists();
+                    inTable = true;
+                    tableHeader = cells.Select(c => c.Trim()).ToList();
+                }
+                else
+                {
+                    tableBody.Add(cells.Select(c => c.Trim()).ToList());
+                }
+                continue;
+            }
+            else
+            {
+                FlushTable();
+            }
+
+            // Headers
+            if (trimmed.StartsWith("#### "))
+            {
+                CloseLists();
+                html.Add($"<h4>{EscapeHtml(trimmed[5..])}</h4>");
+            }
+            else if (trimmed.StartsWith("### "))
+            {
+                CloseLists();
+                html.Add($"<h3>{EscapeHtml(trimmed[4..])}</h3>");
+            }
+            else if (trimmed.StartsWith("## "))
+            {
+                CloseLists();
+                html.Add($"<h2>{EscapeHtml(trimmed[3..])}</h2>");
+            }
+            else if (trimmed.StartsWith("# "))
+            {
+                CloseLists();
+                html.Add($"<h1>{EscapeHtml(trimmed[2..])}</h1>");
+            }
+            else if (trimmed.StartsWith("- "))
+            {
+                if (inOrderedList) { html.Add("</ol>"); inOrderedList = false; }
+                if (!inList) { html.Add("<ul>"); inList = true; }
+                html.Add($"<li>{ProcessInline(trimmed[2..])}</li>");
+            }
+            else if (Regex.IsMatch(trimmed, @"^\d+\.\s"))
+            {
+                if (inList) { html.Add("</ul>"); inList = false; }
+                if (!inOrderedList) { html.Add("<ol>"); inOrderedList = true; }
+                var idx = trimmed.IndexOf('.');
+                html.Add($"<li>{ProcessInline(trimmed[(idx + 2)..])}</li>");
+            }
+            else
+            {
+                CloseLists();
+                html.Add($"<p>{ProcessInline(trimmed)}</p>");
+            }
+        }
+        FlushTable();
+        CloseLists();
+        return string.Join("", html);
+    }
+
+    private static string EscapeHtml(string s) =>
+        s.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;");
+
+    private static string ProcessInline(string s)
+    {
+        s = EscapeHtml(s);
+        s = Regex.Replace(s, @"\*\*(.+?)\*\*", "<strong>$1</strong>");
+        s = Regex.Replace(s, @"\*(.+?)\*", "<em>$1</em>");
+        s = Regex.Replace(s, @"`(.+?)`", "<code>$1</code>");
+        return s;
+    }
+
+    private static async Task<(string? Json, string? Error)> CreateWorkItemViaRestApi(
+        string orgUrl, string project, string workItemType, string title,
+        string areaPath, string iterationPath, string fields, string? descriptionText)
+    {
+        try
+        {
+            var restUri = $"{orgUrl}/{Uri.EscapeDataString(project)}/_apis/wit/workitems/${workItemType}?api-version=6.0";
+
+            // Build JSON Patch body
+            var operations = new List<string>
+            {
+                $"{{\"op\": \"add\", \"path\": \"/fields/System.Title\", \"value\": \"{EscapeJson(title)}\"}}",
+                $"{{\"op\": \"add\", \"path\": \"/fields/System.AreaPath\", \"value\": \"{EscapeJson(areaPath)}\"}}",
+                $"{{\"op\": \"add\", \"path\": \"/fields/System.IterationPath\", \"value\": \"{EscapeJson(iterationPath)}\"}}"
+            };
+
+            if (!string.IsNullOrEmpty(descriptionText))
+            {
+                operations.Add($"{{\"op\": \"add\", \"path\": \"/fields/System.Description\", \"value\": \"{EscapeJson(descriptionText)}\"}}");
+            }
+
+            // Parse custom fields from the fields string
+            var fieldPairs = Regex.Matches(fields, @"""([^""]+)=([^""]+)""");
+            foreach (Match match in fieldPairs)
+            {
+                var fieldName = match.Groups[1].Value;
+                var fieldValue = match.Groups[2].Value;
+                operations.Add($"{{\"op\": \"add\", \"path\": \"/fields/{fieldName}\", \"value\": \"{EscapeJson(fieldValue)}\"}}");
+            }
+
+            var body = $"[{string.Join(", ", operations)}]";
+            var escapedBody = body.Replace("\"", "\\\"");
+
+            var (result, error) = await RunAzCaptureWithError(
+                $"rest --method post --resource {AzDevOpsResource} --uri \"{restUri}\" --headers \"Content-Type=application/json-patch+json\" --body \"{escapedBody}\"");
+
+            return (result, error);
+        }
+        catch (Exception ex)
+        {
+            return (null, ex.Message);
+        }
+    }
+
+    private static string EscapeJson(string s) =>
+        s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r").Replace("\t", "\\t");
 }

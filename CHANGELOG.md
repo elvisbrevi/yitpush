@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.8] - 2026-05-13
+
+### Fixed
+- **Task description format** — Descriptions now preserved as raw Markdown via Azure DevOps REST API. Newlines, headers, lists, and formatting render correctly since the API stores JSON with proper `\n` encoding. No conversion needed — Azure DevOps renders Markdown natively.
+
+---
+
 ## [2.1.7] - 2026-05-13
 
 ### Added
@@ -14,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`--repo` + `--branch` auto-link** for `hu task` — when both flags are provided, tasks are linked to the specified branch automatically without prompting.
 
 ### Fixed
-- **Task description newlines** — `\n` in `--description` is now replaced with a space instead of appearing as literal backslash-n in the task description. Headings and list items are preserved.
+- **Task description formatting** — Markdown descriptions are now converted to HTML and stored in `Microsoft.VSTS.Common.DescriptionHtml` via Azure DevOps REST API. Headers, lists, bold, italic, and code formatting render correctly in Azure DevOps.
 
 ---
 
