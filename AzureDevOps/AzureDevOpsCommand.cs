@@ -289,7 +289,7 @@ partial class Program
         table.AddRow("repo checkout", "Clone a repository interactively");
         table.AddRow("variable-group list", "List and inspect variable groups");
         table.AddRow("hu task", "Create tasks for a User Story");
-        table.AddRow("hu task <org> <proj> <hu-id> [[--description \"...\"]] [[--effort \"...\"]]", "Create tasks (skip menus)");
+        table.AddRow("hu task <org> <proj> <hu-id> [[--description|-d \"...\"]] [[--effort|-e \"...\"]] [[--task-titles|-t \"...\"]]", "Create tasks (skip menus)");
         table.AddRow("hu show", "Show User Story details");
         table.AddRow("hu show <org> <hu-id>", "Show details (skip menus)");
         table.AddRow("hu list", "List tasks of a User Story");
@@ -305,14 +305,14 @@ partial class Program
 
         AnsiConsole.Write(table);
 
-        AnsiConsole.MarkupLine("\n[dim]Short flags for hu task: --description|-d, --effort|-e[/]");
+        AnsiConsole.MarkupLine("\n[dim]Short flags for hu task: --description|-d, --effort|-e, --task-titles|-t[/]");
 
         AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu show MyOrg 12345           [dim]# Show HU info[/]");
         AnsiConsole.MarkupLine("  yp azure-devops task show MyOrg 67890         [dim]# Show Task info[/]");
         AnsiConsole.MarkupLine("  yp azure-devops task update MyOrg 67890 --effort \"8\" --state \"Doing\"  [dim]# Update task[/]");
         AnsiConsole.MarkupLine("  yp azure-devops task update MyOrg 67890 --comment \"Fixed the bug\"     [dim]# Add comment[/]");
-        AnsiConsole.MarkupLine("  yp azure-devops hu task MyOrg MyProj 123 --effort \"8\"  [dim]# Quick task with effort[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops hu task MyOrg MyProj 123 --effort \"8\" -t \"Desarrollo, Pruebas\"  [dim]# Quick task with custom titles[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu link MyOrg MyProj 123 --repo Repo --branch main  [dim]# Quick link[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu list MyOrg MyProj 123      [dim]# List tasks of HU[/]");
         AnsiConsole.MarkupLine("  yp azure-devops link MyOrg MyProj 123         [dim]# Add link to work item[/]");

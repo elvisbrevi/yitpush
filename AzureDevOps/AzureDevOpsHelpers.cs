@@ -364,9 +364,7 @@ partial class Program
 
     private static async Task<int> CreateTasksForUserStory(string orgUrl, string project, string huId, string areaPath, string iterationPath, string? fixedDescription = null, string? fixedEffort = null, string? fixedTaskTitles = null)
     {
-        var taskTitles = fixedTaskTitles ?? AnsiConsole.Prompt(
-            new TextPrompt<string>("Enter task titles (comma separated):")
-                .DefaultValue("Desarrollo, Pruebas Unitarias, Code Review"));
+        var taskTitles = fixedTaskTitles ?? "Desarrollo, Pruebas Unitarias, Code Review";
 
         var titles = taskTitles.Split(',').Select(t => t.Trim()).Where(t => !string.IsNullOrEmpty(t));
 
@@ -382,14 +380,7 @@ partial class Program
         }
 
         // Ask for estimated effort if not fixed
-        var effortHours = fixedEffort;
-        if (string.IsNullOrEmpty(effortHours))
-        {
-            effortHours = AnsiConsole.Prompt(
-                new TextPrompt<string>("Estimated effort in hours (default: 1):")
-                    .DefaultValue("1")
-                    .AllowEmpty());
-        }
+        var effortHours = fixedEffort ?? "1";
 
         if (string.IsNullOrWhiteSpace(effortHours)) effortHours = "1";
 

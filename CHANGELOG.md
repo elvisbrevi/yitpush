@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.6] - 2026-05-13
+
+### Fixed
+- **Documentation** — Documented `--task-titles` / `-t` flag in CLI help and agent skill file. It was supported but undocumented, making it impossible to discover.
+
+---
+
 ## [2.1.5] - 2026-05-13
 
 ### Fixed
