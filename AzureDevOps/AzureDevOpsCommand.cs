@@ -50,24 +50,21 @@ partial class Program
         string? comment = null;
         string? effortReal = null;
         string? taskTitles = null;
+        bool noLink = false;
 
         for (int i = 0; i < args.Length; i++)
         {
             if ((args[i] == "--description" || args[i] == "-d") && i + 1 < args.Length)
             {
                 description = args[i + 1];
-            }
-            if ((args[i] == "--effort" || args[i] == "-e") && i + 1 < args.Length)
+}
+            if ((args[i] == "--comment" || args[i] == "-c") && i + 1 < args.Length)
             {
-                effort = args[i + 1];
+                comment = args[i + 1];
             }
-            if ((args[i] == "--effort-real" || args[i] == "-er") && i + 1 < args.Length)
+            if (args[i] == "--no-link" || args[i] == "-n")
             {
-                effortReal = args[i + 1];
-            }
-            if ((args[i] == "--task-titles" || args[i] == "-t") && i + 1 < args.Length)
-            {
-                taskTitles = args[i + 1];
+                noLink = true;
             }
             if (args[i] == "--repo" && i + 1 < args.Length)
             {
@@ -115,7 +112,7 @@ partial class Program
                 var proj = args[3];
                 var huId = args[4];
                 var orgUrl = $"https://dev.azure.com/{org}";
-                return await CreateTasksDirectForHU(orgUrl, proj, huId, description, effort, taskTitles);
+                return await CreateTasksDirectForHU(orgUrl, proj, huId, description, effort, taskTitles, noLink, repo, branch);
             }
             var result = await ListAzureUserStories(description, effort);
             return result == BackToMenu ? 0 : result;
@@ -289,7 +286,7 @@ partial class Program
         table.AddRow("repo checkout", "Clone a repository interactively");
         table.AddRow("variable-group list", "List and inspect variable groups");
         table.AddRow("hu task", "Create tasks for a User Story");
-        table.AddRow("hu task <org> <proj> <hu-id> [[--description|-d \"...\"]] [[--effort|-e \"...\"]] [[--task-titles|-t \"...\"]]", "Create tasks (skip menus)");
+        table.AddRow("hu task <org> <proj> <hu-id> [[--description|-d \"...\"]] [[--effort|-e \"...\"]] [[--task-titles|-t \"...\"]] [[--no-link|-n]] [[--repo <repo> --branch <branch>]]", "Create tasks (skip menus)");
         table.AddRow("hu show", "Show User Story details");
         table.AddRow("hu show <org> <hu-id>", "Show details (skip menus)");
         table.AddRow("hu list", "List tasks of a User Story");
@@ -305,14 +302,15 @@ partial class Program
 
         AnsiConsole.Write(table);
 
-        AnsiConsole.MarkupLine("\n[dim]Short flags for hu task: --description|-d, --effort|-e, --task-titles|-t[/]");
+        AnsiConsole.MarkupLine("\n[dim]Short flags for hu task: --description|-d, --effort|-e, --task-titles|-t, --no-link|-n[/]");
 
         AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu show MyOrg 12345           [dim]# Show HU info[/]");
         AnsiConsole.MarkupLine("  yp azure-devops task show MyOrg 67890         [dim]# Show Task info[/]");
         AnsiConsole.MarkupLine("  yp azure-devops task update MyOrg 67890 --effort \"8\" --state \"Doing\"  [dim]# Update task[/]");
         AnsiConsole.MarkupLine("  yp azure-devops task update MyOrg 67890 --comment \"Fixed the bug\"     [dim]# Add comment[/]");
-        AnsiConsole.MarkupLine("  yp azure-devops hu task MyOrg MyProj 123 --effort \"8\" -t \"Desarrollo, Pruebas\"  [dim]# Quick task with custom titles[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops hu task MyOrg MyProj 123 --effort \"8\" -t \"Desarrollo, Pruebas\" -n  [dim]# Quick task, no linking[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops hu task MyOrg MyProj 123 --effort \"8\" --repo MyRepo --branch feature/123  [dim]# Auto-link branch to tasks[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu link MyOrg MyProj 123 --repo Repo --branch main  [dim]# Quick link[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu list MyOrg MyProj 123      [dim]# List tasks of HU[/]");
         AnsiConsole.MarkupLine("  yp azure-devops link MyOrg MyProj 123         [dim]# Add link to work item[/]");

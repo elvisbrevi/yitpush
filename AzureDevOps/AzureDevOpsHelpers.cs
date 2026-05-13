@@ -362,7 +362,7 @@ partial class Program
         }
     }
 
-    private static async Task<int> CreateTasksForUserStory(string orgUrl, string project, string huId, string areaPath, string iterationPath, string? fixedDescription = null, string? fixedEffort = null, string? fixedTaskTitles = null)
+    private static async Task<int> CreateTasksForUserStory(string orgUrl, string project, string huId, string areaPath, string iterationPath, string? fixedDescription = null, string? fixedEffort = null, string? fixedTaskTitles = null, bool noLink = false, string? fixedRepo = null, string? fixedBranch = null)
     {
         var taskTitles = fixedTaskTitles ?? "Desarrollo, Pruebas Unitarias, Code Review";
 
@@ -403,9 +403,7 @@ partial class Program
 
             if (!string.IsNullOrEmpty(description))
             {
-                // Escape description for AZ CLI fields - it needs careful quoting
-                // Azure CLI fields take "Field=Value" and we already wrap the whole thing in quotes
-                var escapedDescription = description.Replace("\"", "\\\"");
+                var escapedDescription = description.Replace("\"", "\\\"").Replace("\n", " ").Replace("\r", "");
                 fields += $" \"System.Description={escapedDescription}\"";
             }
 
@@ -500,19 +498,24 @@ partial class Program
             }
         }
 
-        if (createdTaskIds.Count > 0 && AnsiConsole.Confirm("Would you like to link a [cyan]branch[/] to these tasks?"))
+        bool shouldLink = createdTaskIds.Count > 0 && (
+            noLink ? false
+            : (!string.IsNullOrEmpty(fixedRepo) && !string.IsNullOrEmpty(fixedBranch)) ? true
+            : AnsiConsole.Confirm("Would you like to link a [cyan]branch[/] to these tasks?"));
+
+        if (shouldLink)
         {
             foreach (var taskId in createdTaskIds)
             {
                 AnsiConsole.MarkupLine($"\n[bold]Linking to task #{taskId}...[/]");
-                await AddLinkToRepo(orgUrl, project, taskId);
+                await AddLinkToRepo(orgUrl, project, taskId, fixedRepo, fixedBranch);
             }
         }
 
         return 0;
     }
 
-    private static async Task<int> CreateTasksDirectForHU(string orgUrl, string project, string huId, string? description = null, string? effort = null, string? taskTitles = null)
+    private static async Task<int> CreateTasksDirectForHU(string orgUrl, string project, string huId, string? description = null, string? effort = null, string? taskTitles = null, bool noLink = false, string? fixedRepo = null, string? fixedBranch = null)
     {
         var setup = await EnsureAzureDevOpsReady();
         if (setup == null) return 1;
@@ -537,7 +540,7 @@ partial class Program
         }
         catch { }
 
-        return await CreateTasksForUserStory(orgUrl, project, huId, areaPath, iterationPath, description, effort, taskTitles);
+        return await CreateTasksForUserStory(orgUrl, project, huId, areaPath, iterationPath, description, effort, taskTitles, noLink, fixedRepo, fixedBranch);
     }
 
     private static async Task<int> ListTasksForHU(string orgUrl, string projectName, string projectId, string huId)

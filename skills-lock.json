@@ -4,8 +4,8 @@
     "yp": {
       "source": "elvisbrevi/yitpush",
       "sourceType": "github",
-      "skillPath": "skills/yp/SKILL.md",
-      "computedHash": "6725025b858f4868e034e6becad85e2fc11ab99e1a17248594881afb809410c4"
+      "skillPath": ".agents/skills/yp/SKILL.md",
+      "computedHash": "0b4184fb8f4de63c61b7f7f0770c907fe11bfa1fb27e3f18e1ed20272535301a"
     }
   }
 }

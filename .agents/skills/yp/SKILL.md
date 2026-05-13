@@ -85,7 +85,7 @@ Convention: `<org>` is the Azure DevOps organization name (the path segment afte
 ```bash
 yp azure-devops hu show <org> <hu-id>                                  # details + links
 yp azure-devops hu list <org> <project> <hu-id>                        # list child tasks
-yp azure-devops hu task <org> <project> <hu-id> [--description|-d "..."] [--effort|-e "4"] [--task-titles|-t "Desarrollo, Pruebas Unitarias, Code Review"]
+yp azure-devops hu task <org> <project> <hu-id> [--description|-d "..."] [--effort|-e "4"] [--task-titles|-t "Desarrollo, Pruebas Unitarias, Code Review"] [[--no-link|-n]] [[--repo <repo> --branch <branch>]]
 yp azure-devops hu link <org> <project> <hu-id> --repo <repo> --branch <branch>
 ```
 
@@ -152,7 +152,7 @@ Map intent → command. If a row matches the user's request, run that command. S
 | Install the yp skill in my agent | `yp skill` |
 | Show user story <id> | `yp azure-devops hu show <org> <id>` |
 | List tasks of user story <id> | `yp azure-devops hu list <org> <project> <id>` |
-| Create tasks for user story <id> | `yp azure-devops hu task <org> <project> <id> [-d "..."] [-e "..."] [-t "..."]` |
+| Create tasks for user story <id> | `yp azure-devops hu task <org> <project> <id> [-d "..."] [-e "..."] [-t "..."] [-n] [--repo <r> --branch <b>]` |
 | Link branch to user story <id> | `yp azure-devops hu link <org> <project> <id> --repo <r> --branch <b>` |
 | Show task <id> | `yp azure-devops task show <org> <id>` |
 | Update task state | `yp azure-devops task update <org> <id> --state "Doing"` |

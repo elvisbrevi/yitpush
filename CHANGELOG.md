@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.7] - 2026-05-13
+
+### Added
+- **`--no-link` / `-n` flag** for `hu task` — skips the branch-linking prompt entirely, enabling fully non-interactive task creation.
+- **`--repo` + `--branch` auto-link** for `hu task` — when both flags are provided, tasks are linked to the specified branch automatically without prompting.
+
+### Fixed
+- **Task description newlines** — `\n` in `--description` is now replaced with a space instead of appearing as literal backslash-n in the task description. Headings and list items are preserved.
+
+---
+
 ## [2.1.6] - 2026-05-13
 
 ### Fixed
