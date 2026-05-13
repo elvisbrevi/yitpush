@@ -49,6 +49,7 @@ partial class Program
         string? state = null;
         string? comment = null;
         string? effortReal = null;
+        string? taskTitles = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -63,6 +64,10 @@ partial class Program
             if ((args[i] == "--effort-real" || args[i] == "-er") && i + 1 < args.Length)
             {
                 effortReal = args[i + 1];
+            }
+            if ((args[i] == "--task-titles" || args[i] == "-t") && i + 1 < args.Length)
+            {
+                taskTitles = args[i + 1];
             }
             if (args[i] == "--repo" && i + 1 < args.Length)
             {
@@ -110,7 +115,7 @@ partial class Program
                 var proj = args[3];
                 var huId = args[4];
                 var orgUrl = $"https://dev.azure.com/{org}";
-                return await CreateTasksDirectForHU(orgUrl, proj, huId, description, effort);
+                return await CreateTasksDirectForHU(orgUrl, proj, huId, description, effort, taskTitles);
             }
             var result = await ListAzureUserStories(description, effort);
             return result == BackToMenu ? 0 : result;

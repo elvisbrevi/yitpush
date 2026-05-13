@@ -362,9 +362,9 @@ partial class Program
         }
     }
 
-    private static async Task<int> CreateTasksForUserStory(string orgUrl, string project, string huId, string areaPath, string iterationPath, string? fixedDescription = null, string? fixedEffort = null)
+    private static async Task<int> CreateTasksForUserStory(string orgUrl, string project, string huId, string areaPath, string iterationPath, string? fixedDescription = null, string? fixedEffort = null, string? fixedTaskTitles = null)
     {
-        var taskTitles = AnsiConsole.Prompt(
+        var taskTitles = fixedTaskTitles ?? AnsiConsole.Prompt(
             new TextPrompt<string>("Enter task titles (comma separated):")
                 .DefaultValue("Desarrollo, Pruebas Unitarias, Code Review"));
 
@@ -521,7 +521,7 @@ partial class Program
         return 0;
     }
 
-    private static async Task<int> CreateTasksDirectForHU(string orgUrl, string project, string huId, string? description = null, string? effort = null)
+    private static async Task<int> CreateTasksDirectForHU(string orgUrl, string project, string huId, string? description = null, string? effort = null, string? taskTitles = null)
     {
         var setup = await EnsureAzureDevOpsReady();
         if (setup == null) return 1;
@@ -546,7 +546,7 @@ partial class Program
         }
         catch { }
 
-        return await CreateTasksForUserStory(orgUrl, project, huId, areaPath, iterationPath, description, effort);
+        return await CreateTasksForUserStory(orgUrl, project, huId, areaPath, iterationPath, description, effort, taskTitles);
     }
 
     private static async Task<int> ListTasksForHU(string orgUrl, string projectName, string projectId, string huId)
