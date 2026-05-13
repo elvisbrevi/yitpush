@@ -177,6 +177,7 @@ partial class Program
             var cacheFile = Path.Combine(home, ".yitpush", "version-check.json");
 
             string? latestVersion = null;
+            string? releaseNotes = null;
 
             // Read cache — check at most once per day
             if (File.Exists(cacheFile))
@@ -188,13 +189,14 @@ partial class Program
                 if (cache != null && (DateTime.UtcNow - cache.LastCheck).TotalHours < 24)
                 {
                     latestVersion = cache.LatestVersion;
+                    releaseNotes = cache.ReleaseNotes;
                 }
             }
 
             // Fetch from NuGet if cache is stale or missing
             if (latestVersion == null)
             {
-                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(10) };
                 var json = await http.GetStringAsync(
                     "https://api.nuget.org/v3-flatcontainer/yitpush/index.json");
                 var doc = JsonDocument.Parse(json);
@@ -204,11 +206,35 @@ partial class Program
                     .Select(v => v.GetString() ?? "")
                     .LastOrDefault(v => !string.IsNullOrEmpty(v));
 
+                // Fetch release notes from nuspec
+                if (latestVersion != null)
+                {
+                    try
+                    {
+                        var nuspecXml = await http.GetStringAsync(
+                            $"https://api.nuget.org/v3-flatcontainer/yitpush/{latestVersion}/yitpush.nuspec");
+                        var rnStart = nuspecXml.IndexOf("<releaseNotes>");
+                        if (rnStart >= 0)
+                        {
+                            rnStart += "<releaseNotes>".Length;
+                            var rnEnd = nuspecXml.IndexOf("</releaseNotes>", rnStart);
+                            if (rnEnd > rnStart)
+                            {
+                                var rawNotes = nuspecXml[rnStart..rnEnd];
+                                var lines = rawNotes.Split('\n', StringSplitOptions.RemoveEmptyEntries).Take(3);
+                                releaseNotes = string.Join("\n", lines);
+                                if (releaseNotes.Length > 500) releaseNotes = releaseNotes[..500];
+                            }
+                        }
+                    }
+                    catch { /* non-critical */ }
+                }
+
                 // Update cache
                 var cacheDir = Path.GetDirectoryName(cacheFile)!;
                 Directory.CreateDirectory(cacheDir);
                 await File.WriteAllTextAsync(cacheFile, JsonSerializer.Serialize(
-                    new VersionCheckCache { LastCheck = DateTime.UtcNow, LatestVersion = latestVersion },
+                    new VersionCheckCache { LastCheck = DateTime.UtcNow, LatestVersion = latestVersion, ReleaseNotes = releaseNotes },
                     new JsonSerializerOptions { WriteIndented = true }));
             }
 
@@ -228,6 +254,7 @@ partial class Program
                 Console.WriteLine();
                 AnsiConsole.Write(new Panel(
                     $"[yellow]A new version of yp is available:[/] [bold green]{latestVersion}[/]  [dim](current: {current})[/]\n" +
+                    (releaseNotes != null ? $"[dim]{releaseNotes.Trim()}[/]\n" : "") +
                     "Update with: [cyan]dotnet tool update -g YitPush[/]")
                     .BorderColor(Color.Yellow)
                     .Padding(1, 0));

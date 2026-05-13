@@ -56,6 +56,9 @@ class VersionCheckCache
 
     [JsonPropertyName("latestVersion")]
     public string? LatestVersion { get; set; }
+
+    [JsonPropertyName("releaseNotes")]
+    public string? ReleaseNotes { get; set; }
 }
 
 class ModelsCacheEntry

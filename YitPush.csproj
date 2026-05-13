@@ -34,6 +34,7 @@
     <!-- Additional Metadata -->
     <Copyright>Copyright (c) 2026 Elvis Brevi</Copyright>
     <PackageReleaseNotes>Fix: Added --task-titles / -t flag to 'yp azure-devops hu task' for non-interactive/scripted usage (e.g. when piping descriptions from markdown files).
+Add release notes to version check notification — now shows what's new when a new version is available.
 Full changelog: https://github.com/elvisbrevi/yitpush/blob/main/CHANGELOG.md</PackageReleaseNotes>
   </PropertyGroup>
 
