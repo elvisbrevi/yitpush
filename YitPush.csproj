@@ -12,7 +12,7 @@
 
     <!-- Package Metadata -->
     <PackageId>YitPush</PackageId>
-    <Version>2.1.4</Version>
+    <Version>2.1.5</Version>
     <Authors>Elvis Brevi</Authors>
     <Description>AI-powered git commit and PR description tool with multi-provider support (OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter) and full Azure DevOps management.</Description>
 
@@ -33,10 +33,7 @@
 
     <!-- Additional Metadata -->
     <Copyright>Copyright (c) 2026 Elvis Brevi</Copyright>
-    <PackageReleaseNotes>New: Interactive search and filtering in all menus! Quickly find Azure DevOps projects, work items, git branches, and AI models by typing.
-New: Live model discovery in 'yp setup' — automatically fetches the latest models from OpenAI, Anthropic, Gemini, and OpenRouter.
-New: Models cache for instant menu loading.
-New: CLAUDE.md guidance for AI agents.
+    <PackageReleaseNotes>Fix: Added --task-titles / -t flag to 'yp azure-devops hu task' for non-interactive/scripted usage (e.g. when piping descriptions from markdown files).
 Full changelog: https://github.com/elvisbrevi/yitpush/blob/main/CHANGELOG.md</PackageReleaseNotes>
   </PropertyGroup>
 

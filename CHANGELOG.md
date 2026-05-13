@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.1.5] - 2026-05-13
+
+### Fixed
+- **Non-interactive task creation** — Added `--task-titles` / `-t` flag to `yp azure-devops hu task` for scripted/non-interactive usage (e.g. piping markdown descriptions). Previously the command would fail with `Failed to read input in non-interactive mode` when description was passed via `--description`.
+
+---
+
 ## [2.1.4] - 2026-04-29
 
 ### Added
