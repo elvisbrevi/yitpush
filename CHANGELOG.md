@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.0] - 2026-05-18
+
+### Changed
+- **Task update via REST API** — `UpdateWorkItem` now uses Azure DevOps REST API (`PATCH /wit/workitems/{id}`) instead of Azure CLI. This unifies task creation and update under the same HTTP-based approach.
+- **Comments via REST API** — Comments are now sent as a JSON Patch operation to `System.History` in the same request as field updates, instead of a separate `az boards work-item update --discussion` call.
+
+### Documentation
+- **Agent skill updated** — `.agents/skills/yp/SKILL.md` decision table now includes `-t`, `-n` flags for `hu task`, effort-real for `task update`, and the `wi update` / `hu update` aliases.
+- **README updated** — Anthropic model names include version date suffix; `hu task` example shows `-t` and `-n` flags.
+- **CLI help updated** — `ShowHelp()` short flags note includes `-t` and `-n`.
+
+---
+
 ## [2.1.8] - 2026-05-13
 
 ### Fixed

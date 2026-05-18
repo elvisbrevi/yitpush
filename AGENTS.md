@@ -24,7 +24,7 @@ dotnet tool uninstall -g YitPush                # uninstall
 
 There are no automated tests in this repo. Verify changes by running the CLI against a scratch git repo and an Azure DevOps test project.
 
-When bumping the version, edit `<Version>` in `YitPush.csproj` and add an entry to `CHANGELOG.md`.
+When bumping the version, edit `<Version>` in `YitPush.csproj`, update `<PackageReleaseNotes>` in the same file (NuGet release notes), and add an entry to `CHANGELOG.md`. Also check whether `README.md`, `SKILL.md`, `.agents/skills/yp/SKILL.md`, or `ShowHelp()` in `Program.cs` need updating to reflect the new functionality.
 
 ## Architecture
 

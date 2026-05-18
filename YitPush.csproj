@@ -12,7 +12,7 @@
 
     <!-- Package Metadata -->
     <PackageId>YitPush</PackageId>
-    <Version>2.1.8</Version>
+    <Version>2.2.0</Version>
     <Authors>Elvis Brevi</Authors>
     <Description>AI-powered git commit and PR description tool with multi-provider support (OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter) and full Azure DevOps management.</Description>
 
@@ -33,8 +33,8 @@
 
     <!-- Additional Metadata -->
     <Copyright>Copyright (c) 2026 Elvis Brevi</Copyright>
-    <PackageReleaseNotes>Fix: Added --task-titles / -t flag to 'yp azure-devops hu task' for non-interactive/scripted usage (e.g. when piping descriptions from markdown files).
-Add release notes to version check notification — now shows what's new when a new version is available.
+    <PackageReleaseNotes>- Task update and comments now use Azure DevOps REST API (unified from CLI)
+- Agent skill, README, and CLI help updated with latest flags
 Full changelog: https://github.com/elvisbrevi/yitpush/blob/main/CHANGELOG.md</PackageReleaseNotes>
   </PropertyGroup>
 
