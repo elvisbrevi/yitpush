@@ -145,7 +145,7 @@ partial class Program
 
         AnsiConsole.Write(azTable);
 
-        AnsiConsole.MarkupLine("\n[dim]Short flags for hu task: --description|-d, --effort|-e[/]");
+        AnsiConsole.MarkupLine("\n[dim]Short flags for hu task: --description|-d, --effort|-e, --task-titles|-t, --no-link|-n[/]");
 
         AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
         AnsiConsole.MarkupLine("  yp setup                                        [dim]# Configure AI provider[/]");

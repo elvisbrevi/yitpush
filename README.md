@@ -99,7 +99,7 @@ export OPENROUTER_API_KEY='...'
 | Provider | Models |
 |----------|--------|
 | OpenAI | gpt-4o, gpt-4o-mini, o1, o1-mini, ... |
-| Anthropic | claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5 |
+| Anthropic | claude-opus-4-6-20250514, claude-sonnet-4-6-20250514, claude-haiku-4-5-20250508 |
 | Google Gemini | gemini-2.0-flash, gemini-1.5-pro, ... |
 | DeepSeek | deepseek-chat, deepseek-reasoner |
 | OpenRouter | 100+ models (google/gemini-2.0-flash, openai/gpt-4o, ...) |
@@ -158,7 +158,7 @@ yp azure-devops task update <org> <id> --state "Active" --effort-real "5" --rema
 yp azure-devops task update <org> <id> --comment "Progress update: logic refactored"
 
 # Create tasks with info
-yp azure-devops hu task <org> <proj> <hu-id> --description "Task info" --effort "4"
+yp azure-devops hu task <org> <proj> <hu-id> --description "Task info" --effort "4" --task-titles "Desarrollo, Pruebas Unitarias" --no-link
 ```
 
 #### 🔗 Deep Linking

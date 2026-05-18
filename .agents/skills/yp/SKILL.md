@@ -152,12 +152,13 @@ Map intent → command. If a row matches the user's request, run that command. S
 | Install the yp skill in my agent | `yp skill` |
 | Show user story <id> | `yp azure-devops hu show <org> <id>` |
 | List tasks of user story <id> | `yp azure-devops hu list <org> <project> <id>` |
-| Create tasks for user story <id> | `yp azure-devops hu task <org> <project> <id> [-d "..."] [-e "..."] [-t "..."] [-n] [--repo <r> --branch <b>]` |
+| Create tasks for user story <id> | `yp azure-devops hu task <org> <project> <id> [-d "..."] [-e "..."] [-t "title1,title2,..."] [-n] [--repo <r> --branch <b>]` |
 | Link branch to user story <id> | `yp azure-devops hu link <org> <project> <id> --repo <r> --branch <b>` |
 | Show task <id> | `yp azure-devops task show <org> <id>` |
 | Update task state | `yp azure-devops task update <org> <id> --state "Doing"` |
-| Update task effort/remaining | `yp azure-devops task update <org> <id> --effort "8" --remaining "2"` |
+| Update task effort/remaining/effort-real | `yp azure-devops task update <org> <id> --effort "8" --remaining "2" --effort-real "10"` |
 | Add a comment to a task | `yp azure-devops task update <org> <id> --comment "<text>"` |
+| Update any work item (alias: wi update, hu update) | `yp azure-devops task update <org> <id> [--effort|-e <val>] [--effort-real|-er <val>] [--remaining|-r <val>] [--state|-s <val>] [--comment|-c <text>]` |
 | Link a branch/commit/PR to any work item | `yp azure-devops link <org> <project> <id>` |
 | Create a new Azure DevOps repo | `yp azure-devops repo new` |
 | Clone an Azure DevOps repo | `yp azure-devops repo checkout` |

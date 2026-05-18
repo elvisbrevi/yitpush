@@ -123,6 +123,7 @@ yp azure-devops [subcommand] [args] [flags]
 | `hu show <org> <id>` | Show User Story details |
 | `hu list <org> <proj> <id>` | List tasks of a User Story |
 | `hu task <org> <proj> <id>` | Create tasks for a User Story |
+| `hu task flags` | `--description|-d`, `--effort|-e`, `--task-titles|-t`, `--no-link|-n`, `--repo`, `--branch` |
 | `hu link <org> <proj> <id> --repo <r> --branch <b>` | Link a branch to a User Story |
 | `task show <org> <id>` | Show task details |
 | `task update <org> <id> [flags]` | Update task fields (alias: `hu update`, `wi update`) |

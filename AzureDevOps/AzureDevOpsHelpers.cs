@@ -1,5 +1,7 @@
 using System.Diagnostics;
+using System.Net.Http;
 using System.Runtime.InteropServices;
+using System.Text;
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using Spectre.Console;
@@ -406,7 +408,7 @@ partial class Program
 
             while (!success)
             {
-                // Use REST API when description is provided (supports HTML)
+                // Use REST API when description is provided (converts to HTML for proper rendering)
                 if (!string.IsNullOrEmpty(description))
                 {
                     var htmlDescription = MarkdownToSimpleHtml(description);
@@ -1731,7 +1733,6 @@ partial class Program
         if (!string.IsNullOrEmpty(effortReal))
         {
             fieldsList.Add($"{AzFieldEffortRealHH}={effortReal}");
-            // Also try standard field name just in case
             fieldsList.Add($"Microsoft.VSTS.Scheduling.CompletedWork={effortReal}");
         }
         if (!string.IsNullOrEmpty(remaining)) fieldsList.Add($"{AzFieldRemainingWork}={remaining}");
@@ -1748,28 +1749,25 @@ partial class Program
 
         bool anySuccess = false;
 
-        if (fieldsList.Count > 0)
+        if (fieldsList.Count > 0 || !string.IsNullOrEmpty(comment))
         {
-            var fieldsArg = string.Join(" ", fieldsList.Select(f => $"\"{f}\""));
-            AnsiConsole.MarkupLine($"[dim]Updating fields for work item {id}...[/]");
-            var success = await RunAzPassthrough(
-                $"boards work-item update --id {id} --organization {orgUrl} --fields {fieldsArg} --output none");
-            if (success)
+            var token = await GetAzureAccessToken();
+            if (token == null)
             {
-                AnsiConsole.MarkupLine($"[green]✅ Fields updated successfully.[/]");
+                AnsiConsole.MarkupLine("[red]❌ Failed to get Azure access token.[/]");
+                return 1;
+            }
+
+            var (restSuccess, restError) = await UpdateWorkItemViaRestApi(orgUrl, id, fieldsList, comment);
+            if (restSuccess)
+            {
+                AnsiConsole.MarkupLine("[green]✅ Work item updated successfully via REST API.[/]");
                 anySuccess = true;
             }
-        }
-
-        if (!string.IsNullOrEmpty(comment))
-        {
-            AnsiConsole.MarkupLine($"[dim]Adding comment to work item {id}...[/]");
-            var success = await RunAzPassthrough(
-                $"boards work-item update --id {id} --organization {orgUrl} --discussion \"{comment}\" --output none");
-            if (success)
+            else
             {
-                AnsiConsole.MarkupLine($"[green]✅ Comment added successfully.[/]");
-                anySuccess = true;
+                AnsiConsole.MarkupLine($"[red]❌ REST API update failed: {Markup.Escape(restError ?? "Unknown error")}[/]");
+                return 1;
             }
         }
 
@@ -1780,6 +1778,70 @@ partial class Program
         }
 
         return anySuccess ? 0 : 1;
+    }
+
+    private static async Task<(bool Success, string? Error)> UpdateWorkItemViaRestApi(
+        string orgUrl, string workItemId, List<string> fieldsList, string? comment)
+    {
+        try
+        {
+            var token = await GetAzureAccessToken();
+            if (token == null)
+                return (false, "AADSTS50173: Authentication failed - could not get access token.");
+
+            int maxRetries = 3;
+            for (int attempt = 1; attempt <= maxRetries; attempt++)
+            {
+                var restUri = $"{orgUrl}/_apis/wit/workitems/{workItemId}?api-version=7.0";
+
+                var operations = new List<string>();
+                foreach (var field in fieldsList)
+                {
+                    var idx = field.IndexOf('=');
+                    if (idx > 0)
+                    {
+                        var fieldName = field[..idx];
+                        var fieldValue = field[(idx + 1)..];
+                        operations.Add($"{{\"op\": \"add\", \"path\": \"/fields/{fieldName}\", \"value\": \"{EscapeJson(fieldValue)}\"}}");
+                    }
+                }
+
+                if (!string.IsNullOrEmpty(comment))
+                {
+                    operations.Add($"{{\"op\": \"add\", \"path\": \"/fields/System.History\", \"value\": \"{EscapeJson(comment)}\"}}");
+                }
+
+                var body = $"[{string.Join(", ", operations)}]";
+
+                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ApiTimeoutSeconds) };
+                http.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+
+                var content = new StringContent(body, Encoding.UTF8, "application/json-patch+json");
+                var response = await http.PatchAsync(restUri, content);
+                var responseBody = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                    return (true, null);
+
+                if ((int)response.StatusCode == 429 || (int)response.StatusCode >= 500)
+                {
+                    if (attempt < maxRetries)
+                    {
+                        var delay = TimeSpan.FromSeconds(Math.Pow(2, attempt - 1));
+                        AnsiConsole.MarkupLine($"[dim]⚠️  Request throttled (attempt {attempt}/{maxRetries}). Retrying in {delay.TotalSeconds}s...[/]");
+                        await Task.Delay(delay);
+                        continue;
+                    }
+                }
+
+                return (false, responseBody);
+            }
+        }
+        catch (Exception ex)
+        {
+            return (false, ex.Message);
+        }
+        return (false, "Unexpected error");
     }
 
     private static async Task<int> UpdateWorkItemInteractive(string orgUrl, string id)
@@ -1977,6 +2039,10 @@ partial class Program
     {
         try
         {
+            var token = await GetAzureAccessToken();
+            if (token == null)
+                return (null, "AADSTS50173: Authentication failed - could not get access token.");
+
             var restUri = $"{orgUrl}/{Uri.EscapeDataString(project)}/_apis/wit/workitems/${workItemType}?api-version=6.0";
 
             // Build JSON Patch body
@@ -2002,17 +2068,30 @@ partial class Program
             }
 
             var body = $"[{string.Join(", ", operations)}]";
-            var escapedBody = body.Replace("\"", "\\\"");
 
-            var (result, error) = await RunAzCaptureWithError(
-                $"rest --method post --resource {AzDevOpsResource} --uri \"{restUri}\" --headers \"Content-Type=application/json-patch+json\" --body \"{escapedBody}\"");
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ApiTimeoutSeconds) };
+            http.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
 
-            return (result, error);
+            var content = new StringContent(body, Encoding.UTF8, "application/json-patch+json");
+            var response = await http.PostAsync(restUri, content);
+            var responseBody = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+                return (responseBody, null);
+            else
+                return (null, responseBody);
         }
         catch (Exception ex)
         {
             return (null, ex.Message);
         }
+    }
+
+    private static async Task<string?> GetAzureAccessToken()
+    {
+        var (token, error) = await RunAzCaptureWithError(
+            $"account get-access-token --resource {AzDevOpsResource} --query accessToken -o tsv");
+        return token?.Trim();
     }
 
     private static string EscapeJson(string s) =>
