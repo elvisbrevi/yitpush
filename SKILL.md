@@ -129,8 +129,10 @@ yp azure-devops [subcommand] [args] [flags]
 | `task update <org> <id> [flags]` | Update task fields (alias: `hu update`, `wi update`) |
 | `link <org> <proj> <id>` | Add a link (branch/commit/PR) to any work item |
 
-**task update flags**: `--effort|-e`, `--effort-real|-er`, `--remaining|-r`, `--state|-s`, `--comment|-c`
+**task update flags**: `--title`, `--description|-D`, `--evidence`, `--field <RefName=val>`, `--effort|-e`, `--effort-real|-er`, `--remaining|-r`, `--state|-s`, `--comment|-c`, `--history`
 **hu link flags**: `--repo`, `--branch`
+
+Note: `--comment` posts a discussion comment; `--history` writes the legacy History field.
 
 ---
 

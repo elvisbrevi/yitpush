@@ -102,11 +102,16 @@ yp azure-devops task update <org> <task-id> [flags]
 
 | Flag | Short | Purpose |
 |------|-------|---------|
+| `--title` | — | New work item title (`System.Title`) |
+| `--description` | `-D` | New work item description (`System.Description`) |
+| `--evidence` | — | Set the project-specific "Evidencias de finalización" field (resolved by display name) |
+| `--field` | — | Generic: `--field RefName=value`; repeatable, escape hatch for any field |
 | `--effort` | `-e` | Estimated effort in hours (`Custom.EsfuerzoEstimadoHH`) |
 | `--effort-real` | `-er` | Real effort spent (`Custom.EsfuerzoRealHH` + `CompletedWork`) |
 | `--remaining` | `-r` | Remaining work in hours |
 | `--state` | `-s` | New state — accepts `To Do`, `Doing`, `Active`, `In Progress`, `Resolved`, `Done`, `Closed`, `Removed` |
-| `--comment` | `-c` | Append a discussion comment |
+| `--comment` | `-c` | Post a discussion comment (via `POST /comments`) |
+| `--history` | — | Write to the legacy `System.History` field (audit log) |
 
 `task update` is also reachable as `hu update` and `wi update` — use whichever matches the work-item type the user named, but the underlying behavior is identical.
 

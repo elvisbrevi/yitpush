@@ -154,8 +154,12 @@ Update work items directly from your terminal:
 # Update multiple fields
 yp azure-devops task update <org> <id> --state "Active" --effort-real "5" --remaining "2"
 
-# Add a comment
+# Add a comment (posts to the Discussion tab; use --history for the legacy History field)
 yp azure-devops task update <org> <id> --comment "Progress update: logic refactored"
+
+# Edit title, description, or evidence (project-specific "Evidencias de finalización" field, resolved by name)
+yp azure-devops task update <org> <id> --title "New title" --description "New description"
+yp azure-devops task update <org> <id> --evidence "curl http://localhost:3333/api/v1/comunas ..."
 
 # Create tasks with info
 yp azure-devops hu task <org> <proj> <hu-id> --description "Task info" --effort "4" --task-titles "Desarrollo, Pruebas Unitarias" --no-link
