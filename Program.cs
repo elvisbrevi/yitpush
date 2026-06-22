@@ -19,9 +19,10 @@ partial class Program
     private const int ApiMaxContextTokens = 131072;
 
     // Azure DevOps field names
-    private const string AzFieldEffortHH = "Custom.EsfuerzoEstimadoHH";
-    private const string AzFieldEffortRealHH = "Custom.EsfuerzoRealHH";
-    private const string AzFieldRemainingWork = "Microsoft.VSTS.Scheduling.RemainingWork";
+    internal const string AzFieldEffortHH = "Custom.EsfuerzoEstimadoHH";
+    internal const string AzFieldEffortRealHH = "Custom.EsfuerzoRealHH";
+    internal const string AzFieldRemainingWork = "Microsoft.VSTS.Scheduling.RemainingWork";
+    internal const string AzFieldEvidenceDisplay = "Evidencias de finalización";
 
     static async Task<int> Main(string[] args)
     {

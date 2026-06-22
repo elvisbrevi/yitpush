@@ -1726,30 +1726,48 @@ partial class Program
 
     private static readonly string[] ValidAzureStates = { "To Do", "Doing", "Active", "In Progress", "Resolved", "Done", "Closed", "Removed" };
 
-    private static async Task<int> UpdateWorkItem(string orgUrl, string id, string? effort, string? remaining, string? state, string? comment, string? effortReal = null)
+    internal static async Task<int> UpdateWorkItem(
+        string orgUrl, string id,
+        string? effort, string? remaining, string? state, string? comment, string? effortReal = null,
+        string? title = null, string? description = null, string? evidence = null,
+        IReadOnlyList<string>? extraFields = null, string? history = null)
     {
-        var fieldsList = new List<string>();
-        if (!string.IsNullOrEmpty(effort)) fieldsList.Add($"{AzFieldEffortHH}={effort}");
-        if (!string.IsNullOrEmpty(effortReal))
+        if (!string.IsNullOrEmpty(state) && !ValidAzureStates.Contains(state, StringComparer.OrdinalIgnoreCase))
         {
-            fieldsList.Add($"{AzFieldEffortRealHH}={effortReal}");
-            fieldsList.Add($"Microsoft.VSTS.Scheduling.CompletedWork={effortReal}");
+            AnsiConsole.MarkupLine($"[yellow]⚠️  Warning: '{state}' may not be a valid state.[/]");
+            AnsiConsole.MarkupLine($"Common states: [cyan]{string.Join(", ", ValidAzureStates)}[/]");
         }
-        if (!string.IsNullOrEmpty(remaining)) fieldsList.Add($"{AzFieldRemainingWork}={remaining}");
 
-        if (!string.IsNullOrEmpty(state))
+        string? evidenceRefName = null;
+        if (!string.IsNullOrEmpty(evidence))
         {
-            if (!ValidAzureStates.Contains(state, StringComparer.OrdinalIgnoreCase))
+            var (project, workItemType, ctxError) = await GetWorkItemContextAsync(orgUrl, id);
+            if (project != null)
             {
-                AnsiConsole.MarkupLine($"[yellow]⚠️  Warning: '{state}' may not be a valid state.[/]");
-                AnsiConsole.MarkupLine($"Common states: [cyan]{string.Join(", ", ValidAzureStates)}[/]");
+                var token = await GetAzureAccessToken();
+                if (token != null)
+                {
+                    using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ApiTimeoutSeconds) };
+                    http.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+                    var resolver = new AzDevOpsFieldRefNameResolver(http);
+                    evidenceRefName = await resolver.ResolveAsync(
+                        orgUrl, project, workItemType ?? "Task", AzFieldEvidenceDisplay);
+                }
             }
-            fieldsList.Add($"System.State={state}");
+            else
+            {
+                AnsiConsole.MarkupLine($"[yellow]⚠️  Could not resolve work item context to set evidence: {Markup.Escape(ctxError ?? "unknown")}[/]");
+            }
         }
+
+        var fieldsList = TaskUpdateOperationsBuilder.BuildUpdateOperations(
+            title, description, effort, effortReal, remaining, state,
+            evidenceRefName, evidence,
+            extraFields ?? Array.Empty<string>(), history);
 
         bool anySuccess = false;
 
-        if (fieldsList.Count > 0 || !string.IsNullOrEmpty(comment))
+        if (fieldsList.Count > 0)
         {
             var token = await GetAzureAccessToken();
             if (token == null)
@@ -1758,7 +1776,7 @@ partial class Program
                 return 1;
             }
 
-            var (restSuccess, restError) = await UpdateWorkItemViaRestApi(orgUrl, id, fieldsList, comment);
+            var (restSuccess, restError) = await UpdateWorkItemViaRestApi(orgUrl, id, fieldsList);
             if (restSuccess)
             {
                 AnsiConsole.MarkupLine("[green]✅ Work item updated successfully via REST API.[/]");
@@ -1771,17 +1789,69 @@ partial class Program
             }
         }
 
-        if (!anySuccess && fieldsList.Count == 0 && string.IsNullOrEmpty(comment))
+        if (!string.IsNullOrEmpty(comment))
         {
-            AnsiConsole.MarkupLine("[yellow]No updates provided (use --effort, --effort-real, --remaining, --state, or --comment).[/]");
+            var token = await GetAzureAccessToken();
+            if (token == null)
+            {
+                AnsiConsole.MarkupLine("[red]❌ Failed to get Azure access token.[/]");
+                return 1;
+            }
+
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ApiTimeoutSeconds) };
+            http.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+            var commentOk = await AzDevOpsCommentClient.PostDiscussionCommentAsync(http, orgUrl, id, comment);
+            if (commentOk)
+            {
+                AnsiConsole.MarkupLine("[green]✅ Comment posted to discussion.[/]");
+                anySuccess = true;
+            }
+            else
+            {
+                AnsiConsole.MarkupLine("[red]❌ Failed to post discussion comment.[/]");
+                return 1;
+            }
+        }
+
+        if (fieldsList.Count == 0 && string.IsNullOrEmpty(comment))
+        {
+            AnsiConsole.MarkupLine("[yellow]No updates provided (use --title, --description, --evidence, --field, --effort, --effort-real, --remaining, --state, --comment, or --history).[/]");
             return 1;
         }
 
         return anySuccess ? 0 : 1;
     }
 
+    private static async Task<(string? Project, string? WorkItemType, string? Error)> GetWorkItemContextAsync(
+        string orgUrl, string workItemId)
+    {
+        try
+        {
+            var token = await GetAzureAccessToken();
+            if (token == null) return (null, null, "auth failed");
+
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ApiTimeoutSeconds) };
+            http.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+
+            var url = $"{orgUrl}/_apis/wit/workitems/{workItemId}?api-version=7.0";
+            var response = await http.GetAsync(url);
+            if (!response.IsSuccessStatusCode) return (null, null, $"HTTP {(int)response.StatusCode}");
+
+            var json = await response.Content.ReadAsStringAsync();
+            using var doc = JsonDocument.Parse(json);
+            var fields = doc.RootElement.GetProperty("fields");
+            var project = fields.TryGetProperty("System.TeamProject", out var p) ? p.GetString() : null;
+            var type = fields.TryGetProperty("System.WorkItemType", out var t) ? t.GetString() : null;
+            return (project, type, null);
+        }
+        catch (Exception ex)
+        {
+            return (null, null, ex.Message);
+        }
+    }
+
     private static async Task<(bool Success, string? Error)> UpdateWorkItemViaRestApi(
-        string orgUrl, string workItemId, List<string> fieldsList, string? comment)
+        string orgUrl, string workItemId, List<string> fieldsList)
     {
         try
         {
@@ -1804,11 +1874,6 @@ partial class Program
                         var fieldValue = field[(idx + 1)..];
                         operations.Add($"{{\"op\": \"add\", \"path\": \"/fields/{fieldName}\", \"value\": \"{EscapeJson(fieldValue)}\"}}");
                     }
-                }
-
-                if (!string.IsNullOrEmpty(comment))
-                {
-                    operations.Add($"{{\"op\": \"add\", \"path\": \"/fields/System.History\", \"value\": \"{EscapeJson(comment)}\"}}");
                 }
 
                 var body = $"[{string.Join(", ", operations)}]";
