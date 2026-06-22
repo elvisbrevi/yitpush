@@ -130,7 +130,6 @@ yp azure-devops [subcommand] [args] [flags]
 | `link <org> <proj> <id>` | Add a link (branch/commit/PR) to any work item |
 
 **task update flags**: `--effort|-e`, `--effort-real|-er`, `--remaining|-r`, `--state|-s`, `--comment|-c`
-**hu task flags**: `--description|-d`, `--effort|-e`
 **hu link flags**: `--repo`, `--branch`
 
 ---
