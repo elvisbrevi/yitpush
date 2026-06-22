@@ -82,9 +82,17 @@ partial class Program
             {
                 state = args[i + 1];
             }
-            if ((args[i] == "--comment" || args[i] == "-c") && i + 1 < args.Length)
+            if ((args[i] == "--effort" || args[i] == "-e") && i + 1 < args.Length)
             {
-                comment = args[i + 1];
+                effort = args[i + 1];
+            }
+            if ((args[i] == "--effort-real" || args[i] == "-er") && i + 1 < args.Length)
+            {
+                effortReal = args[i + 1];
+            }
+            if ((args[i] == "--task-titles" || args[i] == "-t") && i + 1 < args.Length)
+            {
+                taskTitles = args[i + 1];
             }
         }
 
