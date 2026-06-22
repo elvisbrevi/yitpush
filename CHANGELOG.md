@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.2] - 2026-06-22
+
+### Added
+- **`--title`** flag on `task update` — patches `System.Title`.
+- **`--description` / `-D`** flag on `task update` — patches `System.Description`.
+- **`--evidence`** flag on `task update` — resolves the project-specific "Evidencias de finalización" field by display name (cached per project/work-item-type) and writes to it. No more hardcoded GUIDs.
+- **`--field <RefName=value>`** generic flag on `task update` — repeatable escape hatch for any work-item field.
+- **`--history`** flag on `task update` — explicit opt-in to write to the legacy `System.History` field (the old behavior of `--comment`).
+- **xUnit test project** (`tests/YitPush.Tests/`) with 18 unit tests covering the new flag parser, operations builder, field resolver, and comment client. First automated tests in the repo.
+
+### Changed
+- **`--comment` no longer patches `System.History`** — it now creates a discussion comment via `POST /_apis/wit/workItems/{id}/comments`. Use the new `--history` flag if you need the old behavior. This is a breaking change; v2.2.1 users relying on `--comment` populating `System.History` must update their scripts to `--history`.
+
+---
+
+## [2.2.1] - 2026-06-22
+
 ## [2.2.1] - 2026-06-22
 
 ### Fixed
