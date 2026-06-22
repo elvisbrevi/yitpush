@@ -1738,10 +1738,12 @@ partial class Program
             AnsiConsole.MarkupLine($"Common states: [cyan]{string.Join(", ", ValidAzureStates)}[/]");
         }
 
+        string? workItemContextProject = null;
         string? evidenceRefName = null;
-        if (!string.IsNullOrEmpty(evidence))
+        if (!string.IsNullOrEmpty(evidence) || !string.IsNullOrEmpty(comment))
         {
             var (project, workItemType, ctxError) = await GetWorkItemContextAsync(orgUrl, id);
+            workItemContextProject = project;
             if (project != null)
             {
                 var token = await GetAzureAccessToken();
@@ -1749,12 +1751,15 @@ partial class Program
                 {
                     using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ApiTimeoutSeconds) };
                     http.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
-                    var resolver = new AzDevOpsFieldRefNameResolver(http);
-                    evidenceRefName = await resolver.ResolveAsync(
-                        orgUrl, project, workItemType ?? "Task", AzFieldEvidenceDisplay);
+                    if (!string.IsNullOrEmpty(evidence))
+                    {
+                        var resolver = new AzDevOpsFieldRefNameResolver(http);
+                        evidenceRefName = await resolver.ResolveAsync(
+                            orgUrl, project, workItemType ?? "Task", AzFieldEvidenceDisplay);
+                    }
                 }
             }
-            else
+            else if (!string.IsNullOrEmpty(evidence))
             {
                 AnsiConsole.MarkupLine($"[yellow]⚠️  Could not resolve work item context to set evidence: {Markup.Escape(ctxError ?? "unknown")}[/]");
             }
@@ -1800,7 +1805,7 @@ partial class Program
 
             using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ApiTimeoutSeconds) };
             http.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
-            var commentOk = await AzDevOpsCommentClient.PostDiscussionCommentAsync(http, orgUrl, id, comment);
+            var commentOk = await AzDevOpsCommentClient.PostDiscussionCommentAsync(http, orgUrl, workItemContextProject, id, comment);
             if (commentOk)
             {
                 AnsiConsole.MarkupLine("[green]✅ Comment posted to discussion.[/]");

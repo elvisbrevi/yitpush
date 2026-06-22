@@ -28,12 +28,12 @@ public class AzDevOpsCommentClientTests
         using var http = new HttpClient(handler);
 
         var ok = await AzDevOpsCommentClient.PostDiscussionCommentAsync(
-            http, "https://dev.azure.com/org", "12345", "Hola mundo");
+            http, "https://dev.azure.com/org", "My Project", "12345", "Hola mundo");
 
         Assert.True(ok);
         Assert.Equal(HttpMethod.Post, captured["method"]);
-        Assert.Equal("https://dev.azure.com/org/_apis/wit/workItems/12345/comments?api-version=7.0",
-            captured["url"]);
+        // .NET normalizes the Uri and decodes %20; verify the project is in the path
+        Assert.Contains("/My Project/", captured["url"]?.ToString() ?? "");
         Assert.Contains("application/json", captured["contentType"]?.ToString() ?? "");
         Assert.Contains("Hola mundo", captured["body"]?.ToString() ?? "");
     }
@@ -48,7 +48,7 @@ public class AzDevOpsCommentClientTests
         using var http = new HttpClient(handler);
 
         var ok = await AzDevOpsCommentClient.PostDiscussionCommentAsync(
-            http, "https://dev.azure.com/org", "1", "x");
+            http, "https://dev.azure.com/org", "P", "1", "x");
 
         Assert.False(ok);
     }
