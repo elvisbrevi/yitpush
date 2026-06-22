@@ -98,6 +98,17 @@ public class TaskUpdateOperationsBuilderTests
     }
 
     [Fact]
+    public void BuildUpdateOperations_includes_history_when_provided()
+    {
+        var ops = TaskUpdateOperationsBuilder.BuildUpdateOperations(
+            title: null, description: null, effort: null, effortReal: null,
+            remaining: null, state: null, evidenceRefName: null, evidence: null,
+            extraFields: Array.Empty<string>(), history: "Audit log entry");
+
+        Assert.Contains("System.History=Audit log entry", ops);
+    }
+
+    [Fact]
     public void BuildUpdateOperations_preserves_existing_fields()
     {
         var ops = TaskUpdateOperationsBuilder.BuildUpdateOperations(

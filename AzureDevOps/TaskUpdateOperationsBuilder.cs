@@ -35,6 +35,7 @@ internal static class TaskUpdateOperationsBuilder
         }
 
         foreach (var f in extraFields) ops.Add(f);
+        if (!string.IsNullOrEmpty(history)) ops.Add($"System.History={history}");
 
         return ops;
     }
