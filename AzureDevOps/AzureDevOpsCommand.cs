@@ -188,8 +188,12 @@ partial class Program
                 var orgForUpdate = args[2];
                 var idForUpdate = args[3];
                 var orgUrlForUpdate = $"https://dev.azure.com/{orgForUpdate}";
-                // Ensure all flags (effort, remaining, state, comment, effortReal) are passed from the outer scope parsing
-                return await UpdateWorkItem(orgUrlForUpdate, idForUpdate, effort, remaining, state, comment, effortReal);
+                var newFlags = AzureDevOpsFlagParser.Parse(args);
+                return await UpdateWorkItem(
+                    orgUrlForUpdate, idForUpdate,
+                    effort, remaining, state, comment, effortReal,
+                    newFlags.Title, newFlags.Description, newFlags.Evidence,
+                    newFlags.ExtraFields, newFlags.History);
             }
 
             // Interactive mode: select work item first
