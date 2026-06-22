@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [2.2.1] - 2026-06-22
+
+### Fixed
+- **`--effort` / `-e`, `--effort-real` / `-er`, `--task-titles` / `-t` silently ignored** — flag parser in `AzureDevOpsCommand` was missing these three branches, so values passed to `yp azure-devops task update` and `hu task` were dropped before reaching the API. Also removed a duplicate `--comment` / `-c` parser block.
+
+---
+
 ## [2.2.0] - 2026-05-18
 
 ### Changed
