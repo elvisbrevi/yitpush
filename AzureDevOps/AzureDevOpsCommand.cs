@@ -21,7 +21,8 @@ partial class Program
                 var proj = args[2];
                 var wiId = args[3];
                 var orgUrl = $"https://dev.azure.com/{org}";
-                return await AddLinkToRepo(orgUrl, proj, wiId);
+                var linkFlags = AzureDevOpsFlagParser.Parse(args);
+                return await AddLinkToRepo(orgUrl, proj, wiId, linkFlags.Repo, linkFlags.Branch);
             }
             var setup = await EnsureAzureDevOpsSetup();
             if (setup == null) return 1;
@@ -314,7 +315,7 @@ partial class Program
         table.AddRow("task delete <org> <id> [[--yes|-y]] [[--json]]", "Move work item to the recycle bin (prompts by default; pass --yes in CI)");
         table.AddRow("task attach <org> <project> <id> <file-path> [[--comment|-c \"...\"]] [[--json]]", "Upload a local file as an AttachedFile relation on the work item");
         table.AddRow("link", "Add link (branch/commit/PR) to work item");
-        table.AddRow("link <org> <proj> <wi-id>", "Add link (skip menus)");
+        table.AddRow("link <org> <proj> <wi-id> [[--repo <repo> --branch <branch>]]", "Add link (skip menus) — pass --repo + --branch to skip the menu in quick mode (works for both HUs and Tasks; writes Custom.URLCommit as a fallback)");
         table.AddRow("resolve-field <org> <proj> <type> <displayName>", "Print the refname for a display name; uses the 24h cache");
         table.AddRow("refresh-fields <org> <proj> <type>", "Invalidate the cache for (org, project, workItemType) and re-warm it");
 
@@ -343,7 +344,8 @@ partial class Program
         AnsiConsole.MarkupLine("  yp azure-devops hu link MyOrg MyProj 123 --repo Repo --branch main  [dim]# Quick link[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu list MyOrg MyProj 123      [dim]# List tasks of HU[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu list MyOrg MyProj 123 --json | jq '.value | length'   [dim]# Count child tasks[/]");
-        AnsiConsole.MarkupLine("  yp azure-devops link MyOrg MyProj 123         [dim]# Add link to work item[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops link MyOrg MyProj 123         [dim]# Add link to work item (interactive)[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops link MyOrg MyProj 123 --repo MyRepo --branch feature/abc  [dim]# Quick link (skip menu, works for HUs and Tasks)[/]");
         AnsiConsole.MarkupLine("  yp azure-devops resolve-field MyOrg MyProj Task \"Esfuerzo Real\"   [dim]# Print refname (cached for 24h)[/]");
         AnsiConsole.MarkupLine("  yp azure-devops refresh-fields MyOrg MyProj Task                  [dim]# Invalidate + re-warm cache[/]");
         AnsiConsole.MarkupLine("  yp azure-devops task delete MyOrg 22428 --yes                     [dim]# Move a work item to the recycle bin (skip prompt in CI)[/]");

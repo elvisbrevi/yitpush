@@ -91,7 +91,7 @@ export OPENROUTER_API_KEY='...'
 | `yp azure-devops task delete` | Move a work item to the recycle bin (prompts by default; pass `--yes` in CI) |
 | `yp azure-devops task attach` | Upload a local file as an `AttachedFile` on a work item |
 | `yp azure-devops hu link` | Link a repository branch to a User Story |
-| `yp azure-devops link` | Add a link (branch/commit/PR) to any work item |
+| `yp azure-devops link` | Add a link (branch/commit/PR) to any work item — supports `--repo <r> --branch <b>` quick mode for both HUs and Tasks |
 
 #### 🧰 Stable Output for Agents and Scripts
 The `hu show`, `task show`, and `hu list` commands accept a `--json` flag that emits a flat JSON object on stdout (no ANSI escapes), so the output is safe to pipe into `jq`:
@@ -187,9 +187,13 @@ yp azure-devops hu task <org> <proj> <hu-id> --description "Task info" --effort 
 #### 🔗 Deep Linking
 Link your local branch to an Azure DevOps work item natively:
 ```bash
+# Link a User Story to a branch
 yp azure-devops hu link <org> <proj> <id> --repo <name> --branch <name>
+
+# Link any work item (HU or Task) to a branch — quick mode (issue #9)
+yp azure-devops link <org> <proj> <id> --repo <name> --branch <name>
 ```
-This uses `ArtifactLink`, making the branch appear in the **Development** section of the Azure Boards UI.
+This uses `ArtifactLink`, making the branch appear in the **Development** section of the Azure Boards UI. When the target work item is a Task, the `Custom.URLCommit` field is also written as a navigation fallback for legacy `az` scripts (no-op if the field doesn't exist). Omit `--repo` / `--branch` to fall back to the interactive picker.
 
 ## 📝 Navigation
 - Every interactive menu includes a **`← Back`** option.

@@ -181,7 +181,7 @@ partial class Program
         azTable.AddRow("task update", "Update effort, remaining, state or comment (alias: hu update, wi update)");
         azTable.AddRow("task update <org> <id> [[--effort|-e <e>]] [[--effort-real|-er <er>]] [[--remaining|-r <r>]] [[--state|-s <s>]] [[--comment|-c <c>]]", "Update directly");
         azTable.AddRow("link", "Add link (branch/commit/PR) to work item");
-        azTable.AddRow("link <org> <proj> <wi-id>", "Add link (skip menus)");
+        azTable.AddRow("link <org> <proj> <wi-id> [[--repo <repo> --branch <branch>]]", "Add link (skip menus) — pass --repo + --branch to skip the menu in quick mode (works for both HUs and Tasks; writes Custom.URLCommit as a fallback)");
 
         AnsiConsole.Write(azTable);
 
@@ -202,7 +202,8 @@ partial class Program
         AnsiConsole.MarkupLine("  yp azure-devops task update MyOrg 67890 --state \"Doing\" --effort-real \"3\"  [dim]# Update task[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu link MyOrg MyProj 12345 --repo MyRepo --branch feature/abc  [dim]# Link branch[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu list MyOrg MyProj 12345      [dim]# List tasks of HU[/]");
-        AnsiConsole.MarkupLine("  yp azure-devops link MyOrg MyProj 12345         [dim]# Add link to work item[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops link MyOrg MyProj 12345         [dim]# Add link to work item (interactive)[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops link MyOrg MyProj 12345 --repo MyRepo --branch feature/abc  [dim]# Quick link (skip menu, works for HUs and Tasks)[/]");
         Console.WriteLine();
     }
 
