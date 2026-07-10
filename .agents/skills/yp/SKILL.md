@@ -1,38 +1,176 @@
+# yp (YitPush) — Agent Skill
+
+> The installable skill package is at [`skills/yp/SKILL.md`](skills/yp/SKILL.md) — compatible with the [Agent Skills open standard](https://agentskills.io) and listed on [skills.sh](https://skills.sh).
+>
+> Install with: `npx skills add elvisbrevi/yitpush`
+
+This file is a human-readable reference. The machine-readable skill follows below.
+
+## Skill Metadata
+
+- **Name**: yp
+- **Description**: AI-powered Git commit automation and Azure DevOps management CLI
+- **Version**: 2.0.0
+- **Install**: `dotnet tool install -g YitPush`
+- **Invoke**: `yp <command> [options]`
+
 ---
-name: yp
-description: AI-powered git workflow and Azure DevOps work-item management via the `yp` (YitPush) CLI. Use this skill whenever the user wants to commit and push code, generate a commit message, draft a pull request description, switch git branches interactively, configure an AI provider, or interact with Azure DevOps — including showing/listing/creating/updating user stories and tasks, creating or cloning repos, linking branches/commits/PRs to work items, listing variable groups, or installing the yp agent skill itself. Trigger even when the user does not say "yp" — phrases like "commit my changes", "push this", "make a PR description", "switch branch", "create tasks for HU 12345", "update task state to Doing", "link this branch to the user story", "show me HU 12345", "list tasks of the user story", "create an Azure DevOps repo", or "configure the AI provider" should all activate this skill.
-license: MIT
----
 
-# yp — AI Git & Azure DevOps CLI
+## Tool Definitions
 
-`yp` is a .NET global CLI that turns one-liner intents into git or Azure DevOps actions, using a configurable AI provider (OpenAI, Anthropic, Google Gemini, DeepSeek, or OpenRouter) for natural-language artifacts like commit messages and PR descriptions.
+### tool: commit
 
-This document is the contract between an agent and `yp`: pick the right command for the user's intent, fill in arguments, and execute. Prefer non-interactive ("quick mode") forms whenever the user has provided enough context — agents drive `yp` better when no menus are involved.
+Stages all changes, generates an AI commit message, commits and pushes.
 
-## Prerequisites and prelaunch checks
+```
+yp commit [flags]
+yp commit --amend [flags]
+```
 
-Before running any `yp` command, confirm three things in this order. If any check fails, fix it before continuing.
+**When to use**: User wants to commit and push changes with an AI-generated message. With `--amend`, the AI re-runs against `git diff HEAD~1` and rewrites the last commit (no push).
 
-1. **`yp` is installed.** Run `yp --version` to check. If the binary is missing, install with `dotnet tool install -g YitPush` (requires .NET 10 SDK or runtime).
-2. **An AI provider is configured** (only required for `commit` and `pr`). Look for `~/.yitpush/config.json`, or one of the env vars `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`. If none are present, run `yp setup`.
-3. **Azure CLI is logged in** (only for `azure-devops` subcommands). `az account show` must succeed; `yp` will install the `azure-devops` extension and prompt for login if not.
+**Parameters**:
+- `--confirm` — pause and ask user to approve the message before committing
+- `--detailed` — generate a commit with a subject line + body paragraph
+- `--language <lang>` / `-l <lang>` — language for the output (e.g., spanish, french, portuguese)
+- `--save` — write the commit message to a `.md` file in the current directory
+- `--conventional` — format the message as a Conventional Commits `<type>(<scope>)?!?: <subject>` (optionally with a `BREAKING CHANGE:` footer)
+- `--type <feat|fix|chore|refactor|docs|test|perf|build|ci|style>` — force the Conventional Commits type (overrides the AI's inference)
+- `--scope <scope>` — force the Conventional Commits scope (e.g. `api`, `wcf`)
+- `--detect-breaking` — scan the diff for breaking changes (removed public symbol in C#, removed export in TS/JS, JSON major-version bump, `#major.bump` markers) and feed them into the AI prompt; with `--conventional` the first detected marker is also appended as a `BREAKING CHANGE:` footer
+- `--amend` — regenerate the last commit's message via `git commit --amend`; skips the working-tree flow and does NOT push
+- `--template <path-to-md>` — render the AI output through a Handlebars-ish template (`{{type}}`, `{{scope}}`, `{{subject}}`, `{{body}}`, `{{refs}}`); missing variables resolve to an empty string, malformed tokens (`{{1abc}}`, `{{a.b}}`, `{{}}`) are left untouched; the tool exits `6` when the file is missing
 
-Skip the checks the user has clearly already passed (e.g. they just successfully ran `yp commit` two messages ago).
-
-## Global flags
-
+**Examples**:
 ```bash
-yp --version    # prints the assembly version (e.g. "2.3.0") and exits 0; no ANSI escapes
+yp commit
+yp commit --confirm
+yp commit --detailed -l spanish
+yp commit --conventional --type feat --scope wcf
+yp commit --conventional --detect-breaking
+yp commit --amend
+yp commit --template ~/.yitpush/commit-template.md
+```
+
+The default commit format can also be set per project in `~/.yitpush/config.json` under the new `"commitFormat"` key (`"conventional"`, `"plain"`, `"gitmoji"`, or a template file path). An explicit `--conventional` or `--template` flag on a single invocation overrides the stored default.
+
+---
+
+### tool: pr
+
+Interactively selects two branches, generates a pull request description and copies it to the clipboard.
+
+```
+yp pr [--detailed] [--language <lang>] [--save]
+```
+
+**When to use**: User wants to draft a PR description for a branch.
+
+**Parameters**:
+- `--detailed` — include summary, change list, files changed, and testing notes
+- `--language <lang>` / `-l <lang>` — language for the output
+- `--save` — save description to `pr-description-<from>-to-<to>.md`
+
+**Examples**:
+```bash
+yp pr
+yp pr --detailed
+yp pr -l french --save
+```
+
+---
+
+### tool: setup
+
+Configures the active AI provider interactively.
+
+```
+yp setup
+```
+
+**When to use**: First-time setup or when changing the AI provider or API key.
+
+**Flow**: select provider → enter API key → select model → validate → save to `~/.yitpush/config.json`
+
+Supported providers: **OpenAI**, **Anthropic**, **Google Gemini**, **DeepSeek**, **OpenRouter**, **NVIDIA NIM**. Each provider has a `<PROVIDER>_API_KEY` environment variable that overrides the stored key at runtime (e.g. `NVIDIA_API_KEY` for the NVIDIA NIM provider).
+
+---
+
+### tool: checkout
+
+Interactive branch selector.
+
+```
+yp checkout
+```
+
+**When to use**: User wants to switch to a different git branch interactively.
+
+---
+
+### tool: skill
+
+Installs the `yp` agent skill so any Agent Skills-compatible AI agent (Claude Code, Cursor, Gemini CLI, etc.) knows how to invoke `yp`. Internally runs `npx skills add elvisbrevi/yitpush`.
+
+```
+yp skill
+```
+
+**When to use**: User wants their AI agent to learn how to drive `yp`, or the setup wizard offered to install it later.
+
+---
+
+### tool: azure-devops
+
+Manages Azure DevOps resources. Run without arguments for interactive menu, or pass subcommands directly.
+
+```
+yp azure-devops [subcommand] [args] [flags]
+```
+
+**Key subcommands**:
+
+| Subcommand | Purpose |
+|-----------|---------|
+| `repo new` | Create a new repository interactively |
+| `repo checkout` | Clone/checkout a repository interactively |
+| `variable-group list` | List and inspect variable groups |
+| `hu show <org> <id>` | Show User Story details |
+| `hu list <org> <proj> <id>` | List tasks of a User Story |
+| `hu task <org> <proj> <id>` | Create tasks for a User Story |
+| `hu task flags` | `--description|-d`, `--effort|-e`, `--task-titles|-t`, `--no-link|-n`, `--repo`, `--branch` |
+| `hu link <org> <proj> <id> --repo <r> --branch <b>` | Link a branch to a User Story |
+| `task show <org> <id>` | Show task details |
+| `task update <org> <id> [flags]` | Update task fields (alias: `hu update`, `wi update`) |
+| `task delete <org> <id> [--yes\|-y]` | Move work item to the recycle bin (prompts by default; pass `--yes` in CI) |
+| `task attach <org> <project> <id> <file-path> [--comment <text>]` | Upload a local file as an `AttachedFile` relation on the work item |
+| `link <org> <proj> <id> [--repo <r> --branch <b>]` | Add a link (branch/commit/PR) to any work item; `--repo` + `--branch` skip the menus and create the ArtifactLink in quick mode (same as `hu link`) |
+
+**task update flags**: `--title`, `--description|-D`, `--evidence`, `--field <RefName=val>`, `--effort|-e`, `--effort-real|-er`, `--remaining|-r`, `--state|-s`, `--comment|-c`, `--assigned-to <upn|display-name|"">`, `--history`
+**hu link flags**: `--repo`, `--branch`
+**link flags**: `--repo`, `--branch` (when both are provided the interactive menu is skipped, matching `hu link` quick mode; the `Custom.URLCommit` field is also written as a navigation fallback for legacy `az` scripts)
+
+Note: `--comment` posts a discussion comment; `--history` writes the legacy History field; `--assigned-to` resolves UPN or display name against the project's identity store (multiple matches exit 4 with a candidate list, empty string clears the assignment).
+
+**Pre-flight check (Done transition, v2.3.0):** when `--state "Done"` is passed **without** `--evidence`, `yp` first `GET`s the work item and verifies that `Evidencias de finalización` (resolved via the project-specific refname) is non-empty. If the field is empty, the tool prints `❌ Missing required field for Done transition: Evidencias de finalización (refname Custom.<GUID>). Re-run with --evidence "<text>".` and exits 2 without sending the PATCH. The check is skipped when (a) the target state is not `Done`, (b) `--evidence` is provided (the flag itself populates the field), or (c) the work item already has a non-empty `Evidencias de finalización` value. Any pre-flight failure (auth, network, 5xx, unresolvable refname) is treated as fail-open so the existing PATCH flow is not regressed.
+
+---
+
+## Global Flags
+
+```
+yp --version    # prints the assembly version (e.g. "2.3.0") and exits 0
 yp -V           # short alias
 yp --help       # prints the help table
 ```
 
-`--version` is intended for scripts and CI. Use it instead of `yp --help | head -1` to detect the installed version.
+These work without a subcommand. `yp --version` is intended for scripts and CI; its output has no ANSI escapes.
 
-## Stable JSON output
+---
 
-`hu show`, `task show`, and `hu list` accept a `--json` flag that emits a flat JSON object on stdout instead of a Spectre.Console table. The shape is stable enough to pipe to `jq` without ANSI-escape scrubbing:
+## Stable JSON Output
+
+`hu show`, `task show`, and `hu list` accept a `--json` flag that emits a flat JSON object on stdout instead of a Spectre.Console table. The shape is stable enough to pipe to `jq`:
 
 ```bash
 yp azure-devops hu show MyOrg 12345 --json | jq '.title'
@@ -44,180 +182,30 @@ yp azure-devops hu list MyOrg MyProj 12345 --json | jq '.value | length'
 
 `hu list` emits `{"huId": "...", "value": [{id, title, state}, ...]}` so `jq '.value | length'` returns the number of child tasks.
 
-When stdout is piped (e.g. `| jq`), the interactive follow-up prompt at the end of `hu show` / `hu list` is automatically skipped, so non-interactive invocations never crash with the Spectre "isn't interactive" error.
+When stdout is piped, the interactive follow-up prompt at the end of `hu show` / `hu list` is automatically skipped, so non-interactive invocations never crash with the Spectre "isn't interactive" error.
 
-## Git workflows
+---
 
-### Commit and push
+## Usage Instructions for Gemini CLI
 
-Default behavior: stage all changes, generate an AI commit message, copy it to clipboard, commit, and push.
+When the user asks you to:
 
-```bash
-yp commit                       # auto, no review
-yp commit --confirm             # review the AI message before committing
-yp commit --detailed            # subject + body, conventional commits
-yp commit -l spanish            # write the message in Spanish
-yp commit --save                # also save to commit-message-<timestamp>.md
-```
+- **"commit my changes"** → run `yp commit`
+- **"commit and let me review"** → run `yp commit --confirm`
+- **"generate a PR description"** → run `yp pr`
+- **"switch branch"** → run `yp checkout`
+- **"show user story 12345"** → run `yp azure-devops hu show <org> 12345`; append `--json` when the user wants machine-readable output
+- **"update task 67890 state to Doing"** → run `yp azure-devops task update <org> 67890 --state "Doing"`
+- **"configure AI provider"** → run `yp setup`
+- **"install the yp skill"** → run `yp skill`
+- **"list variable groups"** → run `yp azure-devops variable-group list`
+- **"create a new repo"** → run `yp azure-devops repo new`
+- **"clone a repo"** → run `yp azure-devops repo checkout`
+- **"link a branch to work item 67890"** → run `yp azure-devops link <org> <proj> 67890`; add `--repo <r> --branch <b>` to skip the menus (quick mode)
+- **"what version of yp is installed"** → run `yp --version`
 
-Flag reference: `--confirm`, `--detailed`, `--save`, `--language|--lang|-l <lang>` (default: english). Flags compose freely.
+## Notes
 
-Use `--confirm` whenever the user says "let me review" or anything cautious. Use `--detailed` when they ask for a "thorough", "explanatory" or "with body" commit, or when the diff is large enough that a single line clearly will not capture it.
-
-### Pull request description
-
-```bash
-yp pr                           # interactive: pick source + target branches
-yp pr --detailed                # adds summary, files changed, testing notes
-yp pr --detailed -l french --save
-```
-
-`yp pr` always prompts the user to select branches interactively — there is currently no quick mode for branch selection. The output is copied to clipboard; `--save` writes to `pr-description-<from>-to-<to>.md`.
-
-### Switch branches
-
-```bash
-yp checkout
-```
-
-Interactive branch selector with remote-tracking support. No flags. Use this when the user asks to "change branch", "switch to <branch>", or "checkout <branch>" without specifying — the menu lets them pick.
-
-## Setup and skill installation
-
-### Configure AI provider
-
-```bash
-yp setup
-```
-
-Walks the user through provider selection (OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter, **NVIDIA NIM**), API key entry, model selection, and validation. Saves to `~/.yitpush/config.json`. After saving, optionally adds a `yitpush` shell alias and offers to install this skill.
-
-Each provider has a matching `<PROVIDER>_API_KEY` environment variable that overrides the stored key at runtime: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`, `NVIDIA_API_KEY`. `DEEPSEEK_API_KEY` also acts as a backwards-compatibility fallback when no config file exists.
-
-### Install the yp agent skill
-
-```bash
-yp skill
-```
-
-Runs `npx skills add elvisbrevi/yitpush` so any Agent-Skills-compatible agent (Claude Code, Cursor, Gemini CLI…) gains this skill. Requires Node.js for `npx`. Use this when the user asks to "install the skill" or "let my agent use yp".
-
-## Azure DevOps
-
-All Azure DevOps subcommands live under `yp azure-devops <resource> <action>`. Most accept a "quick mode" with positional args that skip interactive menus — prefer it when the user has given org/project/id, since menus block the agent waiting for keystrokes.
-
-Convention: `<org>` is the Azure DevOps organization name (the path segment after `dev.azure.com/`); `<project>` is the project name; IDs are numeric work-item IDs.
-
-### User stories (HU)
-
-```bash
-yp azure-devops hu show <org> <hu-id> [--json]                         # details + links; --json for machine-readable output
-yp azure-devops hu list <org> <project> <hu-id> [--json]               # list child tasks; --json emits {huId, value:[...]}
-yp azure-devops hu task <org> <project> <hu-id> [--description|-d "..."] [--effort|-e "4"] [--task-titles|-t "Desarrollo, Pruebas Unitarias, Code Review"] [[--no-link|-n]] [[--repo <repo> --branch <branch>]]
-yp azure-devops hu link <org> <project> <hu-id> --repo <repo> --branch <branch>
-```
-
-`hu task` without positional args opens an interactive HU picker; the picker also offers extra interactive-only actions ("Create branch for this HU" — generates `feature/<id>-<title>` — and "Mark as In Progress").
-
-Append `--json` to `hu show` / `hu list` whenever the caller (an agent, a script, or `jq`) needs structured output without ANSI escapes. Piping to `jq` is the canonical use case.
-
-### Tasks
-
-```bash
-yp azure-devops task show <org> <task-id> [--json]                     # details; --json for machine-readable output
-yp azure-devops task update <org> <task-id> [flags]
-yp azure-devops task delete <org> <task-id> [--yes|-y]                 # move to recycle bin (prompts by default)
-yp azure-devops task attach <org> <project> <task-id> <file-path> [--comment "..."]   # upload an AttachedFile
-```
-
-`update` flags (all optional, combine freely):
-
-| Flag | Short | Purpose |
-|------|-------|---------|
-| `--title` | — | New work item title (`System.Title`) |
-| `--description` | `-D` | New work item description (`System.Description`) |
-| `--evidence` | — | Set the project-specific "Evidencias de finalización" field (resolved by display name) |
-| `--field` | — | Generic: `--field RefName=value`; repeatable, escape hatch for any field |
-| `--effort` | `-e` | Estimated effort in hours (`Custom.EsfuerzoEstimadoHH`) |
-| `--effort-real` | `-er` | Real effort spent (`Custom.EsfuerzoRealHH` + `CompletedWork`) |
-| `--remaining` | `-r` | Remaining work in hours |
-| `--state` | `-s` | New state — accepts `To Do`, `Doing`, `Active`, `In Progress`, `Resolved`, `Done`, `Closed`, `Removed` |
-| `--comment` | `-c` | Post a discussion comment (via `POST /comments`) |
-| `--assigned-to` | — | Reassign to a new identity. Accepts UPN (`elvis.brevi@sag.gob.cl`), display name (`Elvis Brevi`), or empty string (`""`) to clear. Resolves via `GET /_apis/identities?searchFilter=General&filterValue=<value>` and writes the proper `{displayName, uniqueName, id}` object. Multiple matches exit `4` with a candidate list. |
-| `--history` | — | Write to the legacy `System.History` field (audit log) |
-
-`task update` is also reachable as `hu update` and `wi update` — use whichever matches the work-item type the user named, but the underlying behavior is identical. `--assigned-to` requires an Azure DevOps access token (`az login` first); the resolver caches per `(org, normalized input)` to avoid repeat API calls during batch updates.
-
-`task delete` calls `DELETE /_apis/wit/recyclebin/{id}?api-version=7.0`. It prompts "Type 'yes' to confirm:" by default; in CI / non-interactive contexts (`Console.IsInputRedirected`) the prompt is bypassed and the command exits 3 with a "Pass --yes to confirm" message unless `--yes` (`-y`) is passed. Exit codes: 0 on success, 1 if the work item is already gone (404), 2 on any other error. Pair with `--json` for machine-readable output.
-
-`task attach` uploads the local file to `POST /{project}/_apis/wit/attachments?fileName=<basename>&api-version=7.1-preview` (content-type `application/octet-stream`) and then `PATCH /_apis/wit/workitems/{id}` with a JSON-Patch `add` to `/relations/-` of type `AttachedFile`. The optional `--comment` becomes the tooltip on the attachment in the Azure Boards form.
-
-### Repositories and variable groups
-
-```bash
-yp azure-devops repo new                       # interactive create
-yp azure-devops repo checkout                  # interactive clone
-yp azure-devops variable-group list            # browse and inspect VGs
-```
-
-### Generic work-item link
-
-```bash
-yp azure-devops link <org> <project> <work-item-id>
-```
-
-Adds a branch/commit/PR link to any work item via `ArtifactLink`, so it appears under "Development" in the Azure Boards UI. Without args it falls back to interactive menus.
-
-### Pure interactive entry point
-
-```bash
-yp azure-devops
-```
-
-Opens a top-level menu (Create repo, Clone repo, Browse variable groups, Create tasks for HU, List tasks of HU, Add link). Reach for this only when the user is exploring and hasn't given enough context for quick mode.
-
-## Decision guide
-
-Map intent → command. If a row matches the user's request, run that command. Substitute `<org>`, `<project>`, `<id>` with values from the user; ask only for missing pieces.
-
-| User intent | Command |
-|---|---|
-| Commit and push | `yp commit` |
-| Commit but let me review the message | `yp commit --confirm` |
-| Detailed/long commit message | `yp commit --detailed` |
-| Commit message in another language | `yp commit -l <language>` |
-| Save the commit message to a file too | `yp commit --save` |
-| Generate a PR description | `yp pr` |
-| Detailed PR description with testing notes | `yp pr --detailed` |
-| Switch / change git branch | `yp checkout` |
-| Configure or change AI provider | `yp setup` |
-| Install the yp skill in my agent | `yp skill` |
-| Print the installed version (scriptable) | `yp --version` |
-| Show user story <id> | `yp azure-devops hu show <org> <id>` |
-| Show user story <id> as JSON for `jq` | `yp azure-devops hu show <org> <id> --json` |
-| List tasks of user story <id> | `yp azure-devops hu list <org> <project> <id>` |
-| Count child tasks of a user story | `yp azure-devops hu list <org> <project> <id> --json \| jq '.value \| length'` |
-| Create tasks for user story <id> | `yp azure-devops hu task <org> <project> <id> [-d "..."] [-e "..."] [-t "title1,title2,..."] [-n] [--repo <r> --branch <b>]` |
-| Link branch to user story <id> | `yp azure-devops hu link <org> <project> <id> --repo <r> --branch <b>` |
-| Show task <id> | `yp azure-devops task show <org> <id>` |
-| Show task <id> as JSON for `jq` | `yp azure-devops task show <org> <id> --json` |
-| Update task state | `yp azure-devops task update <org> <id> --state "Doing"` |
-| Update task effort/remaining/effort-real | `yp azure-devops task update <org> <id> --effort "8" --remaining "2" --effort-real "10"` |
-| Add a comment to a task | `yp azure-devops task update <org> <id> --comment "<text>"` |
-| Reassign a task to a user (UPN or display name) | `yp azure-devops task update <org> <id> --assigned-to "elvis.brevi@sag.gob.cl"` |
-| Clear the assignment on a task | `yp azure-devops task update <org> <id> --assigned-to ""` |
-| Update any work item (alias: wi update, hu update) | `yp azure-devops task update <org> <id> [--effort|-e <val>] [--effort-real|-er <val>] [--remaining|-r <val>] [--state|-s <val>] [--comment|-c <text>] [--assigned-to <upn|display-name|"">]` |
-| Delete a work item (move to recycle bin) | `yp azure-devops task delete <org> <id> --yes` |
-| Attach a local file to a task | `yp azure-devops task attach <org> <project> <id> ./screenshot.png [--comment "..."]` |
-| Link a branch/commit/PR to any work item | `yp azure-devops link <org> <project> <id>` |
-| Create a new Azure DevOps repo | `yp azure-devops repo new` |
-| Clone an Azure DevOps repo | `yp azure-devops repo checkout` |
-| List variable groups | `yp azure-devops variable-group list` |
-| Browse Azure DevOps interactively | `yp azure-devops` |
-
-## Operational notes
-
-- All interactive menus include a `← Back` option; lists (HUs, tasks, projects, repos) sort by ID descending so the most recent items appear first.
-- `yp` performs a daily background NuGet check and prints an upgrade hint when a newer version is available — non-fatal, ignore in automation.
-- Error exit code is `1`; success is `0`. Respect this when chaining `yp` calls.
-- `yp` writes commit messages and PR descriptions to the system clipboard. If the agent runs in a headless environment, prefer `--save` to also get a file copy.
+- `yp` requires a configured AI provider (`yp setup`) or the `DEEPSEEK_API_KEY` env var
+- All interactive menus support `← Back` navigation
+- Version updates are shown automatically when a new version is available on NuGet

@@ -142,6 +142,12 @@ partial class Program
         commitTable.AddRow("--detailed", "Generate detailed commit with title + body");
         commitTable.AddRow("--language <lang>, --lang, -l", "Output language (e.g., english, spanish, french)");
         commitTable.AddRow("--save", "Save commit message to a markdown file");
+        commitTable.AddRow("--conventional", "Format the message as a Conventional Commits `<type>(<scope>): <subject>` (optionally with `BREAKING CHANGE:` footer)");
+        commitTable.AddRow("--type <feat|fix|chore|refactor|docs|test|perf|build|ci|style>", "Force the Conventional Commits type (overrides the AI's inference)");
+        commitTable.AddRow("--scope <scope>", "Force the Conventional Commits scope (e.g. `api`, `wcf`)");
+        commitTable.AddRow("--detect-breaking", "Scan the diff for breaking changes (removed public symbol in C#, removed export in TS/JS, major JSON version bump, `#major.bump` marker) and feed them to the AI");
+        commitTable.AddRow("--amend", "Regenerate the message for the LAST commit and rewrite it in place (`git commit --amend`); skips the working-tree flow and does NOT push");
+        commitTable.AddRow("--template <path-to-md>", "Render the AI output through a Handlebars-ish template (`{{type}}`, `{{scope}}`, `{{subject}}`, `{{body}}`, `{{refs}}`); exits 6 if the file is missing");
 
         AnsiConsole.Write(commitTable);
 
@@ -193,6 +199,10 @@ partial class Program
         AnsiConsole.MarkupLine("  yp commit                                       [dim]# Auto commit and push[/]");
         AnsiConsole.MarkupLine("  yp commit --confirm                             [dim]# Review before committing[/]");
         AnsiConsole.MarkupLine("  yp commit --detailed -l spanish                 [dim]# Detailed commit in Spanish[/]");
+        AnsiConsole.MarkupLine("  yp commit --conventional --type feat --scope wcf   [dim]# Conventional Commits with forced type/scope[/]");
+        AnsiConsole.MarkupLine("  yp commit --conventional --detect-breaking      [dim]# Conventional + scan diff for breaking changes[/]");
+        AnsiConsole.MarkupLine("  yp commit --amend                               [dim]# Regenerate last commit's message (no push)[/]");
+        AnsiConsole.MarkupLine("  yp commit --template ~/.yitpush/commit.md      [dim]# Render AI output through a custom template[/]");
         AnsiConsole.MarkupLine("  yp pr                                           [dim]# Generate PR description[/]");
         AnsiConsole.MarkupLine("  yp pr --detailed -l french                      [dim]# Detailed PR description in French[/]");
         AnsiConsole.MarkupLine("  yp checkout                                     [dim]# Switch branch interactively[/]");
