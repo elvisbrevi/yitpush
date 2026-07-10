@@ -322,8 +322,9 @@ partial class Program
         AnsiConsole.Write(table);
 
         AnsiConsole.MarkupLine("\n[dim]Short flags for hu task: --title, --description|-d|-D, --effort|-e, --trio, --task-titles|-t, --no-link|-n[/]");
-        AnsiConsole.MarkupLine("[dim]hu task default: 1 task. Title precedence: --title > --task-titles[0] > 'Desarrollo'. --trio creates the legacy trio (opt-in). --trio and --task-titles are mutually exclusive.[/]");
+        AnsiConsole.MarkupLine("[dim]hu task default: 1 task. Title precedence: --title > --task-titles[[0]] > 'Desarrollo'. --trio creates the legacy trio (opt-in). --trio and --task-titles are mutually exclusive.[/]");
         AnsiConsole.MarkupLine("[dim]task update: --comment posts to Discussion; --history writes the legacy History field; --evidence resolves the 'Evidencias de finalización' field by name; --assigned-to accepts UPN/display-name/empty and writes the identity object (multiple matches exit 4 with a candidate list)[/]");
+        AnsiConsole.MarkupLine("[dim]task update pre-flight (v2.3.0): when --state \"Done\" is passed without --evidence, the tool GETs the work item and rejects the transition (exit 2) if 'Evidencias de finalización' is empty; the check is skipped for non-Done states, when --evidence is provided, or when the work item already has the field populated; any pre-flight failure (auth/network/5xx/unresolved refname) is fail-open so the PATCH still runs.[/]");
         AnsiConsole.MarkupLine("[dim]--json on hu/task show and hu list emits a flat JSON shape (no ANSI escapes) so it can be piped to jq[/]");
 
         AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
