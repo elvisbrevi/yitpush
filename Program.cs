@@ -19,10 +19,26 @@ partial class Program
     private const int ApiMaxContextTokens = 131072;
 
     // Azure DevOps field names
+    // NOTE: AzFieldEffortHH / AzFieldEffortRealHH are the *historical* refnames used
+    // in some projects (e.g. "Cobro Pago y Tarifas"). Other projects use the localized
+    // "Custom.EsfuerzoEstimado" / "Custom.EsfuerzoReal" (e.g. "Soluciones Transversales").
+    // New code must route writes through AzDevOpsFieldRefNameResolver to discover the
+    // project-specific refname at runtime (see issue #18 BUG-001). These constants are
+    // kept only as a last-resort fallback when the API cannot be reached and the tests
+    // still assert them as the "preserves existing fields" baseline.
+    [Obsolete("Use AzDevOpsFieldRefNameResolver instead. The refname is project-specific (e.g. Custom.EsfuerzoRealHH vs Custom.EsfuerzoReal). See issue #18 BUG-001.")]
     internal const string AzFieldEffortHH = "Custom.EsfuerzoEstimadoHH";
+    [Obsolete("Use AzDevOpsFieldRefNameResolver instead. The refname is project-specific (e.g. Custom.EsfuerzoRealHH vs Custom.EsfuerzoReal). See issue #18 BUG-001.")]
     internal const string AzFieldEffortRealHH = "Custom.EsfuerzoRealHH";
     internal const string AzFieldRemainingWork = "Microsoft.VSTS.Scheduling.RemainingWork";
     internal const string AzFieldEvidenceDisplay = "Evidencias de finalización";
+
+    // Display names used to resolve the project-specific refname via AzDevOpsFieldRefNameResolver.
+    // The actual refname differs per project (issue #18 BUG-001):
+    //   - "Soluciones Transversales" -> Custom.EsfuerzoEstimado / Custom.EsfuerzoReal
+    //   - "Cobro Pago y Tarifas"     -> Custom.EsfuerzoEstimadoHH / Custom.EsfuerzoRealHH
+    internal const string AzDisplayEffortEstimated = "Esfuerzo Estimado HH";
+    internal const string AzDisplayEffortReal = "Esfuerzo Real";
 
     static async Task<int> Main(string[] args)
     {

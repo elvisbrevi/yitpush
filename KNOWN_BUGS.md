@@ -170,11 +170,19 @@ No es bug de yp. Documentar el rule del workflow y considerar agregar un check e
 
 ## Bugs a investigar antes de v2.2.3
 
-- [ ] BUG-001: confirmar `AzFieldEffortRealHH` (HIGH) → fix inmediato
-- [ ] BUG-002: implementar lookup dinámico de states (LOW) → nice-to-have
-- [ ] BUG-003: documentar rule del workflow en SKILL.md (MEDIUM) → quick doc fix
+- [x] BUG-001: routear `--effort-real` / `--effort` a través de `AzDevOpsFieldRefNameResolver` (HIGH) → **Fixed en v2.3.0 (issue #18)**
+- [x] BUG-002: lookup dinámico de states (LOW) → **Fixed en v2.3.0 (issue #18)**
+- [x] BUG-003: pre-flight warning con display name + refname + hint de `--evidence` (MEDIUM) → **Helper entregado en v2.3.0 (issue #18); check completo llega en #17**
 
 ---
+
+## ✅ Resuelto en v2.3.0 (issue #18)
+
+- [x] **BUG-001 — `--effort-real` routea a través de `AzDevOpsFieldRefNameResolver`.** `TaskUpdateOperationsBuilder` ahora acepta `effortRefName` / `effortRealRefName` opcionales y los usa cuando se los pasa. `UpdateWorkItem` los resuelve en runtime desde el field cache (`~/.yitpush/field-cache.json`, TTL 24h) usando los display names "Esfuerzo Estimado HH" y "Esfuerzo Real". El PATCH ahora apunta a `Custom.EsfuerzoReal` en "Soluciones Transversales" y a `Custom.EsfuerzoRealHH` en "Cobro Pago y Tarifas" según corresponda. Las constantes históricas `Program.AzFieldEffortHH` / `Program.AzFieldEffortRealHH` siguen existiendo (con `[Obsolete]`) como fallback de último recurso. PR asociado al cierre de la issue #18.
+
+- [x] **BUG-002 — Validación de state dinámica.** Nueva clase `AzDevOpsStateCache` (`AzureDevOps/AzDevOpsStateCache.cs`) que consulta `GET /wit/workitemtypes/{type}/states?api-version=7.0`, cachea en memoria por (org, project, type), y expone `IsLikelyValidStateAsync` con semántica **fail open** (devuelve `true` si la API falla para nunca bloquear el PATCH). El warning de "may not be a valid state" ahora sólo se imprime si la cache confirma que el state no pertenece al workflow. `--state "En revisión"` ya no dispara el warning falso. La lista hardcodeada `ValidAzureStates` fue removida de `AzureDevOpsHelpers.cs`; el `SelectionPrompt` interactivo ahora carga los states reales al entrar a la pantalla (con fallback a una lista pequeña si la red falla).
+
+- [x] **BUG-003 — Pre-flight warning message.** Nuevo helper `TaskUpdatePreFlight.BuildMissingEvidenceMessage(displayName, refName)` (en `AzureDevOps/TaskUpdatePreFlight.cs`) genera el mensaje de error con el display name localizado ("Evidencias de finalización") y el refname resuelto (`Custom.b505c83e-3745-4d8b-b76b-b3086a0c4c71`), y apunta al usuario a `--evidence`. El check completo (GET del work item, verificación de required fields, exit 2 sin enviar el PATCH) se entrega en la issue #17 (v1: Pre-flight check for Done transition).
 
 ## Resuelto en v2.3.0 (issue #5)
 

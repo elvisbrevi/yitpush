@@ -129,4 +129,67 @@ public class TaskUpdateOperationsBuilderTests
         Assert.Contains($"{Program.AzFieldRemainingWork}=2", ops);
         Assert.Contains("System.State=Doing", ops);
     }
+
+    [Fact]
+    public void BuildUpdateOperations_uses_resolved_effort_refname_when_provided()
+    {
+        var ops = TaskUpdateOperationsBuilder.BuildUpdateOperations(
+            title: null,
+            description: null,
+            effort: "8",
+            effortReal: null,
+            remaining: null,
+            state: null,
+            evidenceRefName: null,
+            evidence: null,
+            extraFields: Array.Empty<string>(),
+            history: null,
+            effortRefName: "Custom.EsfuerzoEstimado",
+            effortRealRefName: null);
+
+        Assert.Contains("Custom.EsfuerzoEstimado=8", ops);
+        Assert.DoesNotContain(ops, op => op.StartsWith($"{Program.AzFieldEffortHH}="));
+    }
+
+    [Fact]
+    public void BuildUpdateOperations_uses_resolved_effortReal_refname_when_provided()
+    {
+        var ops = TaskUpdateOperationsBuilder.BuildUpdateOperations(
+            title: null,
+            description: null,
+            effort: null,
+            effortReal: "5",
+            remaining: null,
+            state: null,
+            evidenceRefName: null,
+            evidence: null,
+            extraFields: Array.Empty<string>(),
+            history: null,
+            effortRefName: null,
+            effortRealRefName: "Custom.EsfuerzoReal");
+
+        Assert.Contains("Custom.EsfuerzoReal=5", ops);
+        Assert.Contains("Microsoft.VSTS.Scheduling.CompletedWork=5", ops);
+        Assert.DoesNotContain(ops, op => op.StartsWith($"{Program.AzFieldEffortRealHH}="));
+    }
+
+    [Fact]
+    public void BuildUpdateOperations_routes_through_resolver_for_different_projects()
+    {
+        // Simulates the same call from two different projects with different refnames
+        // (e.g. "Soluciones Transversales" -> Custom.EsfuerzoReal, "Cobro Pago y Tarifas" -> Custom.EsfuerzoRealHH).
+        var opsSolTrans = TaskUpdateOperationsBuilder.BuildUpdateOperations(
+            title: null, description: null, effort: null, effortReal: "5",
+            remaining: null, state: null, evidenceRefName: null, evidence: null,
+            extraFields: Array.Empty<string>(), history: null,
+            effortRefName: null, effortRealRefName: "Custom.EsfuerzoReal");
+        var opsCobroPago = TaskUpdateOperationsBuilder.BuildUpdateOperations(
+            title: null, description: null, effort: null, effortReal: "5",
+            remaining: null, state: null, evidenceRefName: null, evidence: null,
+            extraFields: Array.Empty<string>(), history: null,
+            effortRefName: null, effortRealRefName: "Custom.EsfuerzoRealHH");
+
+        Assert.Contains("Custom.EsfuerzoReal=5", opsSolTrans);
+        Assert.Contains("Custom.EsfuerzoRealHH=5", opsCobroPago);
+    }
 }

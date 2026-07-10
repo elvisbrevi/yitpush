@@ -1746,7 +1746,7 @@ partial class Program
         }
     }
 
-    private static readonly string[] ValidAzureStates = { "To Do", "Doing", "Active", "In Progress", "Resolved", "Done", "Closed", "Removed" };
+    private static readonly string[] FallbackStateChoices = { "To Do", "Doing", "Active", "In Progress", "Resolved", "Done", "Closed", "Removed" };
 
     internal static async Task<int> UpdateWorkItem(
         string orgUrl, string id,
@@ -1754,15 +1754,23 @@ partial class Program
         string? title = null, string? description = null, string? evidence = null,
         IReadOnlyList<string>? extraFields = null, string? history = null)
     {
-        if (!string.IsNullOrEmpty(state) && !ValidAzureStates.Contains(state, StringComparer.OrdinalIgnoreCase))
+        if (!string.IsNullOrEmpty(state))
         {
-            AnsiConsole.MarkupLine($"[yellow]⚠️  Warning: '{state}' may not be a valid state.[/]");
-            AnsiConsole.MarkupLine($"Common states: [cyan]{string.Join(", ", ValidAzureStates)}[/]");
+            await WarnIfStateNotInWorkflowAsync(orgUrl, id, state);
         }
 
         string? workItemContextProject = null;
         string? evidenceRefName = null;
-        if (!string.IsNullOrEmpty(evidence) || !string.IsNullOrEmpty(comment))
+        string? effortRefName = null;
+        string? effortRealRefName = null;
+
+        var needsResolver =
+            !string.IsNullOrEmpty(evidence) ||
+            !string.IsNullOrEmpty(comment) ||
+            !string.IsNullOrEmpty(effort) ||
+            !string.IsNullOrEmpty(effortReal);
+
+        if (needsResolver)
         {
             var (project, workItemType, ctxError) = await GetWorkItemContextAsync(orgUrl, id);
             workItemContextProject = project;
@@ -1773,11 +1781,22 @@ partial class Program
                 {
                     using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ApiTimeoutSeconds) };
                     http.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+                    var resolver = new AzDevOpsFieldRefNameResolver(http);
+                    var type = workItemType ?? "Task";
                     if (!string.IsNullOrEmpty(evidence))
                     {
-                        var resolver = new AzDevOpsFieldRefNameResolver(http);
                         evidenceRefName = await resolver.ResolveByDisplayNameAsync(
-                            orgUrl, project, workItemType ?? "Task", AzFieldEvidenceDisplay);
+                            orgUrl, project, type, AzFieldEvidenceDisplay);
+                    }
+                    if (!string.IsNullOrEmpty(effort))
+                    {
+                        effortRefName = await resolver.ResolveByDisplayNameAsync(
+                            orgUrl, project, type, AzDisplayEffortEstimated);
+                    }
+                    if (!string.IsNullOrEmpty(effortReal))
+                    {
+                        effortRealRefName = await resolver.ResolveByDisplayNameAsync(
+                            orgUrl, project, type, AzDisplayEffortReal);
                     }
                 }
             }
@@ -1790,7 +1809,8 @@ partial class Program
         var fieldsList = TaskUpdateOperationsBuilder.BuildUpdateOperations(
             title, description, effort, effortReal, remaining, state,
             evidenceRefName, evidence,
-            extraFields ?? Array.Empty<string>(), history);
+            extraFields ?? Array.Empty<string>(), history,
+            effortRefName: effortRefName, effortRealRefName: effortRealRefName);
 
         bool anySuccess = false;
 
@@ -1938,6 +1958,8 @@ partial class Program
 
     private static async Task<int> UpdateWorkItemInteractive(string orgUrl, string id)
     {
+        var stateChoices = await FetchStateChoicesAsync(orgUrl, id);
+
         while (true)
         {
             var field = AnsiConsole.Prompt(
@@ -1954,7 +1976,7 @@ partial class Program
                 state = AnsiConsole.Prompt(
                     new SelectionPrompt<string>()
                         .Title("Select new state:")
-                        .AddChoices(ValidAzureStates)
+                        .AddChoices(stateChoices)
                         .AddChoices("Other..."));
 
                 if (state == "Other...")
@@ -1980,6 +2002,50 @@ partial class Program
             }
 
             await UpdateWorkItem(orgUrl, id, effort, remaining, state, comment, effortReal);
+        }
+    }
+
+    private static async Task WarnIfStateNotInWorkflowAsync(string orgUrl, string id, string state)
+    {
+        try
+        {
+            var (project, workItemType, _) = await GetWorkItemContextAsync(orgUrl, id);
+            if (project == null) return; // fail open — we cannot resolve the workflow
+            var token = await GetAzureAccessToken();
+            if (token == null) return; // fail open
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ApiTimeoutSeconds) };
+            http.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+            var cache = new AzDevOpsStateCache(http);
+            var likely = await cache.IsLikelyValidStateAsync(orgUrl, project, workItemType ?? "Task", state);
+            if (!likely)
+            {
+                AnsiConsole.MarkupLine(
+                    $"[yellow]⚠️  Warning: '{Markup.Escape(state)}' may not be a valid state in this workflow.[/]");
+            }
+        }
+        catch
+        {
+            // Fail open: never block the PATCH on a state-validation failure.
+        }
+    }
+
+    private static async Task<List<string>> FetchStateChoicesAsync(string orgUrl, string id)
+    {
+        try
+        {
+            var (project, workItemType, _) = await GetWorkItemContextAsync(orgUrl, id);
+            if (project == null) return new List<string>(FallbackStateChoices);
+            var token = await GetAzureAccessToken();
+            if (token == null) return new List<string>(FallbackStateChoices);
+            using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ApiTimeoutSeconds) };
+            http.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+            var cache = new AzDevOpsStateCache(http);
+            var states = await cache.GetValidStatesAsync(orgUrl, project, workItemType ?? "Task");
+            return states.Count > 0 ? states.ToList() : new List<string>(FallbackStateChoices);
+        }
+        catch
+        {
+            return new List<string>(FallbackStateChoices);
         }
     }
 

@@ -12,18 +12,26 @@ internal static class TaskUpdateOperationsBuilder
         string? evidenceRefName,
         string? evidence,
         IReadOnlyList<string> extraFields,
-        string? history)
+        string? history,
+        string? effortRefName = null,
+        string? effortRealRefName = null)
     {
         var ops = new List<string>();
 
         if (!string.IsNullOrEmpty(title)) ops.Add($"System.Title={title}");
         if (!string.IsNullOrEmpty(description)) ops.Add($"System.Description={description}");
         if (!string.IsNullOrEmpty(state)) ops.Add($"System.State={state}");
-        if (!string.IsNullOrEmpty(effort)) ops.Add($"{Program.AzFieldEffortHH}={effort}");
+
+        if (!string.IsNullOrEmpty(effort))
+        {
+            var refName = !string.IsNullOrEmpty(effortRefName) ? effortRefName : Program.AzFieldEffortHH;
+            ops.Add($"{refName}={effort}");
+        }
 
         if (!string.IsNullOrEmpty(effortReal))
         {
-            ops.Add($"{Program.AzFieldEffortRealHH}={effortReal}");
+            var refName = !string.IsNullOrEmpty(effortRealRefName) ? effortRealRefName : Program.AzFieldEffortRealHH;
+            ops.Add($"{refName}={effortReal}");
             ops.Add($"Microsoft.VSTS.Scheduling.CompletedWork={effortReal}");
         }
 
