@@ -192,4 +192,70 @@ public class TaskUpdateOperationsBuilderTests
         Assert.Contains("Custom.EsfuerzoReal=5", opsSolTrans);
         Assert.Contains("Custom.EsfuerzoRealHH=5", opsCobroPago);
     }
+
+    [Fact]
+    public void BuildUpdateOperationsStructured_emits_clear_assignedTo_op_when_clear_requested()
+    {
+        var ops = TaskUpdateOperationsBuilder.BuildUpdateOperationsStructured(
+            title: null, description: null, effort: null, effortReal: null,
+            remaining: null, state: null, evidenceRefName: null, evidence: null,
+            extraFields: Array.Empty<string>(), history: null,
+            effortRefName: null, effortRealRefName: null,
+            assignedToMatch: null, clearAssignedTo: true);
+
+        var clearOp = Assert.Single(ops.OfType<TaskUpdateOperationsBuilder.ClearFieldOperation>());
+        Assert.Equal("System.AssignedTo", clearOp.RefName);
+    }
+
+    [Fact]
+    public void BuildUpdateOperationsStructured_emits_identity_assignedTo_op_when_match_provided()
+    {
+        var match = new TaskUpdateOperationsBuilder.IdentityMatch(
+            Id: "00000000-0000-0000-0000-000000000abc",
+            DisplayName: "Elvis Brevi",
+            UniqueName: "elvis.brevi@sag.gob.cl");
+
+        var ops = TaskUpdateOperationsBuilder.BuildUpdateOperationsStructured(
+            title: null, description: null, effort: null, effortReal: null,
+            remaining: null, state: null, evidenceRefName: null, evidence: null,
+            extraFields: Array.Empty<string>(), history: null,
+            effortRefName: null, effortRealRefName: null,
+            assignedToMatch: match, clearAssignedTo: false);
+
+        var identityOp = Assert.Single(ops.OfType<TaskUpdateOperationsBuilder.IdentityFieldOperation>());
+        Assert.Equal("System.AssignedTo", identityOp.RefName);
+        Assert.Equal("Elvis Brevi", identityOp.DisplayName);
+        Assert.Equal("elvis.brevi@sag.gob.cl", identityOp.UniqueName);
+        Assert.Equal("00000000-0000-0000-0000-000000000abc", identityOp.Id);
+    }
+
+    [Fact]
+    public void BuildUpdateOperationsStructured_omits_assignedTo_when_neither_match_nor_clear_provided()
+    {
+        var ops = TaskUpdateOperationsBuilder.BuildUpdateOperationsStructured(
+            title: null, description: null, effort: null, effortReal: null,
+            remaining: null, state: null, evidenceRefName: null, evidence: null,
+            extraFields: Array.Empty<string>(), history: null,
+            effortRefName: null, effortRealRefName: null,
+            assignedToMatch: null, clearAssignedTo: false);
+
+        Assert.DoesNotContain(ops, op => op is TaskUpdateOperationsBuilder.IdentityFieldOperation);
+        Assert.DoesNotContain(ops, op => op is TaskUpdateOperationsBuilder.ClearFieldOperation
+            && ((TaskUpdateOperationsBuilder.ClearFieldOperation)op).RefName == "System.AssignedTo");
+    }
+
+    [Fact]
+    public void BuildUpdateOperationsStructured_does_not_emit_assignedTo_clear_when_other_fields_present()
+    {
+        var ops = TaskUpdateOperationsBuilder.BuildUpdateOperationsStructured(
+            title: "Updated",
+            description: null, effort: null, effortReal: null,
+            remaining: null, state: null, evidenceRefName: null, evidence: null,
+            extraFields: Array.Empty<string>(), history: null,
+            effortRefName: null, effortRealRefName: null,
+            assignedToMatch: null, clearAssignedTo: false);
+
+        Assert.Contains(ops, op => op is TaskUpdateOperationsBuilder.StringFieldOperation s && s.RefName == "System.Title" && s.Value == "Updated");
+        Assert.DoesNotContain(ops, op => op is TaskUpdateOperationsBuilder.ClearFieldOperation);
+    }
 }

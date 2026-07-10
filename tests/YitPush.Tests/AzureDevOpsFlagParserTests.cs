@@ -219,4 +219,31 @@ public class AzureDevOpsFlagParserTests
 
         Assert.False(result.Trio);
     }
+
+    [Fact]
+    public void Parse_sets_assigned_to_when_assigned_to_flag_provided()
+    {
+        var result = AzureDevOpsFlagParser.Parse(
+            new[] { "task", "update", "Org", "1", "--assigned-to", "elvis.brevi@sag.gob.cl" });
+
+        Assert.Equal("elvis.brevi@sag.gob.cl", result.AssignedTo);
+    }
+
+    [Fact]
+    public void Parse_sets_assigned_to_when_assigned_to_flag_is_empty()
+    {
+        var result = AzureDevOpsFlagParser.Parse(
+            new[] { "task", "update", "Org", "1", "--assigned-to", "" });
+
+        Assert.Equal("", result.AssignedTo);
+    }
+
+    [Fact]
+    public void Parse_sets_assigned_to_null_when_assigned_to_flag_missing()
+    {
+        var result = AzureDevOpsFlagParser.Parse(
+            new[] { "task", "update", "Org", "1" });
+
+        Assert.Null(result.AssignedTo);
+    }
 }

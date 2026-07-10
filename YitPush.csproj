@@ -33,10 +33,11 @@
 
     <!-- Additional Metadata -->
     <Copyright>Copyright (c) 2026 Elvis Brevi</Copyright>
-    <PackageReleaseNotes>- Added `yp --version` / `yp -V` global flag (prints "2.3.0" on stdout, exit 0, no ANSI escapes)
+    <PackageReleaseNotes>- Added `--assigned-to` flag on `task update` (accepts UPN, display name, or empty string to clear). Resolves the input against the project's identity store and writes the proper identity object. Multiple matches exit 4 with a candidate list.
+- Added `yp --version` / `yp -V` global flag (prints "2.3.0" on stdout, exit 0, no ANSI escapes)
 - Added `--json` flag to `hu show`, `task show`, and `hu list` — emits a flat JSON object suitable for piping to `jq`
 - Fixed Spectre.Console crash on `hu show` / `hu list` when stdout is redirected (the trailing interactive prompt is now auto-skipped in non-interactive contexts)
-- 16 new unit tests covering the version helper, JSON shape, and `--json` flag parsing
+- 15 new unit tests (8 identity-resolver, 4 structured-ops builder, 3 flag parser)
 Full changelog: https://github.com/elvisbrevi/yitpush/blob/main/CHANGELOG.md</PackageReleaseNotes>
   </PropertyGroup>
 

@@ -131,10 +131,10 @@ yp azure-devops [subcommand] [args] [flags]
 | `task attach <org> <project> <id> <file-path> [--comment <text>]` | Upload a local file as an `AttachedFile` relation on the work item |
 | `link <org> <proj> <id>` | Add a link (branch/commit/PR) to any work item |
 
-**task update flags**: `--title`, `--description|-D`, `--evidence`, `--field <RefName=val>`, `--effort|-e`, `--effort-real|-er`, `--remaining|-r`, `--state|-s`, `--comment|-c`, `--history`
+**task update flags**: `--title`, `--description|-D`, `--evidence`, `--field <RefName=val>`, `--effort|-e`, `--effort-real|-er`, `--remaining|-r`, `--state|-s`, `--comment|-c`, `--assigned-to <upn|display-name|"">`, `--history`
 **hu link flags**: `--repo`, `--branch`
 
-Note: `--comment` posts a discussion comment; `--history` writes the legacy History field.
+Note: `--comment` posts a discussion comment; `--history` writes the legacy History field; `--assigned-to` resolves UPN or display name against the project's identity store (multiple matches exit 4 with a candidate list, empty string clears the assignment).
 
 ---
 
