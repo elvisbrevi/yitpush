@@ -1774,7 +1774,8 @@ partial class Program
             !string.IsNullOrEmpty(comment) ||
             !string.IsNullOrEmpty(effort) ||
             !string.IsNullOrEmpty(effortReal) ||
-            assignedTo != null;
+            assignedTo != null ||
+            string.Equals(state, "Done", StringComparison.OrdinalIgnoreCase);
 
         if (needsResolver)
         {
@@ -1809,6 +1810,30 @@ partial class Program
             else if (!string.IsNullOrEmpty(evidence))
             {
                 AnsiConsole.MarkupLine($"[yellow]⚠️  Could not resolve work item context to set evidence: {Markup.Escape(ctxError ?? "unknown")}[/]");
+            }
+        }
+
+        if (string.Equals(state, "Done", StringComparison.OrdinalIgnoreCase))
+        {
+            var preFlightToken = await GetAzureAccessToken();
+            if (preFlightToken != null)
+            {
+                using var preFlightHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(ApiTimeoutSeconds) };
+                preFlightHttp.DefaultRequestHeaders.Add("Authorization", $"Bearer {preFlightToken}");
+
+                var preFlight = await TaskUpdatePreFlight.RunAsync(new TaskUpdatePreFlight.PreFlightRequest(
+                    Http: preFlightHttp,
+                    OrgUrl: orgUrl,
+                    WorkItemId: id,
+                    State: state,
+                    EvidenceFlagValue: evidence,
+                    EvidenceRefName: evidenceRefName,
+                    EvidenceDisplayName: AzFieldEvidenceDisplay));
+                if (preFlight is TaskUpdatePreFlight.PreFlightFailed failed)
+                {
+                    AnsiConsole.MarkupLine($"[red]{Markup.Escape(failed.Message)}[/]");
+                    return 2;
+                }
             }
         }
 

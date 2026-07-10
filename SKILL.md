@@ -139,6 +139,8 @@ yp azure-devops [subcommand] [args] [flags]
 
 Note: `--comment` posts a discussion comment; `--history` writes the legacy History field; `--assigned-to` resolves UPN or display name against the project's identity store (multiple matches exit 4 with a candidate list, empty string clears the assignment).
 
+**Pre-flight check (Done transition, v2.3.0):** when `--state "Done"` is passed **without** `--evidence`, `yp` first `GET`s the work item and verifies that `Evidencias de finalización` (resolved via the project-specific refname) is non-empty. If the field is empty, the tool prints `❌ Missing required field for Done transition: Evidencias de finalización (refname Custom.<GUID>). Re-run with --evidence "<text>".` and exits 2 without sending the PATCH. The check is skipped when (a) the target state is not `Done`, (b) `--evidence` is provided (the flag itself populates the field), or (c) the work item already has a non-empty `Evidencias de finalización` value. Any pre-flight failure (auth, network, 5xx, unresolvable refname) is treated as fail-open so the existing PATCH flow is not regressed.
+
 ---
 
 ## Global Flags
