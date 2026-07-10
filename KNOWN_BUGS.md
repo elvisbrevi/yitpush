@@ -173,4 +173,16 @@ No es bug de yp. Documentar el rule del workflow y considerar agregar un check e
 - [ ] BUG-001: confirmar `AzFieldEffortRealHH` (HIGH) → fix inmediato
 - [ ] BUG-002: implementar lookup dinámico de states (LOW) → nice-to-have
 - [ ] BUG-003: documentar rule del workflow en SKILL.md (MEDIUM) → quick doc fix
-- [ ] Verificar `AzFieldRemainingWork` y `AzFieldEffortHH` contra work item type real (potencial BUG-001-bis)
+
+---
+
+## Resuelto en v2.3.0 (issue #5)
+
+- [x] **Field resolver genérico con cache persistente** — `AzDevOpsFieldRefNameResolver` ahora persiste el mapa de fields en `~/.yitpush/field-cache.json` con TTL de 24h, expone `ResolveByDisplayNameAsync` + `RefreshAsync`, y se usa desde los nuevos subcomandos `yp azure-devops resolve-field` y `yp azure-devops refresh-fields`. El trabajo de "verificar `AzFieldRemainingWork` y `AzFieldEffortHH` contra work item type real" se hace ahora con:
+
+  ```bash
+  yp azure-devops resolve-field <org> <project> Task "Remaining Work"
+  yp azure-devops resolve-field <org> <project> Task "Esfuerzo Real"
+  ```
+
+  El refname devuelto se puede pasar a `--field` mientras se consolidan los fixes de BUG-001.

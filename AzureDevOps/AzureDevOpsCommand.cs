@@ -31,6 +31,26 @@ partial class Program
             return await AddLinkToRepo(oUrl, projectId, workItemId);
         }
 
+        if (args[0] == "resolve-field")
+        {
+            if (args.Length < 5)
+            {
+                AnsiConsole.MarkupLine("[red]Usage: yp azure-devops resolve-field <org> <project> <workItemType> <displayName>[/]");
+                return 1;
+            }
+            return await ResolveFieldCli(args[1], args[2], args[3], args[4]);
+        }
+
+        if (args[0] == "refresh-fields")
+        {
+            if (args.Length < 4)
+            {
+                AnsiConsole.MarkupLine("[red]Usage: yp azure-devops refresh-fields <org> <project> <workItemType>[/]");
+                return 1;
+            }
+            return await RefreshFieldsCli(args[1], args[2], args[3]);
+        }
+
         if (args.Length < 2)
         {
             ShowAzureDevOpsHelp();
@@ -311,6 +331,8 @@ partial class Program
         table.AddRow("task update <org> <id> [[--title <t>]] [[--description|-D <d>]] [[--evidence <e>]] [[--field <RefName=val>]] [[--effort|-e <e>]] [[--effort-real|-er <er>]] [[--remaining|-r <r>]] [[--state|-s <s>]] [[--comment|-c <c>]] [[--history <h>]]", "Update directly");
         table.AddRow("link", "Add link (branch/commit/PR) to work item");
         table.AddRow("link <org> <proj> <wi-id>", "Add link (skip menus)");
+        table.AddRow("resolve-field <org> <proj> <type> <displayName>", "Print the refname for a display name; uses the 24h cache");
+        table.AddRow("refresh-fields <org> <proj> <type>", "Invalidate the cache for (org, project, workItemType) and re-warm it");
 
         AnsiConsole.Write(table);
 
@@ -327,6 +349,8 @@ partial class Program
         AnsiConsole.MarkupLine("  yp azure-devops hu link MyOrg MyProj 123 --repo Repo --branch main  [dim]# Quick link[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu list MyOrg MyProj 123      [dim]# List tasks of HU[/]");
         AnsiConsole.MarkupLine("  yp azure-devops link MyOrg MyProj 123         [dim]# Add link to work item[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops resolve-field MyOrg MyProj Task \"Esfuerzo Real\"   [dim]# Print refname (cached for 24h)[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops refresh-fields MyOrg MyProj Task                  [dim]# Invalidate + re-warm cache[/]");
         Console.WriteLine();
     }
 }

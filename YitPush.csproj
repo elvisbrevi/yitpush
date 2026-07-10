@@ -12,7 +12,7 @@
 
     <!-- Package Metadata -->
     <PackageId>YitPush</PackageId>
-    <Version>2.2.2</Version>
+    <Version>2.3.0</Version>
     <Authors>Elvis Brevi</Authors>
     <Description>AI-powered git commit and PR description tool with multi-provider support (OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter) and full Azure DevOps management.</Description>
 
@@ -33,7 +33,9 @@
 
     <!-- Additional Metadata -->
     <Copyright>Copyright (c) 2026 Elvis Brevi</Copyright>
-    <PackageReleaseNotes>- Fixed --effort, --effort-real, and --task-titles flag parsing in azure-devops commands (values were silently ignored)
+    <PackageReleaseNotes>- Added `yp azure-devops resolve-field` and `yp azure-devops refresh-fields` subcommands for project-specific field refnames
+- AzDevOpsFieldRefNameResolver now persists to ~/.yitpush/field-cache.json with a 24h TTL, per (org, project, workItemType)
+- 11 new unit tests covering persistence, TTL, refresh, isolation, and error invalidation
 Full changelog: https://github.com/elvisbrevi/yitpush/blob/main/CHANGELOG.md</PackageReleaseNotes>
   </PropertyGroup>
 
