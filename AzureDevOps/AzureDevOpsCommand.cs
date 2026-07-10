@@ -151,7 +151,7 @@ partial class Program
             if (args.Length >= 4)
             {
                 var orgUrl = $"https://dev.azure.com/{args[2]}";
-                return await ShowWorkItemDetails(orgUrl, args[3]);
+                return await ShowWorkItemDetails(orgUrl, args[3], json: AzureDevOpsFlagParser.Parse(args).Json);
             }
 
             var result = await ListAzureUserStoriesForTaskList(); // Reuse list for selecting HU to show
@@ -163,7 +163,7 @@ partial class Program
             if (args.Length >= 4)
             {
                 var orgUrl = $"https://dev.azure.com/{args[2]}";
-                return await ShowWorkItemDetails(orgUrl, args[3]);
+                return await ShowWorkItemDetails(orgUrl, args[3], json: AzureDevOpsFlagParser.Parse(args).Json);
             }
 
             // For tasks, we usually go through HUs
@@ -194,7 +194,7 @@ partial class Program
                 var proj = args[3];
                 var huId = args[4];
                 var orgUrl = $"https://dev.azure.com/{org}";
-                return await ListTasksForHU(orgUrl, proj, proj, huId);
+                return await ListTasksForHU(orgUrl, proj, proj, huId, json: AzureDevOpsFlagParser.Parse(args).Json);
             }
             // Interactive mode: select HU first, then list tasks
             var result = await ListAzureUserStoriesForTaskList();
@@ -320,13 +320,13 @@ partial class Program
         table.AddRow("hu task", "Create tasks for a User Story");
         table.AddRow("hu task <org> <proj> <hu-id> [[--description|-d \"...\"]] [[--effort|-e \"...\"]] [[--task-titles|-t \"...\"]] [[--no-link|-n]] [[--repo <repo> --branch <branch>]]", "Create tasks (skip menus)");
         table.AddRow("hu show", "Show User Story details");
-        table.AddRow("hu show <org> <hu-id>", "Show details (skip menus)");
+        table.AddRow("hu show <org> <hu-id> --json", "Show details (skip menus) as a flat JSON object suitable for jq");
         table.AddRow("hu list", "List tasks of a User Story");
-        table.AddRow("hu list <org> <proj> <hu-id>", "List tasks (skip menus)");
+        table.AddRow("hu list <org> <proj> <hu-id> --json", "List tasks (skip menus) as JSON for jq '.value | length'");
         table.AddRow("hu link", "Link a repository branch to a User Story");
         table.AddRow("hu link <org> <proj> <hu-id> --repo <repo> --branch <branch>", "Link branch (skip menus)");
         table.AddRow("task show", "Show task details");
-        table.AddRow("task show <org> <id>", "Show details (skip menus)");
+        table.AddRow("task show <org> <id> --json", "Show details (skip menus) as a flat JSON object");
         table.AddRow("task update", "Update title, description, evidence, effort, remaining, state, comment or history (alias: hu update, wi update)");
         table.AddRow("task update <org> <id> [[--title <t>]] [[--description|-D <d>]] [[--evidence <e>]] [[--field <RefName=val>]] [[--effort|-e <e>]] [[--effort-real|-er <er>]] [[--remaining|-r <r>]] [[--state|-s <s>]] [[--comment|-c <c>]] [[--history <h>]]", "Update directly");
         table.AddRow("link", "Add link (branch/commit/PR) to work item");
@@ -338,16 +338,20 @@ partial class Program
 
         AnsiConsole.MarkupLine("\n[dim]Short flags for hu task: --description|-d, --effort|-e, --task-titles|-t, --no-link|-n[/]");
         AnsiConsole.MarkupLine("[dim]task update: --comment posts to Discussion; --history writes the legacy History field; --evidence resolves the 'Evidencias de finalización' field by name[/]");
+        AnsiConsole.MarkupLine("[dim]--json on hu/task show and hu list emits a flat JSON shape (no ANSI escapes) so it can be piped to jq[/]");
 
         AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu show MyOrg 12345           [dim]# Show HU info[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops hu show MyOrg 12345 --json    [dim]# Show HU info as JSON for jq[/]");
         AnsiConsole.MarkupLine("  yp azure-devops task show MyOrg 67890         [dim]# Show Task info[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops task show MyOrg 67890 --json  [dim]# Show Task info as JSON for jq[/]");
         AnsiConsole.MarkupLine("  yp azure-devops task update MyOrg 67890 --effort \"8\" --state \"Doing\"  [dim]# Update task[/]");
         AnsiConsole.MarkupLine("  yp azure-devops task update MyOrg 67890 --comment \"Fixed the bug\"     [dim]# Add comment[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu task MyOrg MyProj 123 --effort \"8\" -t \"Desarrollo, Pruebas\" -n  [dim]# Quick task, no linking[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu task MyOrg MyProj 123 --effort \"8\" --repo MyRepo --branch feature/123  [dim]# Auto-link branch to tasks[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu link MyOrg MyProj 123 --repo Repo --branch main  [dim]# Quick link[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu list MyOrg MyProj 123      [dim]# List tasks of HU[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops hu list MyOrg MyProj 123 --json | jq '.value | length'   [dim]# Count child tasks[/]");
         AnsiConsole.MarkupLine("  yp azure-devops link MyOrg MyProj 123         [dim]# Add link to work item[/]");
         AnsiConsole.MarkupLine("  yp azure-devops resolve-field MyOrg MyProj Task \"Esfuerzo Real\"   [dim]# Print refname (cached for 24h)[/]");
         AnsiConsole.MarkupLine("  yp azure-devops refresh-fields MyOrg MyProj Task                  [dim]# Invalidate + re-warm cache[/]");

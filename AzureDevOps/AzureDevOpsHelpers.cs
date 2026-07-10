@@ -558,7 +558,7 @@ partial class Program
         return await CreateTasksForUserStory(orgUrl, project, huId, areaPath, iterationPath, description, effort, taskTitles, noLink, fixedRepo, fixedBranch);
     }
 
-    private static async Task<int> ListTasksForHU(string orgUrl, string projectName, string projectId, string huId)
+    private static async Task<int> ListTasksForHU(string orgUrl, string projectName, string projectId, string huId, bool json = false)
     {
         string finalProjectId = projectId;
         // If projectId is not a UUID, fetch it
@@ -626,14 +626,21 @@ partial class Program
             tasks.Add((id, taskTitle, state));
         }
 
-        if (tasks.Count == 0)
+        // Sort tasks by ID DESC
+        var sortedTasks = tasks.OrderByDescending(t => int.TryParse(t.Id, out var id) ? id : 0).ToList();
+
+        if (json)
+        {
+            var payload = BuildTaskListJson(huId, sortedTasks);
+            Console.WriteLine(JsonSerializer.Serialize(payload, new JsonSerializerOptions { WriteIndented = false }));
+            return 0;
+        }
+
+        if (sortedTasks.Count == 0)
         {
             AnsiConsole.MarkupLine($"[yellow]No tasks found for HU {huId}.[/]");
             return 0;
         }
-
-        // Sort tasks by ID DESC
-        var sortedTasks = tasks.OrderByDescending(t => int.TryParse(t.Id, out var id) ? id : 0).ToList();
 
         foreach (var t in sortedTasks)
         {
@@ -645,6 +652,9 @@ partial class Program
             };
             AnsiConsole.MarkupLine($"  [{stateColor}]{t.Id}[/] {Markup.Escape(t.Title)} [dim]({Markup.Escape(t.State)})[/]");
         }
+
+        // Skip the interactive task picker when stdout is piped (e.g. `yp ... | jq ...`).
+        if (Console.IsOutputRedirected) return 0;
 
         while (true)
         {
@@ -1483,12 +1493,12 @@ partial class Program
 
     // ─── Process helpers ──────────────────────────────────────────────────────
 
-    private static async Task<int> ShowWorkItemDetails(string orgUrl, string id)
+    private static async Task<int> ShowWorkItemDetails(string orgUrl, string id, bool json = false)
     {
-        var (json, error) = await RunAzCaptureWithError(
+        var (jsonStr, error) = await RunAzCaptureWithError(
             $"boards work-item show --id {id} --expand relations --organization {orgUrl} --output json");
 
-        if (json == null)
+        if (jsonStr == null)
         {
             AnsiConsole.MarkupLine($"[red]❌ Work item {id} not found.[/]");
             if (!string.IsNullOrEmpty(error))
@@ -1498,8 +1508,16 @@ partial class Program
 
         try
         {
-            using var doc = JsonDocument.Parse(json);
+            using var doc = JsonDocument.Parse(jsonStr);
             var root = doc.RootElement;
+
+            if (json)
+            {
+                var flat = FlattenWorkItem(root);
+                Console.WriteLine(JsonSerializer.Serialize(flat, new JsonSerializerOptions { WriteIndented = false }));
+                return 0;
+            }
+
             var fields = root.GetProperty("fields");
 
             var type = fields.TryGetProperty("System.WorkItemType", out var typeProp) ? typeProp.GetString() : "Work Item";
@@ -1593,6 +1611,12 @@ partial class Program
             }
 
             AnsiConsole.WriteLine();
+
+            // Skip the interactive prompt when stdout is piped (e.g. `yp ... | jq ...`).
+            // AnsiConsole.Prompt would throw "Cannot show selection prompt since the current
+            // terminal isn't interactive", so just return success and let the consumer
+            // take the output as-is.
+            if (Console.IsOutputRedirected) return 0;
 
             var next = AnsiConsole.Prompt(
                 new SelectionPrompt<string>()

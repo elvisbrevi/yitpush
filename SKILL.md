@@ -136,6 +136,36 @@ Note: `--comment` posts a discussion comment; `--history` writes the legacy Hist
 
 ---
 
+## Global Flags
+
+```
+yp --version    # prints the assembly version (e.g. "2.3.0") and exits 0
+yp -V           # short alias
+yp --help       # prints the help table
+```
+
+These work without a subcommand. `yp --version` is intended for scripts and CI; its output has no ANSI escapes.
+
+---
+
+## Stable JSON Output
+
+`hu show`, `task show`, and `hu list` accept a `--json` flag that emits a flat JSON object on stdout instead of a Spectre.Console table. The shape is stable enough to pipe to `jq`:
+
+```bash
+yp azure-devops hu show MyOrg 12345 --json | jq '.title'
+yp azure-devops task show MyOrg 67890 --json | jq '.state'
+yp azure-devops hu list MyOrg MyProj 12345 --json | jq '.value | length'
+```
+
+`hu show` / `task show` emit a single flat object with `id`, `type`, `title`, `state`, `assignedTo`, `createdDate`, `areaPath`, `iterationPath`, `effort`, `effortReal`, `remaining`, `month`, `urlCommit`, `description`, and (when present) `relations`. Unknown custom fields are passed through with their full refname (e.g. `Custom.Foo`).
+
+`hu list` emits `{"huId": "...", "value": [{id, title, state}, ...]}` so `jq '.value | length'` returns the number of child tasks.
+
+When stdout is piped, the interactive follow-up prompt at the end of `hu show` / `hu list` is automatically skipped, so non-interactive invocations never crash with the Spectre "isn't interactive" error.
+
+---
+
 ## Usage Instructions for Gemini CLI
 
 When the user asks you to:
@@ -144,7 +174,7 @@ When the user asks you to:
 - **"commit and let me review"** → run `yp commit --confirm`
 - **"generate a PR description"** → run `yp pr`
 - **"switch branch"** → run `yp checkout`
-- **"show user story 12345"** → run `yp azure-devops hu show <org> 12345`
+- **"show user story 12345"** → run `yp azure-devops hu show <org> 12345`; append `--json` when the user wants machine-readable output
 - **"update task 67890 state to Doing"** → run `yp azure-devops task update <org> 67890 --state "Doing"`
 - **"configure AI provider"** → run `yp setup`
 - **"install the yp skill"** → run `yp skill`
@@ -152,6 +182,7 @@ When the user asks you to:
 - **"create a new repo"** → run `yp azure-devops repo new`
 - **"clone a repo"** → run `yp azure-devops repo checkout`
 - **"link a branch to work item 67890"** → run `yp azure-devops link <org> <proj> 67890`
+- **"what version of yp is installed"** → run `yp --version`
 
 ## Notes
 

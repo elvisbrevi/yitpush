@@ -33,9 +33,10 @@
 
     <!-- Additional Metadata -->
     <Copyright>Copyright (c) 2026 Elvis Brevi</Copyright>
-    <PackageReleaseNotes>- Added `yp azure-devops resolve-field` and `yp azure-devops refresh-fields` subcommands for project-specific field refnames
-- AzDevOpsFieldRefNameResolver now persists to ~/.yitpush/field-cache.json with a 24h TTL, per (org, project, workItemType)
-- 11 new unit tests covering persistence, TTL, refresh, isolation, and error invalidation
+    <PackageReleaseNotes>- Added `yp --version` / `yp -V` global flag (prints "2.3.0" on stdout, exit 0, no ANSI escapes)
+- Added `--json` flag to `hu show`, `task show`, and `hu list` — emits a flat JSON object suitable for piping to `jq`
+- Fixed Spectre.Console crash on `hu show` / `hu list` when stdout is redirected (the trailing interactive prompt is now auto-skipped in non-interactive contexts)
+- 16 new unit tests covering the version helper, JSON shape, and `--json` flag parsing
 Full changelog: https://github.com/elvisbrevi/yitpush/blob/main/CHANGELOG.md</PackageReleaseNotes>
   </PropertyGroup>
 

@@ -33,17 +33,25 @@ partial class Program
         }
         catch { }
 
-        Console.WriteLine();
-
         // Start version check in background — won't block the main command
         var versionCheckTask = Task.Run(CheckForUpdates);
 
         if (args.Length == 0 || args[0] is "--help" or "-h" or "-help" or "help")
         {
+            Console.WriteLine();
             ShowHelp();
             await versionCheckTask;
             return 0;
         }
+
+        if (args[0] is "--version" or "-V")
+        {
+            Console.WriteLine(GetInformationalVersion());
+            await versionCheckTask;
+            return 0;
+        }
+
+        Console.WriteLine();
 
         int result;
         switch (args[0])
@@ -70,6 +78,17 @@ partial class Program
         return result;
     }
 
+    // ─── Version ───────────────────────────────────────────────────────────────
+
+    internal static string GetInformationalVersion()
+    {
+        var raw = Assembly.GetEntryAssembly()
+            ?.GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion ?? "0.0.0";
+
+        return raw.Split('+')[0];
+    }
+
     // ─── Help ─────────────────────────────────────────────────────────────────
 
     private static void ShowHelp()
@@ -91,6 +110,10 @@ partial class Program
         commandsTable.AddRow("skill", "Install the yp skill for your AI agent (Claude Code, Cursor, Gemini CLI...)");
 
         AnsiConsole.Write(commandsTable);
+
+        AnsiConsole.MarkupLine("\n[bold cyan]Global flags[/] (work without a subcommand):");
+        AnsiConsole.MarkupLine("  [cyan]--version, -V[/]  Print the assembly version and exit 0");
+        AnsiConsole.MarkupLine("  [cyan]--help, -h[/]     Show this help");
 
         AnsiConsole.MarkupLine("\n[bold cyan]commit[/] options:");
         var commitTable = new Table()

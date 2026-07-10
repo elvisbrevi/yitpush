@@ -14,11 +14,37 @@ This document is the contract between an agent and `yp`: pick the right command 
 
 Before running any `yp` command, confirm three things in this order. If any check fails, fix it before continuing.
 
-1. **`yp` is installed.** Run `yp --help`. If the binary is missing, install with `dotnet tool install -g YitPush` (requires .NET 10 SDK or runtime).
+1. **`yp` is installed.** Run `yp --version` to check. If the binary is missing, install with `dotnet tool install -g YitPush` (requires .NET 10 SDK or runtime).
 2. **An AI provider is configured** (only required for `commit` and `pr`). Look for `~/.yitpush/config.json`, or one of the env vars `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`. If none are present, run `yp setup`.
 3. **Azure CLI is logged in** (only for `azure-devops` subcommands). `az account show` must succeed; `yp` will install the `azure-devops` extension and prompt for login if not.
 
 Skip the checks the user has clearly already passed (e.g. they just successfully ran `yp commit` two messages ago).
+
+## Global flags
+
+```bash
+yp --version    # prints the assembly version (e.g. "2.3.0") and exits 0; no ANSI escapes
+yp -V           # short alias
+yp --help       # prints the help table
+```
+
+`--version` is intended for scripts and CI. Use it instead of `yp --help | head -1` to detect the installed version.
+
+## Stable JSON output
+
+`hu show`, `task show`, and `hu list` accept a `--json` flag that emits a flat JSON object on stdout instead of a Spectre.Console table. The shape is stable enough to pipe to `jq` without ANSI-escape scrubbing:
+
+```bash
+yp azure-devops hu show MyOrg 12345 --json | jq '.title'
+yp azure-devops task show MyOrg 67890 --json | jq '.state'
+yp azure-devops hu list MyOrg MyProj 12345 --json | jq '.value | length'
+```
+
+`hu show` / `task show` emit a single flat object with `id`, `type`, `title`, `state`, `assignedTo`, `createdDate`, `areaPath`, `iterationPath`, `effort`, `effortReal`, `remaining`, `month`, `urlCommit`, `description`, and (when present) `relations`. Unknown custom fields are passed through with their full refname (e.g. `Custom.Foo`).
+
+`hu list` emits `{"huId": "...", "value": [{id, title, state}, ...]}` so `jq '.value | length'` returns the number of child tasks.
+
+When stdout is piped (e.g. `| jq`), the interactive follow-up prompt at the end of `hu show` / `hu list` is automatically skipped, so non-interactive invocations never crash with the Spectre "isn't interactive" error.
 
 ## Git workflows
 
@@ -83,18 +109,20 @@ Convention: `<org>` is the Azure DevOps organization name (the path segment afte
 ### User stories (HU)
 
 ```bash
-yp azure-devops hu show <org> <hu-id>                                  # details + links
-yp azure-devops hu list <org> <project> <hu-id>                        # list child tasks
+yp azure-devops hu show <org> <hu-id> [--json]                         # details + links; --json for machine-readable output
+yp azure-devops hu list <org> <project> <hu-id> [--json]               # list child tasks; --json emits {huId, value:[...]}
 yp azure-devops hu task <org> <project> <hu-id> [--description|-d "..."] [--effort|-e "4"] [--task-titles|-t "Desarrollo, Pruebas Unitarias, Code Review"] [[--no-link|-n]] [[--repo <repo> --branch <branch>]]
 yp azure-devops hu link <org> <project> <hu-id> --repo <repo> --branch <branch>
 ```
 
 `hu task` without positional args opens an interactive HU picker; the picker also offers extra interactive-only actions ("Create branch for this HU" — generates `feature/<id>-<title>` — and "Mark as In Progress").
 
+Append `--json` to `hu show` / `hu list` whenever the caller (an agent, a script, or `jq`) needs structured output without ANSI escapes. Piping to `jq` is the canonical use case.
+
 ### Tasks
 
 ```bash
-yp azure-devops task show <org> <task-id>
+yp azure-devops task show <org> <task-id> [--json]                     # details; --json for machine-readable output
 yp azure-devops task update <org> <task-id> [flags]
 ```
 
@@ -155,11 +183,15 @@ Map intent → command. If a row matches the user's request, run that command. S
 | Switch / change git branch | `yp checkout` |
 | Configure or change AI provider | `yp setup` |
 | Install the yp skill in my agent | `yp skill` |
+| Print the installed version (scriptable) | `yp --version` |
 | Show user story <id> | `yp azure-devops hu show <org> <id>` |
+| Show user story <id> as JSON for `jq` | `yp azure-devops hu show <org> <id> --json` |
 | List tasks of user story <id> | `yp azure-devops hu list <org> <project> <id>` |
+| Count child tasks of a user story | `yp azure-devops hu list <org> <project> <id> --json \| jq '.value \| length'` |
 | Create tasks for user story <id> | `yp azure-devops hu task <org> <project> <id> [-d "..."] [-e "..."] [-t "title1,title2,..."] [-n] [--repo <r> --branch <b>]` |
 | Link branch to user story <id> | `yp azure-devops hu link <org> <project> <id> --repo <r> --branch <b>` |
 | Show task <id> | `yp azure-devops task show <org> <id>` |
+| Show task <id> as JSON for `jq` | `yp azure-devops task show <org> <id> --json` |
 | Update task state | `yp azure-devops task update <org> <id> --state "Doing"` |
 | Update task effort/remaining/effort-real | `yp azure-devops task update <org> <id> --effort "8" --remaining "2" --effort-real "10"` |
 | Add a comment to a task | `yp azure-devops task update <org> <id> --comment "<text>"` |
