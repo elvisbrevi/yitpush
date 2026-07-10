@@ -23,23 +23,36 @@ This file is a human-readable reference. The machine-readable skill follows belo
 Stages all changes, generates an AI commit message, commits and pushes.
 
 ```
-yp commit [--confirm] [--detailed] [--language <lang>] [--save]
+yp commit [flags]
+yp commit --amend [flags]
 ```
 
-**When to use**: User wants to commit and push changes with an AI-generated message.
+**When to use**: User wants to commit and push changes with an AI-generated message. With `--amend`, the AI re-runs against `git diff HEAD~1` and rewrites the last commit (no push).
 
 **Parameters**:
 - `--confirm` — pause and ask user to approve the message before committing
 - `--detailed` — generate a commit with a subject line + body paragraph
 - `--language <lang>` / `-l <lang>` — language for the output (e.g., spanish, french, portuguese)
 - `--save` — write the commit message to a `.md` file in the current directory
+- `--conventional` — format the message as a Conventional Commits `<type>(<scope>)?!?: <subject>` (optionally with a `BREAKING CHANGE:` footer)
+- `--type <feat|fix|chore|refactor|docs|test|perf|build|ci|style>` — force the Conventional Commits type (overrides the AI's inference)
+- `--scope <scope>` — force the Conventional Commits scope (e.g. `api`, `wcf`)
+- `--detect-breaking` — scan the diff for breaking changes (removed public symbol in C#, removed export in TS/JS, JSON major-version bump, `#major.bump` markers) and feed them into the AI prompt; with `--conventional` the first detected marker is also appended as a `BREAKING CHANGE:` footer
+- `--amend` — regenerate the last commit's message via `git commit --amend`; skips the working-tree flow and does NOT push
+- `--template <path-to-md>` — render the AI output through a Handlebars-ish template (`{{type}}`, `{{scope}}`, `{{subject}}`, `{{body}}`, `{{refs}}`); missing variables resolve to an empty string, malformed tokens (`{{1abc}}`, `{{a.b}}`, `{{}}`) are left untouched; the tool exits `6` when the file is missing
 
 **Examples**:
 ```bash
 yp commit
 yp commit --confirm
 yp commit --detailed -l spanish
+yp commit --conventional --type feat --scope wcf
+yp commit --conventional --detect-breaking
+yp commit --amend
+yp commit --template ~/.yitpush/commit-template.md
 ```
+
+The default commit format can also be set per project in `~/.yitpush/config.json` under the new `"commitFormat"` key (`"conventional"`, `"plain"`, `"gitmoji"`, or a template file path). An explicit `--conventional` or `--template` flag on a single invocation overrides the stored default.
 
 ---
 

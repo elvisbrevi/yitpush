@@ -122,14 +122,18 @@ When stdout is piped, the trailing interactive prompt is automatically skipped, 
 The `NVIDIA_API_KEY` environment variable overrides the stored API key for the NVIDIA NIM provider (same convention as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.).
 
 ### 📝 Smart Commits
-`yp commit` analyzes your staged changes and generates a professional commit message.
+`yp commit` analyzes your staged changes and generates a professional commit message. With `--conventional` the output follows the `<type>(<scope>)?!?: <subject>` format; with `--amend` the last commit is rewritten in place from `git diff HEAD~1`.
 
 ```bash
-yp commit                          # Auto commit and push
-yp commit --confirm                # Review before committing
-yp commit --detailed               # Generate title + body
-yp commit --language spanish       # Output in Spanish
-yp commit -l french                # Short flag for language
+yp commit                                # Auto commit and push
+yp commit --confirm                      # Review before committing
+yp commit --detailed                     # Generate title + body
+yp commit --language spanish             # Output in Spanish
+yp commit -l french                      # Short flag for language
+yp commit --conventional --type feat --scope wcf           # Conventional Commits, forced type/scope
+yp commit --conventional --detect-breaking                # Conventional + scan diff for breaking changes
+yp commit --amend                        # Regenerate last commit's message (no push)
+yp commit --template ~/.yitpush/commit.md                 # Render output through a custom template
 ```
 
 | Flag | Description |
@@ -138,6 +142,14 @@ yp commit -l french                # Short flag for language
 | `--detailed` | Generate detailed commit with title + body |
 | `--language <lang>`, `--lang`, `-l` | Output language (default: english) |
 | `--save` | Save commit message to a markdown file |
+| `--conventional` | Format as Conventional Commits `<type>(<scope>)?!?: <subject>` (with optional `BREAKING CHANGE:` footer) |
+| `--type <feat\|fix\|chore\|refactor\|docs\|test\|perf\|build\|ci\|style>` | Force the Conventional Commits type (overrides AI inference) |
+| `--scope <scope>` | Force the Conventional Commits scope (e.g. `api`, `wcf`) |
+| `--detect-breaking` | Scan the diff for breaking changes (removed C# public symbol, removed TS/JS export, JSON major bump, `#major.bump` marker) and feed them to the AI / append as footer |
+| `--amend` | Regenerate the LAST commit's message from `git diff HEAD~1` via `git commit --amend` — no `git add`, no push |
+| `--template <path-to-md>` | Render the AI output through a Handlebars-ish template (`{{type}}`, `{{scope}}`, `{{subject}}`, `{{body}}`, `{{refs}}`); exits 6 if the file is missing |
+
+The default commit format can also be set per project in `~/.yitpush/config.json` under the `"commitFormat"` key (`"conventional"`, `"plain"`, `"gitmoji"`, or a path to a template file). An explicit `--conventional` or `--template` flag on a single invocation overrides the stored default.
 
 ### 📋 Pull Request Descriptions
 `yp pr` interactively selects two branches and generates a ready-to-paste PR description.
