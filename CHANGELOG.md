@@ -9,7 +9,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.3.0] - 2026-07-10
 
+### Changed
+- **`yp azure-devops hu task` default is now 1 task** (was 3). The legacy trio (Desarrollo / Pruebas Unitarias / Code Review) is preserved as an opt-in via the new `--trio` flag or by passing `--task-titles "Desarrollo,Pruebas Unitarias,Code Review"`. Title precedence in single-task mode: `--title` > `taskTitles[0]` > `"Desarrollo"`. Projects that were relying on the implicit trio need to add `--trio` to their commands or scripts. Resolves #6.
+- **`AzureDevOpsFlagParser.Parse(args)` is now the single source of truth** for all Azure DevOps flag parsing. The duplicated manual parser that lived at the top of `AzureDevOpsCommand.cs` is gone. `--description`/`-d`, `--no-link`/`-n`, `--effort`/`-e`, `--effort-real`/`-er`, `--remaining`/`-r`, `--state`/`-s`, `--comment`/`-c`, `--task-titles`/`-t`, `--repo`, `--branch` are all parsed by the same function used by `task update` / `hu show` / `hu list` / `task show`. This eliminates the "Quick mode ignores --task-titles" class of bugs.
+
 ### Added
+- **`--title <text>`** flag on `yp azure-devops hu task` — patches the single task with the provided title. Highest precedence; overrides `--task-titles` and `--trio`.
+- **`--trio`** flag on `yp azure-devops hu task` — restores the legacy three-task default (Desarrollo / Pruebas Unitarias / Code Review). Mutually exclusive with `--task-titles` (combined use exits 5).
+- **22 new xUnit tests** — `HuTaskPlanTests` (8, covering the new plan computation: single, trio, custom, conflict, whitespace stripping, override precedence) and 14 new cases in `AzureDevOpsFlagParserTests` (all the new flags: --title, -d, -D, -e, -er, -r, -s, -c, -n, --no-link, --repo, --branch, -t, --trio). Total test count: 64 (was 42).
 - **`yp azure-devops resolve-field <org> <project> <workItemType> <displayName>`** — prints the refname for a work item field by its display name (e.g. `Custom.EsfuerzoReal` for "Esfuerzo Real" in "Soluciones Transversales"). Exits `3` with a clear error when the field is unknown. Uses the disk-persisted cache so the second call is instant.
 - **`yp azure-devops refresh-fields <org> <project> <workItemType>`** — invalidates the cache for the given `(org, project, workItemType)` triple and re-warms it with a fresh REST call.
 - **`AzDevOpsFieldRefNameResolver.ResolveByDisplayNameAsync`** — generic, project-aware lookup that fetches `GET /_apis/wit/workitemtypes/{type}/fields?api-version=7.0` once and resolves any number of display names from the cached map.

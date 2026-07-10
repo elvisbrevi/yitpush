@@ -152,8 +152,8 @@ partial class Program
         azTable.AddRow("repo new", "Create a new repository interactively");
         azTable.AddRow("repo checkout", "Clone a repository interactively");
         azTable.AddRow("variable-group list", "List and inspect variable groups");
-        azTable.AddRow("hu task", "Create tasks for a User Story");
-        azTable.AddRow("hu task <org> <proj> <hu-id> [[--description \"...\"]] [[--effort \"...\"]]", "Create tasks (skip menus)");
+        azTable.AddRow("hu task", "Create tasks for a User Story (1 by default, --trio for legacy trio)");
+        azTable.AddRow("hu task <org> <proj> <hu-id> [[--title <t>]] [[--description|-d \"...\"]] [[--effort|-e \"...\"]] [[--trio]] [[--no-link|-n]]", "Create tasks (skip menus)");
         azTable.AddRow("hu show", "Show User Story details");
         azTable.AddRow("hu show <org> <hu-id>", "Show details (skip menus)");
         azTable.AddRow("hu list", "List tasks of a User Story");
@@ -169,7 +169,7 @@ partial class Program
 
         AnsiConsole.Write(azTable);
 
-        AnsiConsole.MarkupLine("\n[dim]Short flags for hu task: --description|-d, --effort|-e, --task-titles|-t, --no-link|-n[/]");
+        AnsiConsole.MarkupLine("\n[dim]Short flags for hu task: --title, --description|-d|-D, --effort|-e, --trio, --task-titles|-t, --no-link|-n. Default: 1 task (title 'Desarrollo'). --trio restores the legacy trio.[/]");
 
         AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
         AnsiConsole.MarkupLine("  yp setup                                        [dim]# Configure AI provider[/]");
