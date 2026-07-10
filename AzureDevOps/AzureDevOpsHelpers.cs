@@ -1754,7 +1754,7 @@ partial class Program
                     if (!string.IsNullOrEmpty(evidence))
                     {
                         var resolver = new AzDevOpsFieldRefNameResolver(http);
-                        evidenceRefName = await resolver.ResolveAsync(
+                        evidenceRefName = await resolver.ResolveByDisplayNameAsync(
                             orgUrl, project, workItemType ?? "Task", AzFieldEvidenceDisplay);
                     }
                 }
@@ -2166,4 +2166,56 @@ partial class Program
 
     private static string EscapeJson(string s) =>
         s.Replace("\\", "\\\\").Replace("\"", "\\\"").Replace("\n", "\\n").Replace("\r", "\\r").Replace("\t", "\\t");
+
+    internal static async Task<int> ResolveFieldCli(
+        string org, string project, string workItemType, string displayName)
+    {
+        var orgUrl = $"https://dev.azure.com/{org}";
+        var token = await GetAzureAccessToken();
+        if (token == null)
+        {
+            AnsiConsole.MarkupLine("[red]❌ Failed to get Azure access token. Run `az login` first.[/]");
+            return 1;
+        }
+
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ApiTimeoutSeconds) };
+        http.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+
+        var resolver = new AzDevOpsFieldRefNameResolver(http);
+        var refname = await resolver.ResolveByDisplayNameAsync(orgUrl, project, workItemType, displayName);
+
+        if (refname == null)
+        {
+            AnsiConsole.MarkupLine(
+                $"[red]❌ Field '[bold]{Markup.Escape(displayName)}[/]' not found on work item type " +
+                $"'[bold]{Markup.Escape(workItemType)}[/]' in project '[bold]{Markup.Escape(project)}[/]' " +
+                $"(org '[bold]{Markup.Escape(org)}[/]').[/]");
+            return 3;
+        }
+
+        Console.WriteLine(refname);
+        return 0;
+    }
+
+    internal static async Task<int> RefreshFieldsCli(string org, string project, string workItemType)
+    {
+        var orgUrl = $"https://dev.azure.com/{org}";
+        var token = await GetAzureAccessToken();
+        if (token == null)
+        {
+            AnsiConsole.MarkupLine("[red]❌ Failed to get Azure access token. Run `az login` first.[/]");
+            return 1;
+        }
+
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ApiTimeoutSeconds) };
+        http.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+
+        var resolver = new AzDevOpsFieldRefNameResolver(http);
+        await resolver.RefreshAsync(orgUrl, project, workItemType);
+
+        AnsiConsole.MarkupLine(
+            $"[green]✅ Refreshed field cache for [bold]{Markup.Escape(project)}[/] / " +
+            $"[bold]{Markup.Escape(workItemType)}[/] (org '[bold]{Markup.Escape(org)}[/]').[/]");
+        return 0;
+    }
 }
