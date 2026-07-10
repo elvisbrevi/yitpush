@@ -151,7 +151,7 @@ yp azure-devops [subcommand] [args] [flags]
 | `hu link [<org> <proj> <hu-id>]` | Link a branch to a User Story |
 | `task show [<org> <id>]` | Show task details |
 | `task update [<org> <id>]` | Update task fields |
-| `link [<org> <proj> <wi-id>]` | Add a link to a work item |
+| `link [<org> <proj> <wi-id>]` | Add a link to a work item (supports `--repo <r> --branch <b>` quick mode for both HUs and Tasks; writes `Custom.URLCommit` as fallback for Tasks) |
 
 #### task update flags
 
@@ -172,6 +172,13 @@ yp azure-devops [subcommand] [args] [flags]
 | `--description <text>` | Task description |
 | `--effort <val>` | Effort estimate |
 
+#### link flags (issue #9, works for HUs and Tasks)
+
+| Flag | Description |
+|------|-------------|
+| `--repo <name>` | Repository name (with `--branch` skips the menu) |
+| `--branch <name>` | Branch name (with `--repo` skips the menu) |
+
 Examples:
 ```bash
 yp azure-devops hu show MyOrg 12345
@@ -179,6 +186,7 @@ yp azure-devops hu list MyOrg MyProj 12345
 yp azure-devops task update MyOrg 67890 --state "Doing" --effort-real "3"
 yp azure-devops task update MyOrg 67890 --comment "Fixed the issue"
 yp azure-devops hu link MyOrg MyProj 12345 --repo MyRepo --branch feature/abc
+yp azure-devops link MyOrg MyProj 67890 --repo MyRepo --branch feature/abc   # quick mode for any work item (issue #9)
 yp azure-devops hu task MyOrg MyProj 12345 --description "Backend task" --effort "4"
 ```
 

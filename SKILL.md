@@ -129,10 +129,11 @@ yp azure-devops [subcommand] [args] [flags]
 | `task update <org> <id> [flags]` | Update task fields (alias: `hu update`, `wi update`) |
 | `task delete <org> <id> [--yes\|-y]` | Move work item to the recycle bin (prompts by default; pass `--yes` in CI) |
 | `task attach <org> <project> <id> <file-path> [--comment <text>]` | Upload a local file as an `AttachedFile` relation on the work item |
-| `link <org> <proj> <id>` | Add a link (branch/commit/PR) to any work item |
+| `link <org> <proj> <id> [--repo <r> --branch <b>]` | Add a link (branch/commit/PR) to any work item; `--repo` + `--branch` skip the menus and create the ArtifactLink in quick mode (same as `hu link`) |
 
 **task update flags**: `--title`, `--description|-D`, `--evidence`, `--field <RefName=val>`, `--effort|-e`, `--effort-real|-er`, `--remaining|-r`, `--state|-s`, `--comment|-c`, `--assigned-to <upn|display-name|"">`, `--history`
 **hu link flags**: `--repo`, `--branch`
+**link flags**: `--repo`, `--branch` (when both are provided the interactive menu is skipped, matching `hu link` quick mode; the `Custom.URLCommit` field is also written as a navigation fallback for legacy `az` scripts)
 
 Note: `--comment` posts a discussion comment; `--history` writes the legacy History field; `--assigned-to` resolves UPN or display name against the project's identity store (multiple matches exit 4 with a candidate list, empty string clears the assignment).
 
@@ -183,7 +184,7 @@ When the user asks you to:
 - **"list variable groups"** → run `yp azure-devops variable-group list`
 - **"create a new repo"** → run `yp azure-devops repo new`
 - **"clone a repo"** → run `yp azure-devops repo checkout`
-- **"link a branch to work item 67890"** → run `yp azure-devops link <org> <proj> 67890`
+- **"link a branch to work item 67890"** → run `yp azure-devops link <org> <proj> 67890`; add `--repo <r> --branch <b>` to skip the menus (quick mode)
 - **"what version of yp is installed"** → run `yp --version`
 
 ## Notes

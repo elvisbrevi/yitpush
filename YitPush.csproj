@@ -37,7 +37,8 @@
 - Added `yp --version` / `yp -V` global flag (prints "2.3.0" on stdout, exit 0, no ANSI escapes)
 - Added `--json` flag to `hu show`, `task show`, and `hu list` — emits a flat JSON object suitable for piping to `jq`
 - Fixed Spectre.Console crash on `hu show` / `hu list` when stdout is redirected (the trailing interactive prompt is now auto-skipped in non-interactive contexts)
-- 15 new unit tests (8 identity-resolver, 4 structured-ops builder, 3 flag parser)
+- `yp azure-devops link &lt;org&gt; &lt;proj&gt; &lt;id&gt; --repo &lt;r&gt; --branch &lt;b&gt;` now honors quick mode for both HUs and Tasks (issue #9). Both flags together skip the interactive menu and create the ArtifactLink directly. For Tasks, the `Custom.URLCommit` field is also written as a legacy fallback (no-op if the field doesn't exist).
+- 22 new unit tests in `AddLinkToRepoHelpersTests` (URL construction, menu-skip predicate, repo lookup, JSON-Patch body builder, link route end-to-end flag parsing)
 Full changelog: https://github.com/elvisbrevi/yitpush/blob/main/CHANGELOG.md</PackageReleaseNotes>
   </PropertyGroup>
 

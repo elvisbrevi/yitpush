@@ -854,7 +854,7 @@ partial class Program
         (string Name, string RemoteUrl, string Id)? selectedRepo = null;
         if (!string.IsNullOrEmpty(fixedRepo))
         {
-            selectedRepo = repos.FirstOrDefault(r => string.Equals(r.Name, fixedRepo, StringComparison.OrdinalIgnoreCase));
+            selectedRepo = AddLinkToRepoHelpers.FindRepoByName(repos, fixedRepo);
             if (selectedRepo == null)
             {
                 AnsiConsole.MarkupLine($"[red]❌ Repository '{fixedRepo}' not found.[/]");
@@ -883,9 +883,13 @@ partial class Program
 
         if (!string.IsNullOrEmpty(fixedBranch))
         {
-            relationTypeHint = "Branch";
-            artifactUrl = $"vstfs:///Git/Ref/{finalProjectId}/{selectedRepo.Value.Id}/GB{Uri.EscapeDataString(fixedBranch)}";
-            webUrl = $"{orgUrl}/{Uri.EscapeDataString(finalProjectName)}/_git/{Uri.EscapeDataString(selectedRepo.Value.Name)}?version=GB{Uri.EscapeDataString(fixedBranch)}";
+            var link = AddLinkToRepoHelpers.BuildBranchLinkArtifact(
+                orgUrl, finalProjectId, finalProjectName,
+                selectedRepo.Value.Id, selectedRepo.Value.Name, fixedBranch);
+            relationTypeHint = link.RelationTypeHint;
+            artifactUrl = link.ArtifactUrl;
+            webUrl = link.WebUrl;
+            branchToLink = link.BranchToLink;
         }
         else
         {
@@ -980,7 +984,7 @@ partial class Program
         var restUri = string.Format("{0}/_apis/wit/workitems/{1}?api-version=6.0", orgUrl, workItemId);
 
         // Build JSON Patch body. Note: name attribute is REQUIRED for technical links to show in 'Development'
-        var body = string.Format("[{{\"op\": \"add\", \"path\": \"/relations/-\", \"value\": {{\"rel\": \"ArtifactLink\", \"url\": \"{0}\", \"attributes\": {{\"name\": \"{1}\"}} }} }}]", artifactUrl, relationTypeHint);
+        var body = AddLinkToRepoHelpers.BuildArtifactLinkPatchBody(artifactUrl, relationTypeHint);
 
         // For 'az rest', the body needs to be escaped for the shell
         var escapedBodyForShell = body.Replace("\"", "\\\"");
