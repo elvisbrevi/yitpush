@@ -5,7 +5,8 @@ internal record AzureDevOpsFlagParser(
     string? Description,
     string? Evidence,
     string? History,
-    IReadOnlyList<string> ExtraFields)
+    IReadOnlyList<string> ExtraFields,
+    bool Json = false)
 {
     public static AzureDevOpsFlagParser Parse(string[] args)
     {
@@ -14,6 +15,7 @@ internal record AzureDevOpsFlagParser(
         string? evidence = null;
         string? history = null;
         var extraFields = new List<string>();
+        bool json = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -37,8 +39,12 @@ internal record AzureDevOpsFlagParser(
             {
                 extraFields.Add(args[i + 1]);
             }
+            if (args[i] == "--json")
+            {
+                json = true;
+            }
         }
 
-        return new AzureDevOpsFlagParser(title, description, evidence, history, extraFields);
+        return new AzureDevOpsFlagParser(title, description, evidence, history, extraFields, json);
     }
 }

@@ -57,4 +57,22 @@ public class AzureDevOpsFlagParserTests
 
         Assert.Equal(new[] { "System.Tags=foo", "System.AssignedTo=bar" }, result.ExtraFields);
     }
+
+    [Fact]
+    public void Parse_sets_Json_true_when_json_flag_provided()
+    {
+        var result = AzureDevOpsFlagParser.Parse(
+            new[] { "hu", "show", "--json" });
+
+        Assert.True(result.Json);
+    }
+
+    [Fact]
+    public void Parse_sets_Json_false_when_json_flag_missing()
+    {
+        var result = AzureDevOpsFlagParser.Parse(
+            new[] { "hu", "show" });
+
+        Assert.False(result.Json);
+    }
 }

@@ -74,6 +74,7 @@ export OPENROUTER_API_KEY='...'
 | `yp commit` | Stage, commit and push with an AI-generated message |
 | `yp checkout` | Interactive branch checkout |
 | `yp pr` | Generate a pull request description between two branches |
+| `yp --version` / `yp -V` | Print the assembly version (e.g. `2.3.0`) and exit 0 — safe to pipe |
 
 ### Azure DevOps Commands
 | Command | Description |
@@ -89,6 +90,17 @@ export OPENROUTER_API_KEY='...'
 | `yp azure-devops task update` | Update task fields (effort, state, comments) |
 | `yp azure-devops hu link` | Link a repository branch to a User Story |
 | `yp azure-devops link` | Add a link (branch/commit/PR) to any work item |
+
+#### 🧰 Stable Output for Agents and Scripts
+The `hu show`, `task show`, and `hu list` commands accept a `--json` flag that emits a flat JSON object on stdout (no ANSI escapes), so the output is safe to pipe into `jq`:
+
+```bash
+yp azure-devops hu show MyOrg 12345 --json | jq '.title'
+yp azure-devops task show MyOrg 67890 --json | jq '.state'
+yp azure-devops hu list MyOrg MyProj 12345 --json | jq '.value | length'
+```
+
+When stdout is piped, the trailing interactive prompt is automatically skipped, so `yp ... | jq ...` never crashes with the Spectre "isn't interactive" error.
 
 ## 🚀 Detailed Features
 

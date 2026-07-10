@@ -15,7 +15,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`AzDevOpsFieldRefNameResolver.ResolveByDisplayNameAsync`** — generic, project-aware lookup that fetches `GET /_apis/wit/workitemtypes/{type}/fields?api-version=7.0` once and resolves any number of display names from the cached map.
 - **`AzDevOpsFieldRefNameResolver.RefreshAsync`** — clears the in-memory + on-disk cache for a triple and re-warms it on demand.
 - **Persistent field cache** at `~/.yitpush/field-cache.json` (24h TTL, same pattern as `models-cache.json`). Cached entries are isolated per `(org, project, workItemType)`. API errors (e.g. `TF51535`) invalidate the entry instead of caching an empty result, so transient issues self-heal on the next call.
+- **`yp --version` / `yp -V`** — prints the assembly version (`2.3.0`) on stdout with no ANSI escapes, exits `0`. Intended for scripts and CI.
+- **`--json` flag on `hu show`, `hu list`, `task show`** — emits a stable, flat JSON object on stdout (no Spectre.Console ANSI codes) so agents and scripts can pipe to `jq`:
+  ```bash
+  yp azure-devops hu show MyOrg 12345 --json | jq '.title'
+  yp azure-devops hu list MyOrg MyProj 12345 --json | jq '.value | length'
+  ```
+  `hu show` / `task show` return `{id, type, title, state, assignedTo, createdDate, areaPath, iterationPath, effort, effortReal, remaining, month, urlCommit, description, relations?}`. Unknown custom fields pass through with their full refname. `hu list` returns `{huId, value: [{id, title, state}, ...]}`.
+- **Non-interactive safety** for `hu show` / `hu list` — when stdout is piped (`| jq`, redirected to a file, etc.) the trailing `AnsiConsole.Prompt(...)` is skipped automatically, so non-interactive invocations never crash with the Spectre "isn't interactive" error.
 - **11 new unit tests** in `tests/YitPush.Tests/AzDevOpsFieldRefNameResolverTests.cs` (8 covering the new persistence / TTL / refresh / isolation / error behaviors, plus 3 updated existing tests). No live API calls in CI.
+- **16 new unit tests** for the stable-output work — `InformationalVersionTests` (3), `FlattenWorkItemTests` (6), `BuildTaskListJsonTests` (5), plus 2 new cases in `AzureDevOpsFlagParserTests` for `--json`. All public-interface driven; no live API calls.
 
 ### Notes
 - This unlocks fixing the long-standing BUG-001 (`EsfuerzoRealHH` vs `EsfuerzoReal`) and the `Remaining Work` verification todo in `KNOWN_BUGS.md` without touching the hardcoded constants. The new CLI subcommands let users look up the correct refname on demand while the constants are gradually migrated.
