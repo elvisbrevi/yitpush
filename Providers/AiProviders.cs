@@ -43,6 +43,7 @@ partial class Program
         "Google" => "https://generativelanguage.googleapis.com/v1beta",
         "DeepSeek" => "https://api.deepseek.com/v1/chat/completions",
         "OpenRouter" => "https://openrouter.ai/api/v1/chat/completions",
+        "Nvidia" or "NVIDIA NIM" => "https://integrate.api.nvidia.com/v1/chat/completions",
         _ => "https://api.openai.com/v1/chat/completions"
     };
 
@@ -288,7 +289,7 @@ partial class Program
     private const int ModelsFetchTimeoutSeconds = 8;
     private const int ModelsCacheTtlHours = 24;
 
-    private static async Task<List<string>> FetchModelsForProvider(string providerKey, string apiKey, string? customBaseUrl = null)
+    private static async Task<List<string>> FetchModelsForProvider(string providerKey, string apiKey, string? customBaseUrl = null, HttpMessageHandler? handler = null)
     {
         // Cache hit?
         var cached = ModelsCacheManager.Get(providerKey);
@@ -298,11 +299,12 @@ partial class Program
         {
             var fetched = providerKey switch
             {
-                "OpenAI" => await FetchOpenAiModels("https://api.openai.com/v1/models", apiKey, m => m.StartsWith("gpt-") || m.StartsWith("o1") || m.StartsWith("o3") || m.StartsWith("o4") || m.StartsWith("chatgpt-")),
-                "DeepSeek" => await FetchOpenAiModels("https://api.deepseek.com/v1/models", apiKey, _ => true),
-                "OpenRouter" => await FetchOpenRouterModels(customBaseUrl),
-                "Anthropic" => await FetchAnthropicModels(apiKey),
-                "Google" => await FetchGeminiModels(apiKey),
+                "OpenAI" => await FetchOpenAiModels("https://api.openai.com/v1/models", apiKey, m => m.StartsWith("gpt-") || m.StartsWith("o1") || m.StartsWith("o3") || m.StartsWith("o4") || m.StartsWith("chatgpt-"), handler),
+                "DeepSeek" => await FetchOpenAiModels("https://api.deepseek.com/v1/models", apiKey, _ => true, handler),
+                "OpenRouter" => await FetchOpenRouterModels(customBaseUrl, handler),
+                "Anthropic" => await FetchAnthropicModels(apiKey, handler),
+                "Google" => await FetchGeminiModels(apiKey, handler),
+                "Nvidia" => await FetchNvidiaModels(customBaseUrl, apiKey, handler),
                 _ => new List<string>()
             };
 
@@ -317,9 +319,11 @@ partial class Program
         return new List<string>();
     }
 
-    private static async Task<List<string>> FetchOpenAiModels(string url, string apiKey, Func<string, bool> filter)
+    private static async Task<List<string>> FetchOpenAiModels(string url, string apiKey, Func<string, bool> filter, HttpMessageHandler? handler = null)
     {
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ModelsFetchTimeoutSeconds) };
+        using var http = handler != null
+            ? new HttpClient(handler, disposeHandler: false) { Timeout = TimeSpan.FromSeconds(ModelsFetchTimeoutSeconds) }
+            : new HttpClient { Timeout = TimeSpan.FromSeconds(ModelsFetchTimeoutSeconds) };
         http.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
 
         var response = await http.GetAsync(url);
@@ -339,21 +343,23 @@ partial class Program
         return ids;
     }
 
-    private static async Task<List<string>> FetchOpenRouterModels(string? customBaseUrl)
+    private static async Task<List<string>> FetchNvidiaModels(string? customBaseUrl, string apiKey, HttpMessageHandler? handler = null)
     {
-        // OpenRouter exposes /models without auth; use the configured base host if provided
-        var listUrl = "https://openrouter.ai/api/v1/models";
-        if (!string.IsNullOrEmpty(customBaseUrl))
+        var baseUrl = customBaseUrl ?? GetDefaultBaseUrl("Nvidia");
+        // Strip the trailing /chat/completions path so we can hit /v1/models.
+        var listUrl = baseUrl;
+        try
         {
-            try
-            {
-                var uri = new Uri(customBaseUrl);
-                listUrl = $"{uri.Scheme}://{uri.Host}/api/v1/models";
-            }
-            catch { }
+            var uri = new Uri(baseUrl);
+            listUrl = $"{uri.Scheme}://{uri.Host}{uri.AbsolutePath.TrimEnd('/').Replace("/chat/completions", "")}/models";
         }
+        catch { /* fall through with original URL */ }
 
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ModelsFetchTimeoutSeconds) };
+        using var http = handler != null
+            ? new HttpClient(handler, disposeHandler: false) { Timeout = TimeSpan.FromSeconds(ModelsFetchTimeoutSeconds) }
+            : new HttpClient { Timeout = TimeSpan.FromSeconds(ModelsFetchTimeoutSeconds) };
+        http.DefaultRequestHeaders.Add("Authorization", $"Bearer {apiKey}");
+
         var response = await http.GetAsync(listUrl);
         if (!response.IsSuccessStatusCode) return new List<string>();
 
@@ -369,9 +375,43 @@ partial class Program
             .ToList();
     }
 
-    private static async Task<List<string>> FetchAnthropicModels(string apiKey)
+    private static async Task<List<string>> FetchOpenRouterModels(string? customBaseUrl, HttpMessageHandler? handler = null)
     {
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ModelsFetchTimeoutSeconds) };
+        // OpenRouter exposes /models without auth; use the configured base host if provided
+        var listUrl = "https://openrouter.ai/api/v1/models";
+        if (!string.IsNullOrEmpty(customBaseUrl))
+        {
+            try
+            {
+                var uri = new Uri(customBaseUrl);
+                listUrl = $"{uri.Scheme}://{uri.Host}/api/v1/models";
+            }
+            catch { }
+        }
+
+        using var http = handler != null
+            ? new HttpClient(handler, disposeHandler: false) { Timeout = TimeSpan.FromSeconds(ModelsFetchTimeoutSeconds) }
+            : new HttpClient { Timeout = TimeSpan.FromSeconds(ModelsFetchTimeoutSeconds) };
+        var response = await http.GetAsync(listUrl);
+        if (!response.IsSuccessStatusCode) return new List<string>();
+
+        var json = await response.Content.ReadAsStringAsync();
+        using var doc = JsonDocument.Parse(json);
+
+        return doc.RootElement.GetProperty("data")
+            .EnumerateArray()
+            .Select(e => e.TryGetProperty("id", out var id) ? id.GetString() : null)
+            .Where(id => !string.IsNullOrEmpty(id))
+            .Select(id => id!)
+            .OrderBy(id => id)
+            .ToList();
+    }
+
+    private static async Task<List<string>> FetchAnthropicModels(string apiKey, HttpMessageHandler? handler = null)
+    {
+        using var http = handler != null
+            ? new HttpClient(handler, disposeHandler: false) { Timeout = TimeSpan.FromSeconds(ModelsFetchTimeoutSeconds) }
+            : new HttpClient { Timeout = TimeSpan.FromSeconds(ModelsFetchTimeoutSeconds) };
         http.DefaultRequestHeaders.Add("x-api-key", apiKey);
         http.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
 
@@ -390,9 +430,11 @@ partial class Program
             .ToList();
     }
 
-    private static async Task<List<string>> FetchGeminiModels(string apiKey)
+    private static async Task<List<string>> FetchGeminiModels(string apiKey, HttpMessageHandler? handler = null)
     {
-        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ModelsFetchTimeoutSeconds) };
+        using var http = handler != null
+            ? new HttpClient(handler, disposeHandler: false) { Timeout = TimeSpan.FromSeconds(ModelsFetchTimeoutSeconds) }
+            : new HttpClient { Timeout = TimeSpan.FromSeconds(ModelsFetchTimeoutSeconds) };
         var response = await http.GetAsync($"https://generativelanguage.googleapis.com/v1beta/models?key={apiKey}");
         if (!response.IsSuccessStatusCode) return new List<string>();
 

@@ -43,7 +43,7 @@ yp setup
 ```
 
 The wizard will guide you through:
-1. Selecting a provider: **OpenAI**, **Anthropic**, **Google Gemini**, **DeepSeek**, or **OpenRouter**
+1. Selecting a provider: **OpenAI**, **Anthropic**, **Google Gemini**, **DeepSeek**, **OpenRouter**, or **NVIDIA NIM**
 2. Entering your API key (masked input)
 3. Selecting a model from a curated list or entering a custom one
 4. Validating the key with a test call
@@ -108,15 +108,18 @@ When stdout is piped, the trailing interactive prompt is automatically skipped, 
 
 ### 🤖 Multi-Provider AI Support
 
-`yp` supports five AI providers. Run `yp setup` to switch between them at any time.
+`yp` supports six AI providers. Run `yp setup` to switch between them at any time.
 
 | Provider | Models |
 |----------|--------|
 | OpenAI | gpt-4o, gpt-4o-mini, o1, o1-mini, ... |
-| Anthropic | claude-opus-4-6-20250514, claude-sonnet-4-6-20250514, claude-haiku-4-5-20250508 |
+| Anthropic | claude-opus-4-6-20250514, claude-sonnet-4-6-20250514, claude-haiku-4-5-20251008 |
 | Google Gemini | gemini-2.0-flash, gemini-1.5-pro, ... |
 | DeepSeek | deepseek-chat, deepseek-reasoner |
 | OpenRouter | 100+ models (google/gemini-2.0-flash, openai/gpt-4o, ...) |
+| NVIDIA NIM | meta/llama-3.1-70b-instruct, nvidia/nemotron-4-340b-instruct, ... |
+
+The `NVIDIA_API_KEY` environment variable overrides the stored API key for the NVIDIA NIM provider (same convention as `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, etc.).
 
 ### 📝 Smart Commits
 `yp commit` analyzes your staged changes and generates a professional commit message.

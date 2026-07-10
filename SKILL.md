@@ -79,6 +79,8 @@ yp setup
 
 **Flow**: select provider → enter API key → select model → validate → save to `~/.yitpush/config.json`
 
+Supported providers: **OpenAI**, **Anthropic**, **Google Gemini**, **DeepSeek**, **OpenRouter**, **NVIDIA NIM**. Each provider has a `<PROVIDER>_API_KEY` environment variable that overrides the stored key at runtime (e.g. `NVIDIA_API_KEY` for the NVIDIA NIM provider).
+
 ---
 
 ### tool: checkout
