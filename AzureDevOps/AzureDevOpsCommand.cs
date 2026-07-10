@@ -60,61 +60,7 @@ partial class Program
         var resource = args[0];
         var action = args[1];
 
-        // Flag parsing
-        string? description = null;
-        string? effort = null;
-        string? repo = null;
-        string? branch = null;
-        string? remaining = null;
-        string? state = null;
-        string? comment = null;
-        string? effortReal = null;
-        string? taskTitles = null;
-        bool noLink = false;
-
-        for (int i = 0; i < args.Length; i++)
-        {
-            if ((args[i] == "--description" || args[i] == "-d") && i + 1 < args.Length)
-            {
-                description = args[i + 1];
-}
-            if ((args[i] == "--comment" || args[i] == "-c") && i + 1 < args.Length)
-            {
-                comment = args[i + 1];
-            }
-            if (args[i] == "--no-link" || args[i] == "-n")
-            {
-                noLink = true;
-            }
-            if (args[i] == "--repo" && i + 1 < args.Length)
-            {
-                repo = args[i + 1];
-            }
-            if (args[i] == "--branch" && i + 1 < args.Length)
-            {
-                branch = args[i + 1];
-            }
-            if ((args[i] == "--remaining" || args[i] == "-r") && i + 1 < args.Length)
-            {
-                remaining = args[i + 1];
-            }
-            if ((args[i] == "--state" || args[i] == "-s") && i + 1 < args.Length)
-            {
-                state = args[i + 1];
-            }
-            if ((args[i] == "--effort" || args[i] == "-e") && i + 1 < args.Length)
-            {
-                effort = args[i + 1];
-            }
-            if ((args[i] == "--effort-real" || args[i] == "-er") && i + 1 < args.Length)
-            {
-                effortReal = args[i + 1];
-            }
-            if ((args[i] == "--task-titles" || args[i] == "-t") && i + 1 < args.Length)
-            {
-                taskTitles = args[i + 1];
-            }
-        }
+        var flags = AzureDevOpsFlagParser.Parse(args);
 
         if (resource == "repo" && action == "new")
         {
@@ -133,16 +79,30 @@ partial class Program
         }
         else if (resource == "hu" && action == "task")
         {
-            // Quick mode: yp azure-devops hu task <org> <project> <hu-id> [--description "desc"] [--effort "5"]
+            // Quick mode: yp azure-devops hu task <org> <project> <hu-id> [--title "..."] [--description "desc"] [--effort "5"] [--trio] [--no-link]
             if (args.Length >= 5 && !args[2].StartsWith("-"))
             {
                 var org = args[2];
                 var proj = args[3];
                 var huId = args[4];
                 var orgUrl = $"https://dev.azure.com/{org}";
-                return await CreateTasksDirectForHU(orgUrl, proj, huId, description, effort, taskTitles, noLink, repo, branch);
+
+                try
+                {
+                    HuTaskPlan.ComputePlan(flags.Title, flags.TaskTitles, flags.Trio);
+                }
+                catch (ArgumentException ex)
+                {
+                    AnsiConsole.MarkupLine($"[red]❌ {Markup.Escape(ex.Message)}[/]");
+                    return 5;
+                }
+
+                return await CreateTasksDirectForHU(
+                    orgUrl, proj, huId,
+                    flags.Title, flags.Description, flags.Effort, flags.TaskTitles, flags.Trio,
+                    flags.NoLink, flags.Repo, flags.Branch);
             }
-            var result = await ListAzureUserStories(description, effort);
+            var result = await ListAzureUserStories(flags.Description, flags.Effort);
             return result == BackToMenu ? 0 : result;
         }
         else if (resource == "hu" && action == "show")
@@ -151,7 +111,7 @@ partial class Program
             if (args.Length >= 4)
             {
                 var orgUrl = $"https://dev.azure.com/{args[2]}";
-                return await ShowWorkItemDetails(orgUrl, args[3], json: AzureDevOpsFlagParser.Parse(args).Json);
+                return await ShowWorkItemDetails(orgUrl, args[3], json: flags.Json);
             }
 
             var result = await ListAzureUserStoriesForTaskList(); // Reuse list for selecting HU to show
@@ -163,7 +123,7 @@ partial class Program
             if (args.Length >= 4)
             {
                 var orgUrl = $"https://dev.azure.com/{args[2]}";
-                return await ShowWorkItemDetails(orgUrl, args[3], json: AzureDevOpsFlagParser.Parse(args).Json);
+                return await ShowWorkItemDetails(orgUrl, args[3], json: flags.Json);
             }
 
             // For tasks, we usually go through HUs
@@ -179,7 +139,7 @@ partial class Program
                 var proj = args[3];
                 var huId = args[4];
                 var orgUrl = $"https://dev.azure.com/{org}";
-                return await AddLinkToRepo(orgUrl, proj, huId, repo, branch);
+                return await AddLinkToRepo(orgUrl, proj, huId, flags.Repo, flags.Branch);
             }
 
             var result = await ListAzureUserStoriesForLinking();
@@ -194,7 +154,7 @@ partial class Program
                 var proj = args[3];
                 var huId = args[4];
                 var orgUrl = $"https://dev.azure.com/{org}";
-                return await ListTasksForHU(orgUrl, proj, proj, huId, json: AzureDevOpsFlagParser.Parse(args).Json);
+                return await ListTasksForHU(orgUrl, proj, proj, huId, json: flags.Json);
             }
             // Interactive mode: select HU first, then list tasks
             var result = await ListAzureUserStoriesForTaskList();
@@ -208,12 +168,11 @@ partial class Program
                 var orgForUpdate = args[2];
                 var idForUpdate = args[3];
                 var orgUrlForUpdate = $"https://dev.azure.com/{orgForUpdate}";
-                var newFlags = AzureDevOpsFlagParser.Parse(args);
                 return await UpdateWorkItem(
                     orgUrlForUpdate, idForUpdate,
-                    effort, remaining, state, comment, effortReal,
-                    newFlags.Title, newFlags.Description, newFlags.Evidence,
-                    newFlags.ExtraFields, newFlags.History);
+                    flags.Effort, flags.Remaining, flags.State, flags.Comment, flags.EffortReal,
+                    flags.Title, flags.Description, flags.Evidence,
+                    flags.ExtraFields, flags.History);
             }
 
             // Interactive mode: select work item first
@@ -318,7 +277,7 @@ partial class Program
         table.AddRow("repo checkout", "Clone a repository interactively");
         table.AddRow("variable-group list", "List and inspect variable groups");
         table.AddRow("hu task", "Create tasks for a User Story");
-        table.AddRow("hu task <org> <proj> <hu-id> [[--description|-d \"...\"]] [[--effort|-e \"...\"]] [[--task-titles|-t \"...\"]] [[--no-link|-n]] [[--repo <repo> --branch <branch>]]", "Create tasks (skip menus)");
+        table.AddRow("hu task <org> <proj> <hu-id> [[--title <t>]] [[--description|-d|-D \"...\"]] [[--effort|-e \"...\"]] [[--trio]] [[--task-titles|-t \"A, B, C\"]] [[--no-link|-n]] [[--repo <repo> --branch <branch>]]", "Create tasks (skip menus) — single task by default, --trio for legacy trio, --task-titles for custom list");
         table.AddRow("hu show", "Show User Story details");
         table.AddRow("hu show <org> <hu-id> --json", "Show details (skip menus) as a flat JSON object suitable for jq");
         table.AddRow("hu list", "List tasks of a User Story");
@@ -336,7 +295,8 @@ partial class Program
 
         AnsiConsole.Write(table);
 
-        AnsiConsole.MarkupLine("\n[dim]Short flags for hu task: --description|-d, --effort|-e, --task-titles|-t, --no-link|-n[/]");
+        AnsiConsole.MarkupLine("\n[dim]Short flags for hu task: --title, --description|-d|-D, --effort|-e, --trio, --task-titles|-t, --no-link|-n[/]");
+        AnsiConsole.MarkupLine("[dim]hu task default: 1 task. Title precedence: --title > --task-titles[0] > 'Desarrollo'. --trio creates the legacy trio (opt-in). --trio and --task-titles are mutually exclusive.[/]");
         AnsiConsole.MarkupLine("[dim]task update: --comment posts to Discussion; --history writes the legacy History field; --evidence resolves the 'Evidencias de finalización' field by name[/]");
         AnsiConsole.MarkupLine("[dim]--json on hu/task show and hu list emits a flat JSON shape (no ANSI escapes) so it can be piped to jq[/]");
 
@@ -347,7 +307,10 @@ partial class Program
         AnsiConsole.MarkupLine("  yp azure-devops task show MyOrg 67890 --json  [dim]# Show Task info as JSON for jq[/]");
         AnsiConsole.MarkupLine("  yp azure-devops task update MyOrg 67890 --effort \"8\" --state \"Doing\"  [dim]# Update task[/]");
         AnsiConsole.MarkupLine("  yp azure-devops task update MyOrg 67890 --comment \"Fixed the bug\"     [dim]# Add comment[/]");
-        AnsiConsole.MarkupLine("  yp azure-devops hu task MyOrg MyProj 123 --effort \"8\" -t \"Desarrollo, Pruebas\" -n  [dim]# Quick task, no linking[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops hu task MyOrg MyProj 123 --title \"WCF: op SOAP\" -d \"...\" -e 8   [dim]# 1 task with explicit title (v2.3.0 default)[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops hu task MyOrg MyProj 123 -d \"...\" -e 8 -n                       [dim]# 1 task titled 'Desarrollo', no linking[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops hu task MyOrg MyProj 123 --trio -d \"...\" -e 8                  [dim]# Legacy trio (opt-in)[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops hu task MyOrg MyProj 123 --effort \"8\" -t \"Desarrollo, Pruebas\" -n  [dim]# Custom multi-task list[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu task MyOrg MyProj 123 --effort \"8\" --repo MyRepo --branch feature/123  [dim]# Auto-link branch to tasks[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu link MyOrg MyProj 123 --repo Repo --branch main  [dim]# Quick link[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu list MyOrg MyProj 123      [dim]# List tasks of HU[/]");
