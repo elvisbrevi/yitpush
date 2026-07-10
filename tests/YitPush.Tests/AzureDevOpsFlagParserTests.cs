@@ -14,6 +14,24 @@ public class AzureDevOpsFlagParserTests
     }
 
     [Fact]
+    public void Parse_sets_yes_when_yes_flag_provided()
+    {
+        var result = AzureDevOpsFlagParser.Parse(
+            new[] { "task", "delete", "--yes" });
+
+        Assert.True(result.Yes);
+    }
+
+    [Fact]
+    public void Parse_sets_yes_when_y_short_flag_provided()
+    {
+        var result = AzureDevOpsFlagParser.Parse(
+            new[] { "task", "delete", "-y" });
+
+        Assert.True(result.Yes);
+    }
+
+    [Fact]
     public void Parse_sets_description_when_description_flag_provided()
     {
         var result = AzureDevOpsFlagParser.Parse(

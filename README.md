@@ -88,6 +88,8 @@ export OPENROUTER_API_KEY='...'
 | `yp azure-devops hu show` | Show details of a User Story (title, effort, links) |
 | `yp azure-devops task show` | Show details of a Task (effort, remaining, description) |
 | `yp azure-devops task update` | Update task fields (effort, state, comments) |
+| `yp azure-devops task delete` | Move a work item to the recycle bin (prompts by default; pass `--yes` in CI) |
+| `yp azure-devops task attach` | Upload a local file as an `AttachedFile` on a work item |
 | `yp azure-devops hu link` | Link a repository branch to a User Story |
 | `yp azure-devops link` | Add a link (branch/commit/PR) to any work item |
 
