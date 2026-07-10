@@ -16,7 +16,8 @@ internal record AzureDevOpsFlagParser(
     bool NoLink,
     bool Trio,
     IReadOnlyList<string> ExtraFields,
-    bool Json = false)
+    bool Json = false,
+    bool Yes = false)
 {
     public static AzureDevOpsFlagParser Parse(string[] args)
     {
@@ -36,6 +37,7 @@ internal record AzureDevOpsFlagParser(
         bool trio = false;
         var extraFields = new List<string>();
         bool json = false;
+        bool yes = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -103,12 +105,16 @@ internal record AzureDevOpsFlagParser(
             {
                 json = true;
             }
+            if (args[i] == "--yes" || args[i] == "-y")
+            {
+                yes = true;
+            }
         }
 
         return new AzureDevOpsFlagParser(
             title, description, evidence, history, comment,
             effort, effortReal, remaining, state,
             repo, branch, taskTitles, noLink, trio,
-            extraFields, json);
+            extraFields, json, yes);
     }
 }

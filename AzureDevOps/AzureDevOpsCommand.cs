@@ -183,6 +183,28 @@ partial class Program
             var idPrompt = AnsiConsole.Prompt(new TextPrompt<string>("Work item ID:"));
             return await UpdateWorkItemInteractive(orgUrlS, idPrompt);
         }
+        else if (resource == "task" && action == "delete")
+        {
+            // Quick mode: yp azure-devops task delete <org> <id> [--yes] [--json]
+            if (args.Length >= 4 && !args[2].StartsWith("-"))
+            {
+                return await TaskDeleteCli(args[2], args[3], flags.Yes, flags.Json);
+            }
+
+            AnsiConsole.MarkupLine("[red]Usage: yp azure-devops task delete <org> <id> [--yes] [--json][/]");
+            return 1;
+        }
+        else if (resource == "task" && action == "attach")
+        {
+            // Quick mode: yp azure-devops task attach <org> <proj> <id> <file-path> [--comment "..."] [--json]
+            if (args.Length >= 6 && !args[2].StartsWith("-"))
+            {
+                return await TaskAttachCli(args[2], args[3], args[4], args[5], flags.Comment, flags.Json);
+            }
+
+            AnsiConsole.MarkupLine("[red]Usage: yp azure-devops task attach <org> <project> <id> <file-path> [--comment \"...\"] [--json][/]");
+            return 1;
+        }
         else
         {
             AnsiConsole.MarkupLine($"[red]❌ Unknown command:[/] azure-devops {Markup.Escape(resource)} {Markup.Escape(action)}\n");
@@ -288,6 +310,8 @@ partial class Program
         table.AddRow("task show <org> <id> --json", "Show details (skip menus) as a flat JSON object");
         table.AddRow("task update", "Update title, description, evidence, effort, remaining, state, comment or history (alias: hu update, wi update)");
         table.AddRow("task update <org> <id> [[--title <t>]] [[--description|-D <d>]] [[--evidence <e>]] [[--field <RefName=val>]] [[--effort|-e <e>]] [[--effort-real|-er <er>]] [[--remaining|-r <r>]] [[--state|-s <s>]] [[--comment|-c <c>]] [[--history <h>]]", "Update directly");
+        table.AddRow("task delete <org> <id> [[--yes|-y]] [[--json]]", "Move work item to the recycle bin (prompts by default; pass --yes in CI)");
+        table.AddRow("task attach <org> <project> <id> <file-path> [[--comment|-c \"...\"]] [[--json]]", "Upload a local file as an AttachedFile relation on the work item");
         table.AddRow("link", "Add link (branch/commit/PR) to work item");
         table.AddRow("link <org> <proj> <wi-id>", "Add link (skip menus)");
         table.AddRow("resolve-field <org> <proj> <type> <displayName>", "Print the refname for a display name; uses the 24h cache");
@@ -318,6 +342,9 @@ partial class Program
         AnsiConsole.MarkupLine("  yp azure-devops link MyOrg MyProj 123         [dim]# Add link to work item[/]");
         AnsiConsole.MarkupLine("  yp azure-devops resolve-field MyOrg MyProj Task \"Esfuerzo Real\"   [dim]# Print refname (cached for 24h)[/]");
         AnsiConsole.MarkupLine("  yp azure-devops refresh-fields MyOrg MyProj Task                  [dim]# Invalidate + re-warm cache[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops task delete MyOrg 22428 --yes                     [dim]# Move a work item to the recycle bin (skip prompt in CI)[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops task attach MyOrg MyProj 22427 ./screenshot.png   [dim]# Upload a local file as an AttachedFile[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops task attach MyOrg MyProj 22427 ./screenshot.png -c 'Curl folio 3535303'  [dim]# Attach with comment[/]");
         Console.WriteLine();
     }
 }

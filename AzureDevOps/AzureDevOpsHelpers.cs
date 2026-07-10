@@ -2240,4 +2240,151 @@ partial class Program
             $"[bold]{Markup.Escape(workItemType)}[/] (org '[bold]{Markup.Escape(org)}[/]').[/]");
         return 0;
     }
+
+    internal static async Task<int> TaskDeleteCli(string org, string workItemId, bool yes, bool json)
+    {
+        if (!yes)
+        {
+            if (Console.IsInputRedirected)
+            {
+                AnsiConsole.MarkupLine("[red]❌ Non-interactive mode: pass --yes to confirm task deletion.[/]");
+                return 3;
+            }
+
+            AnsiConsole.MarkupLine(
+                $"[yellow]⚠️  This will permanently move work item [bold]{Markup.Escape(workItemId)}[/] in org " +
+                $"'[bold]{Markup.Escape(org)}[/]' to the recycle bin. Continue?[/]");
+
+            var confirm = AnsiConsole.Prompt(
+                new TextPrompt<string>("Type 'yes' to confirm:")
+                    .DefaultValue("no"));
+
+            if (!string.Equals(confirm, "yes", StringComparison.OrdinalIgnoreCase))
+            {
+                AnsiConsole.MarkupLine("[dim]Cancelled.[/]");
+                return 0;
+            }
+        }
+
+        var token = await GetAzureAccessToken();
+        if (token == null)
+        {
+            AnsiConsole.MarkupLine("[red]❌ Failed to get Azure access token. Run `az login` first.[/]");
+            return 1;
+        }
+
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ApiTimeoutSeconds) };
+        http.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+
+        var orgUrl = $"https://dev.azure.com/{org}";
+        var result = await AzDevOpsDeleteClient.DeleteWorkItemAsync(http, orgUrl, workItemId);
+
+        if (json)
+        {
+            var payload = new
+            {
+                org,
+                workItemId,
+                exitCode = result.ExitCode,
+                error = result.Error
+            };
+            Console.WriteLine(JsonSerializer.Serialize(payload));
+        }
+
+        return result.ExitCode switch
+        {
+            0 => EmitTaskDeleteSuccess(org, workItemId, json),
+            1 => EmitTaskDeleteAlreadyGone(org, workItemId, json),
+            _ => EmitTaskDeleteError(org, workItemId, result.Error, json)
+        };
+    }
+
+    private static int EmitTaskDeleteSuccess(string org, string workItemId, bool json)
+    {
+        if (json) return 0;
+        AnsiConsole.MarkupLine(
+            $"[green]✅ Work item [bold]{Markup.Escape(workItemId)}[/] moved to the recycle bin in org '[bold]{Markup.Escape(org)}[/]'.[/]");
+        return 0;
+    }
+
+    private static int EmitTaskDeleteAlreadyGone(string org, string workItemId, bool json)
+    {
+        if (json) return 1;
+        AnsiConsole.MarkupLine(
+            $"[yellow]⚠️  Work item [bold]{Markup.Escape(workItemId)}[/] is already gone in org '[bold]{Markup.Escape(org)}[/]'.[/]");
+        return 1;
+    }
+
+    private static int EmitTaskDeleteError(string org, string workItemId, string? error, bool json)
+    {
+        if (json) return 2;
+        AnsiConsole.MarkupLine(
+            $"[red]❌ Failed to delete work item [bold]{Markup.Escape(workItemId)}[/] in org '[bold]{Markup.Escape(org)}[/]':[/]");
+        if (!string.IsNullOrEmpty(error))
+            AnsiConsole.MarkupLine($"[dim]{Markup.Escape(error)}[/]");
+        return 2;
+    }
+
+    internal static async Task<int> TaskAttachCli(
+        string org, string project, string workItemId, string filePath, string? comment, bool json)
+    {
+        if (!File.Exists(filePath))
+        {
+            if (json)
+            {
+                Console.WriteLine(JsonSerializer.Serialize(new
+                {
+                    org, project, workItemId, filePath, exitCode = 2, error = $"File not found: {filePath}"
+                }));
+            }
+            else
+            {
+                AnsiConsole.MarkupLine($"[red]❌ File not found:[/] {Markup.Escape(filePath)}");
+            }
+            return 2;
+        }
+
+        var token = await GetAzureAccessToken();
+        if (token == null)
+        {
+            AnsiConsole.MarkupLine("[red]❌ Failed to get Azure access token. Run `az login` first.[/]");
+            return 1;
+        }
+
+        using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(ApiTimeoutSeconds) };
+        http.DefaultRequestHeaders.Add("Authorization", $"Bearer {token}");
+
+        var orgUrl = $"https://dev.azure.com/{org}";
+        var result = await AzDevOpsAttachmentClient.AttachFileToWorkItemAsync(
+            http, orgUrl, project, workItemId, filePath, comment);
+
+        if (json)
+        {
+            Console.WriteLine(JsonSerializer.Serialize(new
+            {
+                org, project, workItemId, filePath,
+                attachmentUrl = result.AttachmentUrl,
+                exitCode = result.ExitCode,
+                error = result.Error
+            }));
+        }
+        else if (result.ExitCode == 0)
+        {
+            AnsiConsole.MarkupLine(
+                $"[green]✅ Attached [bold]{Markup.Escape(Path.GetFileName(filePath))}[/] " +
+                $"to work item [bold]{Markup.Escape(workItemId)}[/] in [bold]{Markup.Escape(project)}[/].[/]");
+            if (!string.IsNullOrEmpty(result.AttachmentUrl))
+                AnsiConsole.MarkupLine($"[dim]{Markup.Escape(result.AttachmentUrl)}[/]");
+        }
+        else
+        {
+            AnsiConsole.MarkupLine(
+                $"[red]❌ Failed to attach [bold]{Markup.Escape(filePath)}[/] to work item " +
+                $"[bold]{Markup.Escape(workItemId)}[/]:[/]");
+            if (!string.IsNullOrEmpty(result.Error))
+                AnsiConsole.MarkupLine($"[dim]{Markup.Escape(result.Error)}[/]");
+        }
+
+        return result.ExitCode;
+    }
 }

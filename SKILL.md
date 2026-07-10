@@ -127,6 +127,8 @@ yp azure-devops [subcommand] [args] [flags]
 | `hu link <org> <proj> <id> --repo <r> --branch <b>` | Link a branch to a User Story |
 | `task show <org> <id>` | Show task details |
 | `task update <org> <id> [flags]` | Update task fields (alias: `hu update`, `wi update`) |
+| `task delete <org> <id> [--yes\|-y]` | Move work item to the recycle bin (prompts by default; pass `--yes` in CI) |
+| `task attach <org> <project> <id> <file-path> [--comment <text>]` | Upload a local file as an `AttachedFile` relation on the work item |
 | `link <org> <proj> <id>` | Add a link (branch/commit/PR) to any work item |
 
 **task update flags**: `--title`, `--description|-D`, `--evidence`, `--field <RefName=val>`, `--effort|-e`, `--effort-real|-er`, `--remaining|-r`, `--state|-s`, `--comment|-c`, `--history`

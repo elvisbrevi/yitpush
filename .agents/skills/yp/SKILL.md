@@ -124,6 +124,8 @@ Append `--json` to `hu show` / `hu list` whenever the caller (an agent, a script
 ```bash
 yp azure-devops task show <org> <task-id> [--json]                     # details; --json for machine-readable output
 yp azure-devops task update <org> <task-id> [flags]
+yp azure-devops task delete <org> <task-id> [--yes|-y]                 # move to recycle bin (prompts by default)
+yp azure-devops task attach <org> <project> <task-id> <file-path> [--comment "..."]   # upload an AttachedFile
 ```
 
 `update` flags (all optional, combine freely):
@@ -142,6 +144,10 @@ yp azure-devops task update <org> <task-id> [flags]
 | `--history` | — | Write to the legacy `System.History` field (audit log) |
 
 `task update` is also reachable as `hu update` and `wi update` — use whichever matches the work-item type the user named, but the underlying behavior is identical.
+
+`task delete` calls `DELETE /_apis/wit/recyclebin/{id}?api-version=7.0`. It prompts "Type 'yes' to confirm:" by default; in CI / non-interactive contexts (`Console.IsInputRedirected`) the prompt is bypassed and the command exits 3 with a "Pass --yes to confirm" message unless `--yes` (`-y`) is passed. Exit codes: 0 on success, 1 if the work item is already gone (404), 2 on any other error. Pair with `--json` for machine-readable output.
+
+`task attach` uploads the local file to `POST /{project}/_apis/wit/attachments?fileName=<basename>&api-version=7.1-preview` (content-type `application/octet-stream`) and then `PATCH /_apis/wit/workitems/{id}` with a JSON-Patch `add` to `/relations/-` of type `AttachedFile`. The optional `--comment` becomes the tooltip on the attachment in the Azure Boards form.
 
 ### Repositories and variable groups
 
@@ -196,6 +202,8 @@ Map intent → command. If a row matches the user's request, run that command. S
 | Update task effort/remaining/effort-real | `yp azure-devops task update <org> <id> --effort "8" --remaining "2" --effort-real "10"` |
 | Add a comment to a task | `yp azure-devops task update <org> <id> --comment "<text>"` |
 | Update any work item (alias: wi update, hu update) | `yp azure-devops task update <org> <id> [--effort|-e <val>] [--effort-real|-er <val>] [--remaining|-r <val>] [--state|-s <val>] [--comment|-c <text>]` |
+| Delete a work item (move to recycle bin) | `yp azure-devops task delete <org> <id> --yes` |
+| Attach a local file to a task | `yp azure-devops task attach <org> <project> <id> ./screenshot.png [--comment "..."]` |
 | Link a branch/commit/PR to any work item | `yp azure-devops link <org> <project> <id>` |
 | Create a new Azure DevOps repo | `yp azure-devops repo new` |
 | Clone an Azure DevOps repo | `yp azure-devops repo checkout` |
