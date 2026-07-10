@@ -141,9 +141,10 @@ yp azure-devops task attach <org> <project> <task-id> <file-path> [--comment "..
 | `--remaining` | `-r` | Remaining work in hours |
 | `--state` | `-s` | New state — accepts `To Do`, `Doing`, `Active`, `In Progress`, `Resolved`, `Done`, `Closed`, `Removed` |
 | `--comment` | `-c` | Post a discussion comment (via `POST /comments`) |
+| `--assigned-to` | — | Reassign to a new identity. Accepts UPN (`elvis.brevi@sag.gob.cl`), display name (`Elvis Brevi`), or empty string (`""`) to clear. Resolves via `GET /_apis/identities?searchFilter=General&filterValue=<value>` and writes the proper `{displayName, uniqueName, id}` object. Multiple matches exit `4` with a candidate list. |
 | `--history` | — | Write to the legacy `System.History` field (audit log) |
 
-`task update` is also reachable as `hu update` and `wi update` — use whichever matches the work-item type the user named, but the underlying behavior is identical.
+`task update` is also reachable as `hu update` and `wi update` — use whichever matches the work-item type the user named, but the underlying behavior is identical. `--assigned-to` requires an Azure DevOps access token (`az login` first); the resolver caches per `(org, normalized input)` to avoid repeat API calls during batch updates.
 
 `task delete` calls `DELETE /_apis/wit/recyclebin/{id}?api-version=7.0`. It prompts "Type 'yes' to confirm:" by default; in CI / non-interactive contexts (`Console.IsInputRedirected`) the prompt is bypassed and the command exits 3 with a "Pass --yes to confirm" message unless `--yes` (`-y`) is passed. Exit codes: 0 on success, 1 if the work item is already gone (404), 2 on any other error. Pair with `--json` for machine-readable output.
 
@@ -201,7 +202,9 @@ Map intent → command. If a row matches the user's request, run that command. S
 | Update task state | `yp azure-devops task update <org> <id> --state "Doing"` |
 | Update task effort/remaining/effort-real | `yp azure-devops task update <org> <id> --effort "8" --remaining "2" --effort-real "10"` |
 | Add a comment to a task | `yp azure-devops task update <org> <id> --comment "<text>"` |
-| Update any work item (alias: wi update, hu update) | `yp azure-devops task update <org> <id> [--effort|-e <val>] [--effort-real|-er <val>] [--remaining|-r <val>] [--state|-s <val>] [--comment|-c <text>]` |
+| Reassign a task to a user (UPN or display name) | `yp azure-devops task update <org> <id> --assigned-to "elvis.brevi@sag.gob.cl"` |
+| Clear the assignment on a task | `yp azure-devops task update <org> <id> --assigned-to ""` |
+| Update any work item (alias: wi update, hu update) | `yp azure-devops task update <org> <id> [--effort|-e <val>] [--effort-real|-er <val>] [--remaining|-r <val>] [--state|-s <val>] [--comment|-c <text>] [--assigned-to <upn|display-name|"">]` |
 | Delete a work item (move to recycle bin) | `yp azure-devops task delete <org> <id> --yes` |
 | Attach a local file to a task | `yp azure-devops task attach <org> <project> <id> ./screenshot.png [--comment "..."]` |
 | Link a branch/commit/PR to any work item | `yp azure-devops link <org> <project> <id>` |

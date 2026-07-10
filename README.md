@@ -175,6 +175,11 @@ yp azure-devops task update <org> <id> --comment "Progress update: logic refacto
 yp azure-devops task update <org> <id> --title "New title" --description "New description"
 yp azure-devops task update <org> <id> --evidence "curl http://localhost:3333/api/v1/comunas ..."
 
+# Reassign the task (accepts UPN, display name, or empty to clear)
+yp azure-devops task update <org> <id> --assigned-to "elvis.brevi@sag.gob.cl"
+yp azure-devops task update <org> <id> --assigned-to "Elvis Brevi"
+yp azure-devops task update <org> <id> --assigned-to ""
+
 # Create tasks with info
 yp azure-devops hu task <org> <proj> <hu-id> --description "Task info" --effort "4" --task-titles "Desarrollo, Pruebas Unitarias" --no-link
 ```

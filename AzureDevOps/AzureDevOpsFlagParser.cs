@@ -17,7 +17,8 @@ internal record AzureDevOpsFlagParser(
     bool Trio,
     IReadOnlyList<string> ExtraFields,
     bool Json = false,
-    bool Yes = false)
+    bool Yes = false,
+    string? AssignedTo = null)
 {
     public static AzureDevOpsFlagParser Parse(string[] args)
     {
@@ -38,6 +39,7 @@ internal record AzureDevOpsFlagParser(
         var extraFields = new List<string>();
         bool json = false;
         bool yes = false;
+        string? assignedTo = null;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -109,12 +111,16 @@ internal record AzureDevOpsFlagParser(
             {
                 yes = true;
             }
+            if (args[i] == "--assigned-to" && i + 1 < args.Length)
+            {
+                assignedTo = args[i + 1];
+            }
         }
 
         return new AzureDevOpsFlagParser(
             title, description, evidence, history, comment,
             effort, effortReal, remaining, state,
             repo, branch, taskTitles, noLink, trio,
-            extraFields, json, yes);
+            extraFields, json, yes, assignedTo);
     }
 }

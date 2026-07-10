@@ -1752,7 +1752,8 @@ partial class Program
         string orgUrl, string id,
         string? effort, string? remaining, string? state, string? comment, string? effortReal = null,
         string? title = null, string? description = null, string? evidence = null,
-        IReadOnlyList<string>? extraFields = null, string? history = null)
+        IReadOnlyList<string>? extraFields = null, string? history = null,
+        string? assignedTo = null)
     {
         if (!string.IsNullOrEmpty(state))
         {
@@ -1768,7 +1769,8 @@ partial class Program
             !string.IsNullOrEmpty(evidence) ||
             !string.IsNullOrEmpty(comment) ||
             !string.IsNullOrEmpty(effort) ||
-            !string.IsNullOrEmpty(effortReal);
+            !string.IsNullOrEmpty(effortReal) ||
+            assignedTo != null;
 
         if (needsResolver)
         {
@@ -1806,15 +1808,54 @@ partial class Program
             }
         }
 
-        var fieldsList = TaskUpdateOperationsBuilder.BuildUpdateOperations(
+        TaskUpdateOperationsBuilder.IdentityMatch? assignedToMatch = null;
+        bool clearAssignedTo = false;
+        if (assignedTo != null)
+        {
+            var idToken = await GetAzureAccessToken();
+            if (idToken == null)
+            {
+                AnsiConsole.MarkupLine("[red]❌ Failed to get Azure access token.[/]");
+                return 1;
+            }
+
+            using var idHttp = new HttpClient { Timeout = TimeSpan.FromSeconds(ApiTimeoutSeconds) };
+            idHttp.DefaultRequestHeaders.Add("Authorization", $"Bearer {idToken}");
+            var identityResolver = new AzDevOpsIdentityResolver(idHttp);
+
+            var idResult = await identityResolver.ResolveAsync(orgUrl, assignedTo);
+            switch (idResult)
+            {
+                case IdentityResolutionResult.Clear:
+                    clearAssignedTo = true;
+                    break;
+                case IdentityResolutionResult.SingleMatch sm:
+                    assignedToMatch = sm.Match;
+                    break;
+                case IdentityResolutionResult.MultipleMatches mm:
+                    AnsiConsole.MarkupLine($"[red]❌ Multiple identities match '{Markup.Escape(assignedTo)}'. Pass a more specific value (full UPN or unique name).[/]");
+                    AnsiConsole.MarkupLine("[yellow]Candidates:[/]");
+                    foreach (var c in mm.Matches)
+                    {
+                        AnsiConsole.MarkupLine($"  • {Markup.Escape(c.DisplayName)} [dim]({Markup.Escape(c.UniqueName)})[/]");
+                    }
+                    return 4;
+                case IdentityResolutionResult.NotFound:
+                    AnsiConsole.MarkupLine($"[red]❌ No identity matches '{Markup.Escape(assignedTo)}' in this organization.[/]");
+                    return 1;
+            }
+        }
+
+        var structuredOps = TaskUpdateOperationsBuilder.BuildUpdateOperationsStructured(
             title, description, effort, effortReal, remaining, state,
             evidenceRefName, evidence,
             extraFields ?? Array.Empty<string>(), history,
-            effortRefName: effortRefName, effortRealRefName: effortRealRefName);
+            effortRefName: effortRefName, effortRealRefName: effortRealRefName,
+            assignedToMatch: assignedToMatch, clearAssignedTo: clearAssignedTo);
 
         bool anySuccess = false;
 
-        if (fieldsList.Count > 0)
+        if (structuredOps.Count > 0)
         {
             var token = await GetAzureAccessToken();
             if (token == null)
@@ -1823,7 +1864,7 @@ partial class Program
                 return 1;
             }
 
-            var (restSuccess, restError) = await UpdateWorkItemViaRestApi(orgUrl, id, fieldsList);
+            var (restSuccess, restError) = await UpdateWorkItemViaRestApi(orgUrl, id, structuredOps);
             if (restSuccess)
             {
                 AnsiConsole.MarkupLine("[green]✅ Work item updated successfully via REST API.[/]");
@@ -1860,9 +1901,9 @@ partial class Program
             }
         }
 
-        if (fieldsList.Count == 0 && string.IsNullOrEmpty(comment))
+        if (structuredOps.Count == 0 && string.IsNullOrEmpty(comment))
         {
-            AnsiConsole.MarkupLine("[yellow]No updates provided (use --title, --description, --evidence, --field, --effort, --effort-real, --remaining, --state, --comment, or --history).[/]");
+            AnsiConsole.MarkupLine("[yellow]No updates provided (use --title, --description, --evidence, --field, --effort, --effort-real, --remaining, --state, --comment, --assigned-to, or --history).[/]");
             return 1;
         }
 
@@ -1898,7 +1939,7 @@ partial class Program
     }
 
     private static async Task<(bool Success, string? Error)> UpdateWorkItemViaRestApi(
-        string orgUrl, string workItemId, List<string> fieldsList)
+        string orgUrl, string workItemId, List<TaskUpdateOperationsBuilder.Operation> ops)
     {
         try
         {
@@ -1912,14 +1953,19 @@ partial class Program
                 var restUri = $"{orgUrl}/_apis/wit/workitems/{workItemId}?api-version=7.0";
 
                 var operations = new List<string>();
-                foreach (var field in fieldsList)
+                foreach (var op in ops)
                 {
-                    var idx = field.IndexOf('=');
-                    if (idx > 0)
+                    switch (op)
                     {
-                        var fieldName = field[..idx];
-                        var fieldValue = field[(idx + 1)..];
-                        operations.Add($"{{\"op\": \"add\", \"path\": \"/fields/{fieldName}\", \"value\": \"{EscapeJson(fieldValue)}\"}}");
+                        case TaskUpdateOperationsBuilder.StringFieldOperation s:
+                            operations.Add($"{{\"op\": \"add\", \"path\": \"/fields/{s.RefName}\", \"value\": \"{EscapeJson(s.Value)}\"}}");
+                            break;
+                        case TaskUpdateOperationsBuilder.IdentityFieldOperation i:
+                            operations.Add($"{{\"op\": \"add\", \"path\": \"/fields/{i.RefName}\", \"value\": {{\"displayName\": \"{EscapeJson(i.DisplayName)}\", \"uniqueName\": \"{EscapeJson(i.UniqueName)}\", \"id\": \"{EscapeJson(i.Id)}\"}}}}");
+                            break;
+                        case TaskUpdateOperationsBuilder.ClearFieldOperation c:
+                            operations.Add($"{{\"op\": \"add\", \"path\": \"/fields/{c.RefName}\", \"value\": null}}");
+                            break;
                     }
                 }
 
