@@ -118,7 +118,7 @@ partial class Program
             .AddColumn(new TableColumn("[bold]Command[/]").NoWrap())
             .AddColumn(new TableColumn("[bold]Description[/]"));
 
-        commandsTable.AddRow("setup", "Configure AI provider (OpenAI, Anthropic, Google, DeepSeek, OpenRouter)");
+        commandsTable.AddRow("setup", "Configure AI provider (OpenAI, Anthropic, Google, DeepSeek, OpenRouter, NVIDIA NIM)");
         commandsTable.AddRow("commit", "Stage, commit and push changes with an AI-generated message");
         commandsTable.AddRow("pr", "Generate a pull request description between two branches");
         commandsTable.AddRow("checkout", "Interactive branch checkout");

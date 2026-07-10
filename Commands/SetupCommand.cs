@@ -26,7 +26,7 @@ partial class Program
         }
 
         // Step 1: Select provider
-        var providerChoices = new[] { "OpenAI", "Anthropic", "Google Gemini", "DeepSeek", "OpenRouter" };
+        var providerChoices = new[] { "OpenAI", "Anthropic", "Google Gemini", "DeepSeek", "OpenRouter", "NVIDIA NIM" };
         var selectedProvider = AnsiConsole.Prompt(
             new SelectionPrompt<string>()
                 .Title("📡 Select your AI provider:")
@@ -34,7 +34,12 @@ partial class Program
                 .HighlightStyle(new Style(Color.Cyan1))
                 .AddChoices(providerChoices));
 
-        string providerKey = selectedProvider == "Google Gemini" ? "Google" : selectedProvider;
+        string providerKey = selectedProvider switch
+        {
+            "Google Gemini" => "Google",
+            "NVIDIA NIM" => "Nvidia",
+            _ => selectedProvider
+        };
 
         // Step 2: Enter API key
         var apiKey = AnsiConsole.Prompt(
@@ -212,6 +217,7 @@ partial class Program
         "Google Gemini" => new List<string> { "gemini-2.0-flash", "gemini-2.0-pro-exp-02-05", "gemini-1.5-pro", "gemini-1.5-flash" },
         "DeepSeek" => new List<string> { "deepseek-chat", "deepseek-reasoner" },
         "OpenRouter" => new List<string> { "google/gemini-2.0-flash-exp:free", "anthropic/claude-sonnet-4-6", "openai/gpt-4o", "deepseek/deepseek-chat", "meta-llama/llama-3.3-70b-instruct:free", "qwen/qwen-2.5-72b-instruct:free" },
+        "Nvidia" => new List<string> { "meta/llama-3.1-70b-instruct", "meta/llama-3.1-8b-instruct", "nvidia/nemotron-4-340b-instruct" },
         _ => new List<string> { "gpt-4o" }
     };
 

@@ -90,7 +90,9 @@ Interactive branch selector with remote-tracking support. No flags. Use this whe
 yp setup
 ```
 
-Walks the user through provider selection (OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter), API key entry, model selection, and validation. Saves to `~/.yitpush/config.json`. After saving, optionally adds a `yitpush` shell alias and offers to install this skill.
+Walks the user through provider selection (OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter, **NVIDIA NIM**), API key entry, model selection, and validation. Saves to `~/.yitpush/config.json`. After saving, optionally adds a `yitpush` shell alias and offers to install this skill.
+
+Each provider has a matching `<PROVIDER>_API_KEY` environment variable that overrides the stored key at runtime: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`, `NVIDIA_API_KEY`. `DEEPSEEK_API_KEY` also acts as a backwards-compatibility fallback when no config file exists.
 
 ### Install the yp agent skill
 
