@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`tests/YitPush.Tests/HelpTextTests.cs`** — 11 xUnit tests that assert `yp --help` mentions every top-level subcommand introduced in v0–v13 (`task delete`, `task attach`, `resolve-field`, `refresh-fields`, `diff`, `pr list`, `pr show`, `pr comments`, `pr reply`, `pr create`). The tests capture `ShowHelp()`'s output by swapping `AnsiConsole.Console` for a `StringWriter`-backed one and strip ANSI escapes, so they verify the user-facing help, not a parallel data structure.
+- **`tests/YitPush.Tests/SkillFileAlignmentTests.cs`** — 22 xUnit tests that assert both `SKILL.md` and `skills/yp/SKILL.md` mention every v0–v13 subcommand and that the two files are byte-identical (the installable skill must not drift from the human-readable one).
+- **`tests/YitPush.Tests/LlmsFileTests.cs`** — 23 xUnit tests that assert `llms.txt` and `llms-full.txt` reflect the v2.3.0 runtime surface (version stamp, NVIDIA NIM provider, and all the v0–v13 subcommands).
+- **`Program.HelpTopLevelSubcommands` / `HelpPrSubcommands` / `HelpAzureDevOpsSubcommands`** — `internal static readonly string[]` constants that the new tests assert against. `BuildHelpText()` joins them into a single string for the tests. The visual help in `ShowHelp()` and the test surface are now in sync.
+- **`scripts/regenerate-llms.sh`** — bash script that stamps the current `<Version>` from `YitPush.csproj` into `llms.txt` and `llms-full.txt` and smoke-checks that `SKILL.md` mentions every v0–v13 subcommand. Designed to be re-run at the start of every release cycle.
+
+### Fixed
+- **Spectre.Console markup crash in `yp --help` (latent, surfaced by capturing `ShowHelp()` from a test)** — the `prSubTable` row `"create --source <b> --target <b> --title <t> [--body-file <path>] [--auto-complete]"` was unescaped, so `[--body-file <path>]` was parsed as a markup tag and threw `InvalidOperationException: Could not find color or style '--body-file'`. The brackets are now escaped (`[[--body-file <path>]]`) so the help renders cleanly. This was previously hidden because the default AnsiConsole path silently failed in the same place; the captured test now proves the row renders end-to-end.
+
+Resolves #19.
+
+### Added
 - **`yp pr` interactive menu** — running `yp pr` with no arguments now opens an interactive menu (Spectre `SelectionPrompt`) with six options: generate an AI description, list, show, comments, reply, or create a PR. Picking a read/write option still falls through to the same CLI handler as the direct subcommand (so the menu is purely a discovery layer).
 - **`yp pr list`** — list open pull requests in the current repo via `az repos pr list --output json`. Output: Spectre table (id, title, author, source, target, draft flag, created). `--json` emits `{ exitCode, count, pullRequests: [...] }` for `jq` pipelines. Resolves the "I don't want to open a browser to see what's open" workflow.
 - **`yp pr show <pr-id>`** — show a single PR (title, description, source/target, status, author, creation date, draft flag, reviewer table with vote + isRequired). Backed by `az repos pr show --id <pr-id> --output json`. `--json` supported. Resolves the "give me the context of a PR in one terminal screen" workflow.

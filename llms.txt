@@ -1,23 +1,36 @@
 # yp (YitPush)
 
 > AI-powered CLI tool for Git commit automation and Azure DevOps management.
-> Supports multiple AI providers: OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter.
+> Supports multiple AI providers: OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter, NVIDIA NIM.
 
 ## Project
 
-- Version: 2.0.0
+- Version: 2.3.0
 - Language: C# / .NET 10
 - Install: `dotnet tool install -g YitPush`
 - Command: `yp`
 - Repository: https://github.com/elvisbrevi/yitpush
+- AI provider setup: `yp setup` (TUI by default; `--wizard` for the legacy 5-step flow)
 
 ## Commands
 
-- `yp setup` — interactive wizard to configure AI provider and API key
-- `yp commit` — stage, commit and push with an AI-generated message
-- `yp pr` — generate a pull request description between two branches
+- `yp setup` — configure AI provider in the TUI (auto-falls-back to `--wizard` in CI)
+- `yp commit` — stage, commit, and push with an AI-generated message (supports `--conventional`, `--type`, `--scope`, `--detect-breaking`, `--amend`, `--template`)
+- `yp pr` — interactive menu (list / show / comments / reply / create / generate AI description)
+- `yp pr list` — list open pull requests in the current repo
+- `yp pr show <pr-id>` — show a single PR (title, description, reviewers)
+- `yp pr comments <pr-id>` — list all discussion threads with file/line context (REST API)
+- `yp pr reply <pr-id> <thread-id> --body "..."` — post a reply to a thread
+- `yp pr create --source <branch> --target <branch> --title <title> [--body-file <path>] [--auto-complete]` — open a new PR
 - `yp checkout` — interactive branch checkout
+- `yp diff` — working-tree or branch-to-branch diff (`--files`, `--hunks`, `--stat`, `--json`)
+- `yp skill` — install the yp skill for your AI agent
 - `yp azure-devops` — Azure DevOps management (repos, user stories, tasks, links)
+- `yp azure-devops resolve-field <org> <project> <workItemType> <displayName>` — print a work-item field refname
+- `yp azure-devops refresh-fields <org> <project> <workItemType>` — invalidate and re-warm the field cache
+- `yp azure-devops task delete <org> <id> [--yes]` — move a work item to the recycle bin
+- `yp azure-devops task attach <org> <project> <id> <file-path> [--comment "..."]` — upload a file as an AttachedFile
+- `yp --version` / `yp -V` — print the assembly version (e.g. `2.3.0`) and exit 0
 
 ## Key flags
 
@@ -25,15 +38,21 @@
 - `--detailed` — generate a detailed commit or PR description with full body
 - `--confirm` — require confirmation before committing (commit only)
 - `--save` — save output to a markdown file
+- `--conventional` — emit Conventional Commits `<type>(<scope>): <subject>` (optionally with `BREAKING CHANGE:` footer)
+- `--json` — emit a stable JSON envelope on stdout (no ANSI escapes) for `hu show`, `task show`, `hu list`, `pr list/show/comments/reply/create`, `yp diff`
+- `--no-spinner` — skip the AnsiConsole.Status() spinner for long ops (also honored via the `YITPUSH_NO_SPINNER` env var)
 
 ## Configuration
 
 Config file: `~/.yitpush/config.json`
-Supported providers: OpenAI, Anthropic, Google, DeepSeek, OpenRouter
+Supported providers: OpenAI, Anthropic, Google, DeepSeek, OpenRouter, NVIDIA NIM
+Provider env-var overrides: `OPENAI_API_KEY`, `ANTHROPIC_API_KEY`, `GOOGLE_API_KEY`, `DEEPSEEK_API_KEY`, `OPENROUTER_API_KEY`, `NVIDIA_API_KEY`
+Default commit format can be set per project under `"commitFormat"` in `~/.yitpush/config.json` (`"conventional"`, `"plain"`, `"gitmoji"`, or a path to a template file).
 
 ## Documentation
 
 - README: /README.md
 - Changelog: /CHANGELOG.md
 - Quickstart: /QUICKSTART.md
+- Agent skill (installable): /skills/yp/SKILL.md
 - Full docs: /llms-full.txt

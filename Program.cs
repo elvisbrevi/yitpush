@@ -108,7 +108,58 @@ partial class Program
 
     // ─── Help ─────────────────────────────────────────────────────────────────
 
-    private static void ShowHelp()
+    // Single source of truth for the subcommand/flag surface that appears in `yp --help`.
+    // Keep this in sync with the rows ShowHelp() renders; the HelpTextTests assert against
+    // the strings below so a missing subcommand here means it is also missing from the
+    // runtime help.
+    internal static readonly string[] HelpTopLevelSubcommands = new[]
+    {
+        "setup",
+        "commit",
+        "pr",
+        "checkout",
+        "azure-devops",
+        "diff",
+        "skill",
+    };
+
+    internal static readonly string[] HelpPrSubcommands = new[]
+    {
+        "list",
+        "show",
+        "comments",
+        "reply",
+        "create",
+    };
+
+    internal static readonly string[] HelpAzureDevOpsSubcommands = new[]
+    {
+        "repo new",
+        "repo checkout",
+        "variable-group list",
+        "hu task",
+        "hu show",
+        "hu list",
+        "hu link",
+        "task show",
+        "task update",
+        "task delete",
+        "task attach",
+        "link",
+        "resolve-field",
+        "refresh-fields",
+    };
+
+    internal static string BuildHelpText()
+    {
+        var sb = new StringBuilder();
+        foreach (var s in HelpTopLevelSubcommands) sb.AppendLine(s);
+        foreach (var s in HelpPrSubcommands) sb.AppendLine("pr " + s);
+        foreach (var s in HelpAzureDevOpsSubcommands) sb.AppendLine(s);
+        return sb.ToString();
+    }
+
+    internal static void ShowHelp()
     {
         AnsiConsole.MarkupLine("[bold]Usage:[/] yp [bold]<command>[/] [[options]]\n");
 
@@ -167,7 +218,7 @@ partial class Program
         prSubTable.AddRow("show <pr-id>", "Show a single PR (title, description, reviewers, status) — --json supported");
         prSubTable.AddRow("comments <pr-id>", "List all discussion threads with file/line context (REST API) — --json supported");
         prSubTable.AddRow("reply <pr-id> <thread-id> --body \"...\"", "Post a reply to a thread via the REST API — --json supported");
-        prSubTable.AddRow("create --source <b> --target <b> --title <t> [--body-file <path>] [--auto-complete]", "Open a new PR via the REST API (description can be larger than az's argv limit) — --json supported");
+        prSubTable.AddRow("create --source <b> --target <b> --title <t> [[--body-file <path>]] [[--auto-complete]]", "Open a new PR via the REST API (description can be larger than az's argv limit) — --json supported");
 
         AnsiConsole.Write(prSubTable);
 
@@ -223,8 +274,12 @@ partial class Program
         azTable.AddRow("task show <org> <id>", "Show details (skip menus)");
         azTable.AddRow("task update", "Update effort, remaining, state or comment (alias: hu update, wi update)");
         azTable.AddRow("task update <org> <id> [[--effort|-e <e>]] [[--effort-real|-er <er>]] [[--remaining|-r <r>]] [[--state|-s <s>]] [[--comment|-c <c>]]", "Update directly");
+        azTable.AddRow("task delete <org> <id> [[--yes|-y]]", "Move a work item to the recycle bin (prompts by default; pass --yes in CI)");
+        azTable.AddRow("task attach <org> <project> <id> <file-path> [[--comment \"...\"]]", "Upload a local file as an AttachedFile relation on the work item");
         azTable.AddRow("link", "Add link (branch/commit/PR) to work item");
         azTable.AddRow("link <org> <proj> <wi-id> [[--repo <repo> --branch <branch>]]", "Add link (skip menus) — pass --repo + --branch to skip the menu in quick mode (works for both HUs and Tasks; writes Custom.URLCommit as a fallback)");
+        azTable.AddRow("resolve-field <org> <proj> <type> <displayName>", "Print the refname for a display name (cached 24h)");
+        azTable.AddRow("refresh-fields <org> <proj> <type>", "Invalidate the (org, project, workItemType) cache and re-warm it");
 
         AnsiConsole.Write(azTable);
 
@@ -258,10 +313,15 @@ partial class Program
         AnsiConsole.MarkupLine("  yp azure-devops hu show MyOrg 12345             [dim]# Show HU details[/]");
         AnsiConsole.MarkupLine("  yp azure-devops task show MyOrg 67890           [dim]# Show Task details[/]");
         AnsiConsole.MarkupLine("  yp azure-devops task update MyOrg 67890 --state \"Doing\" --effort-real \"3\"  [dim]# Update task[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops task delete MyOrg 22428 --yes    [dim]# Move a work item to the recycle bin[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops task attach MyOrg MyProj 22427 ./screenshot.png  [dim]# Upload a local file as an AttachedFile[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu link MyOrg MyProj 12345 --repo MyRepo --branch feature/abc  [dim]# Link branch[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu list MyOrg MyProj 12345      [dim]# List tasks of HU[/]");
         AnsiConsole.MarkupLine("  yp azure-devops link MyOrg MyProj 12345         [dim]# Add link to work item (interactive)[/]");
         AnsiConsole.MarkupLine("  yp azure-devops link MyOrg MyProj 12345 --repo MyRepo --branch feature/abc  [dim]# Quick link (skip menu, works for HUs and Tasks)[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops resolve-field MyOrg MyProj Task \"Esfuerzo Real\"  [dim]# Print refname (cached 24h)[/]");
+        AnsiConsole.MarkupLine("  yp azure-devops refresh-fields MyOrg MyProj Task                 [dim]# Invalidate + re-warm cache[/]");
+
         Console.WriteLine();
     }
 
