@@ -79,7 +79,7 @@ partial class Program
             case "pr":
                 result = await PrCommand(args.Skip(1).ToArray()); break;
             case "setup":
-                result = await SetupCommand(); break;
+                result = await SetupCommand(args.Skip(1).ToArray()); break;
             case "skill":
                 result = await InstallSkillCommand(); break;
             case "azure-devops":
@@ -119,7 +119,7 @@ partial class Program
             .AddColumn(new TableColumn("[bold]Command[/]").NoWrap())
             .AddColumn(new TableColumn("[bold]Description[/]"));
 
-        commandsTable.AddRow("setup", "Configure AI provider (OpenAI, Anthropic, Google, DeepSeek, OpenRouter, NVIDIA NIM)");
+        commandsTable.AddRow("setup", "Configure AI provider in the TUI (auto-falls-back to --wizard in CI); pass --wizard to force the legacy flow");
         commandsTable.AddRow("commit", "Stage, commit and push changes with an AI-generated message");
         commandsTable.AddRow("pr", "Generate a pull request description between two branches");
         commandsTable.AddRow("checkout", "Interactive branch checkout");
@@ -215,7 +215,9 @@ partial class Program
         AnsiConsole.MarkupLine("\n[dim]Short flags for hu task: --title, --description|-d|-D, --effort|-e, --trio, --task-titles|-t, --no-link|-n. Default: 1 task (title 'Desarrollo'). --trio restores the legacy trio.[/]");
 
         AnsiConsole.MarkupLine("\n[bold]Examples:[/]");
-        AnsiConsole.MarkupLine("  yp setup                                        [dim]# Configure AI provider[/]");
+        AnsiConsole.MarkupLine("  yp setup                                        [dim]# Configure AI provider in the TUI (left/right panel, ←/→ provider, ↑/↓ model, T test, Enter save, Esc cancel)[/]");
+        AnsiConsole.MarkupLine("  yp setup --wizard                               [dim]# Force the legacy 5-step wizard (auto-selected when stdin/stdout is redirected, e.g. CI)[/]");
+        AnsiConsole.MarkupLine("  yp setup --tui                                  [dim]# Force the TUI even if the routing would otherwise pick the wizard[/]");
         AnsiConsole.MarkupLine("  yp skill                                        [dim]# Install skill for your AI agent[/]");
         AnsiConsole.MarkupLine("  yp commit                                       [dim]# Auto commit and push[/]");
         AnsiConsole.MarkupLine("  yp commit --confirm                             [dim]# Review before committing[/]");

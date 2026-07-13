@@ -37,12 +37,16 @@ Listed on [skills.sh/elvisbrevi/yitpush](https://skills.sh/elvisbrevi/yitpush).
 ## 🔑 Configuration
 
 ### Interactive Setup (Recommended)
-Run the setup wizard to configure your preferred AI provider:
+Run the setup TUI to configure your preferred AI provider:
 ```bash
-yp setup
+yp setup                # launches the TUI (default in a real terminal)
+yp setup --wizard       # forces the legacy 5-step wizard (auto-selected in CI)
+yp setup --tui          # forces the TUI even if the routing would otherwise pick --wizard
 ```
 
-The wizard will guide you through:
+The **TUI** shows a two-column live layout: the left column lists the providers (with a green dot for the ones you've already tested), the right column shows the API key status, endpoint, and the model picker. Keyboard: `←/→` switch provider, `↑/↓` switch model, `T` test connection, `Enter` save, `Esc` cancel. The TUI auto-falls-back to the wizard when stdin/stdout is redirected (CI), so scripts and pipes keep working without any change.
+
+The **legacy wizard** (`--wizard`) guides you through:
 1. Selecting a provider: **OpenAI**, **Anthropic**, **Google Gemini**, **DeepSeek**, **OpenRouter**, or **NVIDIA NIM**
 2. Entering your API key (masked input)
 3. Selecting a model from a curated list or entering a custom one
@@ -69,7 +73,7 @@ export OPENROUTER_API_KEY='...'
 ### Git Commands
 | Command | Description |
 |---------|-------------|
-| `yp setup` | Configure your AI provider interactively |
+| `yp setup` | Configure your AI provider in the TUI (pass `--wizard` for the legacy 5-step flow) |
 | `yp skill` | Install the yp skill for your AI agent |
 | `yp commit` | Stage, commit and push with an AI-generated message |
 | `yp checkout` | Interactive branch checkout |

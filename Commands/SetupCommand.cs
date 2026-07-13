@@ -5,7 +5,21 @@ namespace YitPush;
 
 partial class Program
 {
-    private static async Task<int> SetupCommand()
+    private static async Task<int> SetupCommand(string[] args)
+    {
+        // Issue #15 (v12): launch the new TUI by default; fall back to the
+        // legacy 5-step wizard when --wizard is passed or when stdin/stdout
+        // is redirected (CI safety, no real terminal available).
+        if (SetupTui.ShouldUseTui(args))
+        {
+            return await SetupTui.RunAsync(args);
+        }
+
+        return await RunSetupWizard();
+    }
+
+    // The original 5-step wizard, preserved verbatim for --wizard and CI.
+    private static async Task<int> RunSetupWizard()
     {
         AnsiConsole.MarkupLine("[bold cyan]🔧 YitPush (yp) Setup[/]\n");
         AnsiConsole.MarkupLine("Configure your AI provider for commit message and PR description generation.\n");
