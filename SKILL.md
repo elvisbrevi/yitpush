@@ -201,6 +201,8 @@ yp azure-devops [subcommand] [args] [flags]
 | `task delete <org> <id> [--yes\|-y]` | Move work item to the recycle bin (prompts by default; pass `--yes` in CI) |
 | `task attach <org> <project> <id> <file-path> [--comment <text>]` | Upload a local file as an `AttachedFile` relation on the work item |
 | `link <org> <proj> <id> [--repo <r> --branch <b>]` | Add a link (branch/commit/PR) to any work item; `--repo` + `--branch` skip the menus and create the ArtifactLink in quick mode (same as `hu link`) |
+| `resolve-field <org> <project> <workItemType> <displayName>` | Print the refname for a work-item field by its display name; uses the 24h on-disk cache (e.g. `resolve-field MyOrg MyProj Task "Esfuerzo Real"` → `Custom.EsfuerzoReal`) |
+| `refresh-fields <org> <project> <workItemType>` | Invalidate the cache for the `(org, project, workItemType)` triple and re-warm it with a fresh REST call |
 
 **task update flags**: `--title`, `--description|-D`, `--evidence`, `--field <RefName=val>`, `--effort|-e`, `--effort-real|-er`, `--remaining|-r`, `--state|-s`, `--comment|-c`, `--assigned-to <upn|display-name|"">`, `--history`
 **hu link flags**: `--repo`, `--branch`

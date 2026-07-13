@@ -1,6 +1,6 @@
 # yp (YitPush) — Full Documentation Bundle
 
-Version: 2.0.0 | Command: `yp` | Language: C# / .NET 10
+Version: 2.3.0 | Command: `yp` | Language: C# / .NET 10
 
 ---
 
@@ -8,7 +8,7 @@ Version: 2.0.0 | Command: `yp` | Language: C# / .NET 10
 
 ```bash
 dotnet tool install -g YitPush
-yp setup        # configure AI provider interactively
+yp setup        # configure AI provider interactively (TUI by default)
 ```
 
 Update:
@@ -16,14 +16,22 @@ Update:
 dotnet tool update -g YitPush
 ```
 
+Get the current version:
+```bash
+yp --version    # prints "2.3.0" on stdout, exits 0
+```
+
 ---
 
 ## SETUP
 
-Run `yp setup` to configure your AI provider. The wizard will:
-1. Let you pick a provider: OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter
+Run `yp setup` to configure your AI provider. The TUI (default in a real terminal) shows a two-column live layout: the left column lists providers (with a green dot for tested ones), the right column shows API key status, endpoint, and the model picker. Keyboard: `←/→` switch provider, `↑/↓` switch model, `T` test connection, `Enter` save, `Esc` cancel.
+
+The TUI auto-falls-back to the legacy 5-step wizard when stdin/stdout is redirected (CI), and explicit `--wizard` and `--tui` flags force one or the other regardless of TTY detection. The legacy wizard flow:
+
+1. Let you pick a provider: OpenAI, Anthropic, Google Gemini, DeepSeek, OpenRouter, NVIDIA NIM
 2. Enter your API key (masked)
-3. Select a model from a curated list or enter a custom one
+3. Select a model from a curated list, live `/models` discovery, or enter a custom one
 4. Validate the key with a test call
 5. Optionally add the `yitpush` alias to your shell config
 6. Save config to `~/.yitpush/config.json`
@@ -32,10 +40,11 @@ Run `yp setup` to configure your AI provider. The wizard will:
 ```json
 {
   "defaultProvider": "Anthropic",
+  "commitFormat": "conventional",
   "providers": {
     "Anthropic": {
       "apiKey": "sk-ant-...",
-      "model": "claude-sonnet-4-6",
+      "model": "claude-sonnet-4-6-20250514",
       "isActive": true
     },
     "OpenAI": {
@@ -45,9 +54,15 @@ Run `yp setup` to configure your AI provider. The wizard will:
     },
     "OpenRouter": {
       "apiKey": "sk-or-...",
-      "model": "google/gemini-2.0-flash-exp:free",
+      "model": "google/gemini-2.0-flash:free",
       "isActive": false,
       "baseUrl": "https://openrouter.ai/api/v1/chat/completions"
+    },
+    "Nvidia": {
+      "apiKey": "nvapi-...",
+      "model": "meta/llama-3.1-70b-instruct",
+      "isActive": false,
+      "baseUrl": "https://integrate.api.nvidia.com/v1/chat/completions"
     }
   }
 }
@@ -55,11 +70,13 @@ Run `yp setup` to configure your AI provider. The wizard will:
 
 ### Environment variable overrides (backward compatible)
 ```bash
-export DEEPSEEK_API_KEY='...'     # used if no config file exists
-export OPENAI_API_KEY='...'       # overrides stored key for OpenAI
-export ANTHROPIC_API_KEY='...'    # overrides stored key for Anthropic
-export GOOGLE_API_KEY='...'       # overrides stored key for Google
-export OPENROUTER_API_KEY='...'   # overrides stored key for OpenRouter
+export DEEPSEEK_API_KEY='...'      # used if no config file exists
+export OPENAI_API_KEY='...'        # overrides stored key for OpenAI
+export ANTHROPIC_API_KEY='...'     # overrides stored key for Anthropic
+export GOOGLE_API_KEY='...'        # overrides stored key for Google
+export OPENROUTER_API_KEY='...'    # overrides stored key for OpenRouter
+export NVIDIA_API_KEY='...'        # overrides stored key for NVIDIA NIM
+export YITPUSH_NO_SPINNER=1        # disable the AnsiConsole.Status() spinner globally
 ```
 
 ---
@@ -72,6 +89,10 @@ Stage all changes, generate an AI commit message, and push.
 
 ```
 yp commit [--confirm] [--detailed] [--language <lang>] [--save]
+yp commit --conventional [--type <type>] [--scope <scope>] [--detect-breaking]
+yp commit --amend                              # re-run AI on git diff HEAD~1, no push
+yp commit --template <path-to-md>              # render the AI output through a Handlebars-ish template
+yp commit --no-spinner                         # skip the AnsiConsole.Status() spinner
 ```
 
 | Flag | Short | Description |
@@ -80,6 +101,13 @@ yp commit [--confirm] [--detailed] [--language <lang>] [--save]
 | `--detailed` | | Generate commit with title + body |
 | `--language <lang>` | `--lang`, `-l` | Output language (default: english) |
 | `--save` | | Save commit message to a .md file |
+| `--conventional` | | Format as Conventional Commits `<type>(<scope>): <subject>` (with optional `BREAKING CHANGE:` footer) |
+| `--type <feat\|fix\|chore\|refactor\|docs\|test\|perf\|build\|ci\|style>` | | Force the Conventional Commits type |
+| `--scope <scope>` | | Force the Conventional Commits scope (e.g. `api`, `wcf`) |
+| `--detect-breaking` | | Scan the diff for breaking changes (removed C# public symbol, removed TS/JS export, JSON major version bump, `#major.bump` marker) |
+| `--amend` | | Regenerate the last commit's message via `git commit --amend`; no push |
+| `--template <path-to-md>` | | Render the AI output through a Handlebars-ish template (`{{type}}`, `{{scope}}`, `{{subject}}`, `{{body}}`, `{{refs}}`); exits 6 if the file is missing |
+| `--no-spinner` | | Skip the AnsiConsole.Status() spinner that wraps the AI call and `git push` |
 
 Examples:
 ```bash
@@ -88,28 +116,64 @@ yp commit --confirm
 yp commit --detailed
 yp commit -l spanish
 yp commit --detailed -l french --save
+yp commit --conventional --type feat --scope wcf
+yp commit --conventional --detect-breaking
+yp commit --amend
+yp commit --template ~/.yitpush/commit.md
 ```
 
 ### yp pr
 
-Interactively select two branches, generate a PR description and copy to clipboard.
+Triage and act on Azure DevOps pull requests from the terminal, or generate an AI-powered PR description for the current branch. `yp pr` with no args opens an interactive menu; pass `--detailed` (or any AI flag) to bypass the menu and run the AI generator directly (backward compat).
 
 ```
-yp pr [--detailed] [--language <lang>] [--save]
+yp pr                                     # interactive menu (list/show/comments/reply/create + AI)
+yp pr list                                # list open PRs in the current repo (Spectre table or --json)
+yp pr show <pr-id>                        # show a PR's details
+yp pr comments <pr-id>                    # list discussion threads (REST API)
+yp pr reply <pr-id> <thread-id> --body "..."   # reply to a thread (REST API)
+yp pr create --source <b> --target <b> --title <t> [--body-file <path>] [--auto-complete]  # open a PR via REST API
+yp pr [--detailed] [--language <lang>] [--save]   # AI-generated description (backward compat)
 ```
 
-| Flag | Short | Description |
-|------|-------|-------------|
-| `--detailed` | | Detailed description with testing notes and file list |
-| `--language <lang>` | `--lang`, `-l` | Output language (default: english) |
-| `--save` | | Save to pr-description-<from>-to-<to>.md |
+| Subcommand | Description |
+|-----------|-------------|
+| `list` | List open PRs in a Spectre table — `--json` for a stable envelope |
+| `show <pr-id>` | Show title, description, source/target, status, author, reviewers — `--json` supported |
+| `comments <pr-id>` | List all discussion threads (REST API) with file path / line — `--json` supported |
+| `reply <pr-id> <thread-id> --body "..."` | Post a reply to a specific thread via the REST API — `--json` supported |
+| `create --source <b> --target <b> --title <t> [--body-file <path>] [--auto-complete]` | Open a new PR via the REST API so the description can be larger than `az`'s argv limit. Without `--body-file` the description is read from stdin. `--auto-complete` sets `completionOptions` (`deleteSourceBranch: true`). `--json` supported |
+
+Exit codes: `0` success, `1` not-found (404), `2` auth/error, `3` validation.
+
+Read operations (`list`, `show`) go through `az repos pr` so the CLI's auth + defaults are reused. Write operations (`reply`, `create`) and threads (`comments`) go through the Azure DevOps REST API so the description can be larger than `az`'s argv limit and because `az repos pr thread` does not exist.
+
+### yp diff
+
+Friendly wrapper over `git diff` for the common agent and human workflows.
+
+```
+yp diff [--files] [--hunks] [--stat] [--json] [--no-color] [<refA> <refB>]
+```
+
+| Flag | Description |
+|------|-------------|
+| `--files` / `--stat` | List the changed files with `+N -M` per file (a colorful `git diff --stat`) |
+| `--hunks` | Show only the changed lines, no context (`git diff -U0`) |
+| `--json` | Emit a stable JSON shape on stdout (no ANSI escapes) — `--no-color` is auto-applied when stdout is redirected |
+| `--no-color` | Disable Spectre coloring manually |
+| `<refA> <refB>` | Diff branch/tag/commit to another (`git diff <refA>..<refB>`) |
+
+JSON shape: `{ files: [{ path, oldPath?, additions, deletions, isBinary, isRename, hunks: [{ beforeLine, afterLine, content }] }] }`.
 
 Examples:
 ```bash
-yp pr
-yp pr --detailed
-yp pr -l spanish
-yp pr --detailed --save
+yp diff                                         # working-tree diff, colored
+yp diff --files                                 # just the file list
+yp diff --hunks                                 # changed lines only
+yp diff feature/abc main --stat                 # branch-to-branch stat
+yp diff --json | jq '.files[0].hunks[0].afterLine'   # first added line of the first hunk
+yp diff --json | jq '.files[] | select(.additions > 0) | .path'   # only added paths
 ```
 
 ### yp checkout
@@ -120,15 +184,21 @@ Interactive branch selector with search and back navigation.
 yp checkout
 ```
 
-### yp setup
+### yp skill
 
-Configure AI provider interactively.
+Installs the `yp` agent skill for any Agent Skills-compatible AI agent (Claude Code, Cursor, Gemini CLI, ...). Internally runs `npx skills add elvisbrevi/yitpush`.
 
 ```bash
-yp setup
+yp skill
 ```
 
-Reconfigures even if a provider is already set (asks for confirmation).
+### yp setup
+
+Configures the active AI provider interactively. See the SETUP section for the TUI / wizard flow and the per-provider env vars.
+
+### yp --version / yp -V
+
+Prints the assembly version (`2.3.0`) on stdout with no ANSI escapes, exits 0. Safe to pipe in scripts and CI.
 
 ### yp azure-devops
 
@@ -136,71 +206,149 @@ Manage Azure DevOps resources. Can be run interactively (no args) or with subcom
 
 ```
 yp azure-devops [subcommand] [args] [flags]
+yp azure-devops --help    # full azure-devops help
 ```
 
 #### Subcommands
 
 | Subcommand | Description |
 |-----------|-------------|
-| `repo new` | Create a new repository |
-| `repo checkout` | Clone a repository interactively |
-| `variable-group list` | List variable groups |
-| `hu task [<org> <proj> <hu-id>]` | Create tasks for a User Story |
-| `hu show [<org> <hu-id>]` | Show User Story details |
-| `hu list [<org> <proj> <hu-id>]` | List tasks of a User Story |
+| `repo new` | Create a new repository interactively |
+| `repo checkout` | Clone/checkout a repository interactively |
+| `variable-group list` | List and inspect variable groups |
+| `hu task [<org> <proj> <hu-id>]` | Create tasks for a User Story. Default: 1 task (titled `Desarrollo`). `--trio` restores the legacy three-task default. `--title` patches the single task title (highest precedence). |
+| `hu show [<org> <hu-id>]` | Show User Story details — `--json` for a flat object suitable for `jq` |
+| `hu list [<org> <proj> <hu-id>]` | List tasks of a User Story — `--json` for `jq '.value | length'` |
 | `hu link [<org> <proj> <hu-id>]` | Link a branch to a User Story |
-| `task show [<org> <id>]` | Show task details |
-| `task update [<org> <id>]` | Update task fields |
-| `link [<org> <proj> <wi-id>]` | Add a link to a work item (supports `--repo <r> --branch <b>` quick mode for both HUs and Tasks; writes `Custom.URLCommit` as fallback for Tasks) |
+| `task show [<org> <id>]` | Show task details — `--json` for a flat object suitable for `jq` |
+| `task update [<org> <id>]` | Update task fields (alias: `hu update`, `wi update`) |
+| `task delete <org> <id> [--yes\|-y] [--json]` | Move a work item to the recycle bin (prompts by default; pass `--yes` in CI) |
+| `task attach <org> <project> <id> <file-path> [--comment "..."] [--json]` | Upload a local file as an `AttachedFile` relation on the work item |
+| `link [<org> <proj> <wi-id>]` | Add a link (branch/commit/PR) to any work item; `--repo` + `--branch` skip the menus and create the `ArtifactLink` in quick mode (works for both HUs and Tasks; writes `Custom.URLCommit` as a fallback for Tasks) |
+| `resolve-field <org> <project> <workItemType> <displayName>` | Print the refname for a work-item field by display name (24h on-disk cache) |
+| `refresh-fields <org> <project> <workItemType>` | Invalidate the cache for the `(org, project, workItemType)` triple and re-warm it |
 
 #### task update flags
 
 | Flag | Short | Description |
 |------|-------|-------------|
+| `--title <text>` | | Patch `System.Title` (highest precedence on the single task) |
+| `--description <text>` | `-D` | Patch `System.Description` (Markdown) |
+| `--evidence <text>` | | Resolve the project-specific "Evidencias de finalización" field by display name (cached) and write to it |
+| `--field <RefName=value>` | | Generic escape hatch for any work-item field (repeatable) |
 | `--effort <val>` | `-e` | Set Effort (HH) |
 | `--effort-real <val>` | `-er` | Set Esfuerzo Real HH |
 | `--remaining <val>` | `-r` | Set Remaining Work |
-| `--state <val>` | `-s` | Set state (To Do, Doing, Done, ...) |
-| `--comment <val>` | `-c` | Add a comment |
+| `--state <val>` | `-s` | Set state (To Do, Doing, Done, ...). When `--state "Done"` is passed **without** `--evidence`, the tool pre-flights the work item and exits 2 if `Evidencias de finalización` is empty. |
+| `--comment <val>` | `-c` | Post a discussion comment via `POST /_apis/wit/workItems/{id}/comments` |
+| `--history <text>` | | Write to the legacy `System.History` field (the old `--comment` behavior) |
+| `--assigned-to <upn\|display-name\|"">` | | Reassign the work item; accepts UPN (e.g. `elvis.brevi@sag.gob.cl`), display name (e.g. `Elvis Brevi`), or empty string to clear. Multiple matches exit 4 with a candidate list. |
 
-#### hu link / hu task flags
+#### hu task flags
 
 | Flag | Description |
 |------|-------------|
-| `--repo <name>` | Repository name |
-| `--branch <name>` | Branch name |
-| `--description <text>` | Task description |
-| `--effort <val>` | Effort estimate |
+| `--title <t>` | Title for the single task (highest precedence; overrides `--task-titles` and `--trio`) |
+| `--description <text>` | `-d`, `-D` | Task description |
+| `--effort <val>` | `-e` | Effort estimate |
+| `--trio` | Use the legacy three-task default (Desarrollo / Pruebas Unitarias / Code Review) — opt-in, mutually exclusive with `--task-titles` |
+| `--task-titles "A, B, C"` | `-t` | Comma-separated list of task titles (mutually exclusive with `--trio`) |
+| `--no-link` | `-n` | Skip the branch-linking prompt |
+| `--repo <name>` | Repository name (with `--branch` auto-links the branch) |
+| `--branch <name>` | Branch name (with `--repo` auto-links the branch) |
 
-#### link flags (issue #9, works for HUs and Tasks)
+#### hu link / link flags (issue #9, works for both HUs and Tasks)
 
 | Flag | Description |
 |------|-------------|
 | `--repo <name>` | Repository name (with `--branch` skips the menu) |
 | `--branch <name>` | Branch name (with `--repo` skips the menu) |
 
+#### resolve-field / refresh-fields flags
+
+| Subcommand | Description |
+|-----------|-------------|
+| `resolve-field <org> <project> <workItemType> <displayName>` | Print the refname for a work-item field (e.g. `Custom.EsfuerzoReal` for "Esfuerzo Real"). Uses the 24h on-disk cache. Exits 3 if the field is unknown. |
+| `refresh-fields <org> <project> <workItemType>` | Invalidate the cache for the `(org, project, workItemType)` triple and re-warm it with a fresh REST call |
+
+#### Stable JSON output (--json)
+
+`hu show`, `task show`, `hu list` accept `--json` to emit a flat JSON object on stdout (no Spectre.Console ANSI codes) suitable for `jq` piping:
+
+```bash
+yp azure-devops hu show MyOrg 12345 --json | jq '.title'
+yp azure-devops task show MyOrg 67890 --json | jq '.state'
+yp azure-devops hu list MyOrg MyProj 12345 --json | jq '.value | length'
+```
+
+`hu show` / `task show` return `{id, type, title, state, assignedTo, createdDate, areaPath, iterationPath, effort, effortReal, remaining, month, urlCommit, description, relations?}`. Unknown custom fields pass through with their full refname (e.g. `Custom.Foo`). `hu list` returns `{huId, value: [{id, title, state}, ...]}`.
+
+When stdout is piped (e.g. `| jq`), the trailing interactive prompt is auto-skipped, so `yp ... | jq ...` never crashes with the Spectre "isn't interactive" error.
+
+#### Pre-flight check (Done transition, v2.3.0)
+
+When `--state "Done"` is passed **without** `--evidence`, `yp` first `GET`s the work item and verifies that `Evidencias de finalización` (resolved via the project-specific refname via `AzDevOpsFieldRefNameResolver`) is non-empty. If the field is empty, the tool prints an error and exits 2 without sending the PATCH. The check is skipped when (a) the target state is not `Done`, (b) `--evidence` is provided (the flag itself populates the field), or (c) the work item already has the field populated. Any pre-flight failure (auth, network, 5xx, unresolvable refname) is treated as fail-open so the existing PATCH flow is not regressed.
+
 Examples:
 ```bash
 yp azure-devops hu show MyOrg 12345
+yp azure-devops hu show MyOrg 12345 --json
 yp azure-devops hu list MyOrg MyProj 12345
+yp azure-devops hu list MyOrg MyProj 12345 --json | jq '.value | length'
+yp azure-devops task show MyOrg 67890
+yp azure-devops task show MyOrg 67890 --json
 yp azure-devops task update MyOrg 67890 --state "Doing" --effort-real "3"
 yp azure-devops task update MyOrg 67890 --comment "Fixed the issue"
+yp azure-devops task update MyOrg 67890 --assigned-to "elvis.brevi@sag.gob.cl"
+yp azure-devops task update MyOrg 67890 --assigned-to "Elvis Brevi"
+yp azure-devops task update MyOrg 67890 --assigned-to ""           # clear
+yp azure-devops task update MyOrg 67890 --state "Done" --evidence "PR https://... merged"
+yp azure-devops task delete MyOrg 22428 --yes                       # move to recycle bin (skip prompt in CI)
+yp azure-devops task attach MyOrg MyProj 22427 ./screenshot.png     # upload a file as AttachedFile
+yp azure-devops task attach MyOrg MyProj 22427 ./screenshot.png -c "Curl folio 3535303"
 yp azure-devops hu link MyOrg MyProj 12345 --repo MyRepo --branch feature/abc
 yp azure-devops link MyOrg MyProj 67890 --repo MyRepo --branch feature/abc   # quick mode for any work item (issue #9)
 yp azure-devops hu task MyOrg MyProj 12345 --description "Backend task" --effort "4"
+yp azure-devops hu task MyOrg MyProj 12345 --trio --description "..."        # legacy trio (opt-in)
+yp azure-devops resolve-field MyOrg MyProj Task "Esfuerzo Real"
+yp azure-devops refresh-fields MyOrg MyProj Task
 ```
 
 ---
 
 ## PROVIDERS
 
-| Provider | Models | Auth header |
-|----------|--------|-------------|
-| OpenAI | gpt-4o, gpt-4o-mini, o1, o1-mini | Bearer |
-| Anthropic | claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5 | x-api-key |
-| Google Gemini | gemini-2.0-flash, gemini-1.5-pro | query param |
-| DeepSeek | deepseek-chat, deepseek-reasoner | Bearer |
-| OpenRouter | 100+ models | Bearer + HTTP-Referer |
+| Provider | Models | Auth header | Notes |
+|----------|--------|-------------|-------|
+| OpenAI | gpt-4o, gpt-4o-mini, o1, o1-mini | Bearer | Live `/v1/models` discovery (filtered to chat-capable families) |
+| Anthropic | claude-opus-4-6-20250514, claude-sonnet-4-6-20250514, claude-haiku-4-5-20251008 | x-api-key | `GET /v1/models?limit=100` with `anthropic-version` |
+| Google Gemini | gemini-2.0-flash, gemini-1.5-pro | query param | `GET /v1beta/models?key=…` |
+| DeepSeek | deepseek-chat, deepseek-reasoner | Bearer | Live `/v1/models` discovery |
+| OpenRouter | 100+ models | Bearer + HTTP-Referer | `GET /api/v1/models`; honors custom base URL |
+| NVIDIA NIM | meta/llama-3.1-70b-instruct, nvidia/nemotron-4-340b-instruct, ... | Bearer | `https://integrate.api.nvidia.com/v1` (OpenAI-compatible on the wire). On-prem NIM deployments can override the base URL via the config. |
+
+Each provider has a `<PROVIDER>_API_KEY` environment variable that overrides the stored key at runtime (e.g. `NVIDIA_API_KEY` for the NVIDIA NIM provider).
+
+---
+
+## CONVENTIONAL COMMITS
+
+`yp commit --conventional` emits Conventional Commits messages:
+
+```
+<type>(<scope>)?!?: <subject>
+
+[body...]
+
+BREAKING CHANGE: <reason>   # optional footer
+```
+
+- `--type` and `--scope` force the AI's choice (overriding what the model would have inferred).
+- `--detect-breaking` runs a static-analysis pass over the diff and feeds the markers into the prompt and, when `--conventional` is set, into the rendered footer.
+- `--amend` rewrites the last commit in place from `git diff HEAD~1` (no push).
+- `--template <path-to-md>` renders the AI output through a Handlebars-ish template (`{{type}}`, `{{scope}}`, `{{subject}}`, `{{body}}`, `{{refs}}`). Missing variables resolve to an empty string; the tool exits 6 when the file is missing.
+
+The default format for every project can be set under `"commitFormat"` in `~/.yitpush/config.json` (`"conventional"`, `"plain"`, `"gitmoji"`, or any path to a template file). An explicit `--conventional` / `--template` flag overrides the config for that single call.
 
 ---
 
@@ -208,34 +356,52 @@ yp azure-devops hu task MyOrg MyProj 12345 --description "Backend task" --effort
 
 ```
 YitPush/
-├── Program.cs                      # Main entry point, routing, ShowHelp, version check
-├── Models.cs                       # Data models (AppConfig, ProviderConfig, etc.)
+├── Program.cs                                # Main entry point, routing, ShowHelp, version check
+├── Models.cs                                 # Data models (AppConfig, ProviderConfig, etc.)
 ├── Commands/
-│   ├── CommitCommand.cs            # yp commit
-│   ├── PrCommand.cs                # yp pr
-│   ├── SetupCommand.cs             # yp setup + alias installation
-│   └── CheckoutCommand.cs          # yp checkout
+│   ├── CommitCommand.cs                      # yp commit (conventional commits, template, amend)
+│   ├── PrCommand.cs                          # yp pr (interactive menu + list/show/comments/reply/create)
+│   ├── SetupCommand.cs                       # yp setup (TUI + wizard + alias installer)
+│   ├── CheckoutCommand.cs                    # yp checkout
+│   ├── SkillCommand.cs                       # yp skill
+│   ├── DiffCommand.cs                        # yp diff
+│   └── Ui.cs                                 # RunWithStatus + ShouldDisableSpinner
 ├── Providers/
-│   └── AiProviders.cs              # ConfigManager + all AI provider HTTP calls
+│   └── AiProviders.cs                        # ConfigManager + all AI provider HTTP calls
 ├── Git/
-│   └── GitHelpers.cs               # All git operations
+│   └── GitHelpers.cs                         # All git operations
 └── AzureDevOps/
-    ├── AzureDevOpsCommand.cs       # Routing + interactive menu + help
-    └── AzureDevOpsHelpers.cs       # All Azure REST API calls and logic
+    ├── AzureDevOpsCommand.cs                 # Routing + interactive menu + help
+    ├── AzureDevOpsHelpers.cs                 # All Azure REST API calls and logic
+    ├── AzureDevOpsFlagParser.cs              # Single source of truth for AZ flag parsing
+    ├── HuTaskPlan.cs                         # Plan computation for hu task
+    ├── AddLinkToRepoHelpers.cs               # Quick-mode helpers for hu link / link
+    ├── AzDevOpsFieldRefNameResolver.cs       # Project-aware field refname resolver (24h cache)
+    ├── AzDevOpsIdentityResolver.cs           # Resolves UPN/display-name to identity objects
+    ├── AzDevOpsStateCache.cs                 # Caches valid work-item states per project
+    ├── AzDevOpsDeleteClient.cs               # task delete (recycle bin)
+    ├── AzDevOpsAttachmentClient.cs           # task attach (upload + link)
+    ├── AzDevOpsCommentClient.cs              # Post discussion comments
+    ├── AzDevOpsPrClient.cs                   # PR list/show/comments/reply/create via REST
+    ├── PrAzJsonParser.cs                     # Parse `az repos pr` JSON output
+    ├── PrDispatcher.cs                       # Route `yp pr` arguments
+    ├── TaskUpdateOperationsBuilder.cs        # Build JSON-Patch ops for task update
+    ├── TaskUpdatePreFlight.cs                # Pre-flight check for Done transition
+    └── WorkItemJsonFormatter.cs              # Flat work-item → JSON for --json
 ```
 
 ---
 
 ## VERSION CHECK
 
-On every run, `yp` silently checks NuGet for a newer version (cached for 24h in `~/.yitpush/version-check.json`). If a newer version is found, a notice is shown after the command output.
+On every run, `yp` silently checks NuGet for a newer version (cached for 24h in `~/.yitpush/version-check.json`). If a newer version is found, a single-line `⬆ yp X.Y.Z available` hint is shown at the top. The check runs synchronously up-front so the hint never collides with the AnsiConsole.Status() spinner.
 
 ---
 
 ## TROUBLESHOOTING
 
 **No AI provider configured**
-Run `yp setup` or set `DEEPSEEK_API_KEY` env var.
+Run `yp setup` or set `DEEPSEEK_API_KEY` (or any other `*_API_KEY` env var).
 
 **Not a git repository**
 Run from inside a git repo.
@@ -245,3 +411,9 @@ Re-run `yp setup` and enter the correct key.
 
 **git push failed**
 Ensure a remote is configured and credentials are valid.
+
+**`hu show` / `hu list` crashes with "isn't interactive"**
+Make sure stdout is redirected (pipe to `jq` or a file) — the trailing interactive prompt is auto-skipped in non-interactive contexts as of v2.3.0.
+
+**`--no-link` / `--title` ignored on `hu task`**
+Make sure you're on `yp >= 2.3.0` (run `yp --version`); the v2.2.x parser was missing these flags.
