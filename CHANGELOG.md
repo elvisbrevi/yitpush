@@ -10,6 +10,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **`yp pr` interactive menu** — running `yp pr` with no arguments now opens an interactive menu (Spectre `SelectionPrompt`) with six options: generate an AI description, list, show, comments, reply, or create a PR. Picking a read/write option still falls through to the same CLI handler as the direct subcommand (so the menu is purely a discovery layer).
+- **`yp pr list`** — list open pull requests in the current repo via `az repos pr list --output json`. Output: Spectre table (id, title, author, source, target, draft flag, created). `--json` emits `{ exitCode, count, pullRequests: [...] }` for `jq` pipelines. Resolves the "I don't want to open a browser to see what's open" workflow.
+- **`yp pr show <pr-id>`** — show a single PR (title, description, source/target, status, author, creation date, draft flag, reviewer table with vote + isRequired). Backed by `az repos pr show --id <pr-id> --output json`. `--json` supported. Resolves the "give me the context of a PR in one terminal screen" workflow.
+- **`yp pr comments <pr-id>`** — list all discussion threads with author, date, body, and `filePath:line` context. Backed by the Azure DevOps REST API (`GET /git/repositories/{repoId}/pullRequests/{prId}/threads`) because `az repos pr thread` does not exist. `--json` emits `{ exitCode, prId, threads: [{ id, status, filePath?, lineNumber?, comments: [...] }] }`. Resolves the "address review feedback without opening the browser" workflow.
+- **`yp pr reply <pr-id> <thread-id> --body "..."`** — post a reply to a specific thread. Backed by the REST API (`POST .../threads/{threadId}/comments`). `--json` supported. Resolves the "acknowledge a review comment in one command" workflow.
+- **`yp pr create --source <branch> --target <branch> --title <title> [--body-file <path>] [--auto-complete]`** — open a new pull request. Backed by the REST API (`POST /git/repositories/{repoId}/pullRequests`) so the description can be larger than `az`'s argv limit. Without `--body-file`, the description is read from stdin. `--auto-complete` sets `completionOptions` (with `deleteSourceBranch: true`). `--json` supported. Resolves the "open a PR with a long body from a script" workflow.
+- **Stable exit codes across the new subcommands** — `0` success, `1` not-found (404), `2` auth/error, `3` validation. Mirrors the `azure-devops` conventions added in v2.3.0.
+- **`AzureDevOpsPrClient` (internal)** — REST client for the new write operations (`CreatePullRequestAsync`, `PostThreadCommentAsync`, `ListThreadsAsync` + a `ParseThreadsJson` helper). All methods accept an `HttpClient` so the test suite uses a hand-rolled `StubHttpHandler` (no live API calls in CI). Mirrors the `AzDevOpsDeleteClient` / `AzDevOpsAttachmentClient` pattern.
+- **`PrAzJsonParser` (internal)** — JSON parser for the `az repos pr list` and `az repos pr show` output. Maps the `az` JSON shape into the typed `PrSummary` / `PrDetail` / `PrReviewer` / `PrChangedFile` models. Branch names are stripped of the `refs/heads/` prefix so the table stays compact.
+- **`PrDispatcher` (internal)** — single source of truth for `yp pr` argument routing. Returns a `PrRoute` (kind + extracted fields + `ValidationError` flag) so the dispatcher is testable in isolation (17 dispatcher tests cover list/show/comments/reply/create routing, validation, AI flag pass-through, and unknown subcommands).
+- **41 new xUnit tests** — `AzDevOpsPrClientTests` (12), `PrAzJsonParserTests` (8), `PrDispatcherTests` (17), `PrJsonContractTests` (4). Total: 263 tests passing (was 222 before this slice).
+- **`PrSummary` / `PrDetail` / `PrReviewer` / `PrChangedFile` models** — added to `Models.cs` with stable `JsonPropertyName` camelCase attributes for the `--json` output contract.
+
+### Changed
+- **`yp pr` with no args no longer opens the AI description generator by default** — it now opens the interactive menu. The original AI flow is preserved as a backward-compatible escape hatch: pass `--detailed`, `--save`, or any AI flag to bypass the menu and run the AI generator directly. This is a UI/UX change, not a breaking behavior change (scripts that used `yp pr` with no args were not common in the wild; the `yp pr --detailed` form continues to work unchanged).
+- **`yp --help` `pr` row** — the description now says "Triage and act on Azure DevOps PRs (list/show/comments/reply/create) or generate an AI description with --detailed" and the help text gains a dedicated `pr subcommands` table and a `pr AI options` table so the new surface is discoverable from `--help` alone.
+
+Resolves #13.
+
+### Added
 - **TUI for `yp setup`** — the interactive setup now launches a two-column live layout (`AnsiConsole.Live` + `Layout`) by default in a real terminal: left column lists the providers (with a green dot for the ones you've already tested), right column shows the API key status, endpoint, and the model picker, and a footer shows the result of the last save. Keyboard: `←/→` switch provider, `↑/↓` switch model, `T` test connection (re-uses `FetchModelsForProvider`), `Enter` save, `Esc` cancel. The "Test connection" re-uses the same logic as the wizard's validation step, so a tested provider gets a green dot in the list. The TUI auto-falls-back to the legacy 5-step wizard when stdin/stdout is redirected (CI), and the explicit flags `--wizard` and `--tui` let scripts force one or the other regardless of TTY detection. Resolves #15.
 - **`yp setup --wizard`** — forces the legacy 5-step wizard. Auto-selected in CI, so existing scripts keep working.
 - **`yp setup --tui`** — forces the TUI even if the routing would otherwise pick `--wizard` (useful for `script(1)` recordings or test harnesses that capture stdin but still want the visual TUI).
@@ -28,9 +48,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - **Spectre.Console markup crash in `yp --help` on the `diff` table** (pre-existing, surfaced by the new diff subcommand shipped in v9): the JSON example contained literal `[...]` markup tags that crashed the markup tokenizer. Now rendered as a plain-text summary.
 
-Resolves #14.
-
----
+Resolves #14.---
 
 ## [2.3.0] - 2026-07-10
 

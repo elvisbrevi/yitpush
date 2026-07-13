@@ -134,3 +134,81 @@ public class DiffFile
     [JsonPropertyName("hunks")]
     public List<DiffHunk> Hunks { get; set; } = new();
 }
+
+public class PrSummary
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("title")]
+    public string Title { get; set; } = string.Empty;
+
+    [JsonPropertyName("author")]
+    public string Author { get; set; } = string.Empty;
+
+    [JsonPropertyName("sourceBranch")]
+    public string SourceBranch { get; set; } = string.Empty;
+
+    [JsonPropertyName("targetBranch")]
+    public string TargetBranch { get; set; } = string.Empty;
+
+    [JsonPropertyName("isDraft")]
+    public bool IsDraft { get; set; }
+
+    [JsonPropertyName("creationDate")]
+    public string CreationDate { get; set; } = string.Empty;
+}
+
+public class PrReviewer
+{
+    [JsonPropertyName("displayName")]
+    public string DisplayName { get; set; } = string.Empty;
+
+    [JsonPropertyName("vote")]
+    public int Vote { get; set; }
+
+    [JsonPropertyName("isRequired")]
+    public bool IsRequired { get; set; }
+}
+
+public class PrChangedFile
+{
+    [JsonPropertyName("path")]
+    public string Path { get; set; } = string.Empty;
+}
+
+public class PrDetail
+{
+    [JsonPropertyName("id")]
+    public string Id { get; set; } = string.Empty;
+
+    [JsonPropertyName("title")]
+    public string Title { get; set; } = string.Empty;
+
+    [JsonPropertyName("description")]
+    public string Description { get; set; } = string.Empty;
+
+    [JsonPropertyName("sourceBranch")]
+    public string SourceBranch { get; set; } = string.Empty;
+
+    [JsonPropertyName("targetBranch")]
+    public string TargetBranch { get; set; } = string.Empty;
+
+    [JsonPropertyName("author")]
+    public string Author { get; set; } = string.Empty;
+
+    [JsonPropertyName("status")]
+    public string Status { get; set; } = string.Empty;
+
+    [JsonPropertyName("isDraft")]
+    public bool IsDraft { get; set; }
+
+    [JsonPropertyName("creationDate")]
+    public string CreationDate { get; set; } = string.Empty;
+
+    [JsonPropertyName("reviewers")]
+    public List<PrReviewer> Reviewers { get; set; } = new();
+
+    [JsonPropertyName("changedFiles")]
+    public List<PrChangedFile> ChangedFiles { get; set; } = new();
+}
