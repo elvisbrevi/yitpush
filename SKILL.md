@@ -1,3 +1,13 @@
+---
+name: yp
+description: AI-powered Git commit, PR description, and Azure DevOps management via the yp CLI.
+license: MIT
+metadata:
+  version: "2.3.0"
+  install: dotnet tool install -g YitPush
+  invoke: yp <command> [options]
+---
+
 # yp (YitPush) — Agent Skill
 
 > The installable skill package is at [`skills/yp/SKILL.md`](skills/yp/SKILL.md) — compatible with the [Agent Skills open standard](https://agentskills.io) and listed on [skills.sh](https://skills.sh).
@@ -5,14 +15,6 @@
 > Install with: `npx skills add elvisbrevi/yitpush`
 
 This file is a human-readable reference. The machine-readable skill follows below.
-
-## Skill Metadata
-
-- **Name**: yp
-- **Description**: AI-powered Git commit automation and Azure DevOps management CLI
-- **Version**: 2.0.0
-- **Install**: `dotnet tool install -g YitPush`
-- **Invoke**: `yp <command> [options]`
 
 ---
 

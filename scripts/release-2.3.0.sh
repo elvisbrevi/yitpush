@@ -48,7 +48,7 @@ for arg in "$@"; do
   esac
 done
 
-VERSION="$(grep -o '<Version>[^<]*' YitPush.csproj | sed 's/<Version>//')"
+VERSION="${VERSION:-$(grep -o '<Version>[^<]*' YitPush.csproj | sed 's/<Version>//')}"
 if [ -z "$VERSION" ]; then
   echo "FAIL: could not extract <Version> from YitPush.csproj" >&2
   exit 1
@@ -90,13 +90,11 @@ else
   echo "  OK   [SKILL_DRIFT]: SKILL.md and skills/yp/SKILL.md are byte-identical."
 fi
 
-# Warn (do not fail) on stale nupkg/ artifacts from previous versions.
-if [ -d nupkg ]; then
-  STALE="$(ls nupkg/*.nupkg 2>/dev/null | grep -v "${VERSION}" || true)"
-  if [ -n "$STALE" ]; then
-    echo "  WARN [NUPKG_STALE]: nupkg/ has artifacts from previous version(s):" >&2
-    echo "$STALE" | sed 's/^/         /' >&2
-  fi
+if [ -z "${NUGET_API_KEY:-}" ]; then
+  echo "  FAIL [NUGET_API_KEY]: NUGET_API_KEY is not set in the environment. Add 'export NUGET_API_KEY=...' to ~/.bashrc and retry." >&2
+  FAIL=1
+else
+  echo "  OK   [NUGET_API_KEY]: present (prefix ${NUGET_API_KEY:0:4}...)"
 fi
 
 if [ "$FAIL" -ne 0 ]; then
@@ -110,12 +108,29 @@ echo ""
 
 if [ "$DRY_RUN" -eq 1 ]; then
   echo "Dry-run: skipping all 5 release steps."
+  echo "  would: clean nupkg/*.nupkg and nupkg/*.symbols.nupkg"
   echo "  would: dotnet pack -c Release -o ./nupkg"
-  echo "  would: dotnet nuget push ./nupkg/${NUPKG_FILE} --skip-duplicate --source https://api.nuget.org/v3/index.json"
-  echo "  would: git tag -a ${GIT_TAG} -m \"Release ${VERSION}\""
+  echo "  would: dotnet nuget push \"./nupkg/YitPush.${VERSION}.nupkg\" --api-key \"\$NUGET_API_KEY\" --skip-duplicate --source https://api.nuget.org/v3/index.json"
+  echo "  would: git tag -a ${GIT_TAG} -m \"Release ${VERSION}\"   (idempotent: skipped if tag already exists)"
   echo "  would: git push origin ${GIT_TAG}"
   echo "  would: npx skills add elvisbrevi/yitpush --skill yp --all -y   (non-fatal)"
   exit 0
+fi
+
+# Aggressive pre-build cleanup: remove any stale .nupkg / .symbols.nupkg files
+# in nupkg/ before pack. Without this, `dotnet nuget push ./nupkg/YitPush.<v>.nupkg`
+# could glob the directory and re-push artifacts from old versions (which then
+# 409-conflict but skip the current version). The `nupkg/` dir is not git-tracked
+# (build output), so `rm -f` is safe. Only runs on a real (non-dry-run) release.
+if [ -d nupkg ]; then
+  shopt -s nullglob
+  STALE_ARTIFACTS=(nupkg/*.nupkg nupkg/*.symbols.nupkg)
+  shopt -u nullglob
+  if [ "${#STALE_ARTIFACTS[@]}" -gt 0 ]; then
+    echo "Pre-build cleanup: removing ${#STALE_ARTIFACTS[@]} stale artifact(s) from nupkg/:"
+    printf '         %s\n' "${STALE_ARTIFACTS[@]}"
+    rm -f "${STALE_ARTIFACTS[@]}"
+  fi
 fi
 
 # ─── 1. Pack ──────────────────────────────────────────────────────────────────
@@ -124,13 +139,18 @@ dotnet pack -c Release -o ./nupkg
 
 # ─── 2. NuGet push ────────────────────────────────────────────────────────────
 echo "[2/5] Pushing ${NUPKG_FILE} to nuget.org..."
-dotnet nuget push "./nupkg/${NUPKG_FILE}" \
+dotnet nuget push "./nupkg/YitPush.${VERSION}.nupkg" \
+  --api-key "$NUGET_API_KEY" \
   --skip-duplicate \
   --source https://api.nuget.org/v3/index.json
 
-# ─── 3. Git tag (local) ───────────────────────────────────────────────────────
+# ─── 3. Git tag (local) — idempotent ─────────────────────────────────────────
 echo "[3/5] Creating annotated git tag ${GIT_TAG}..."
-git tag -a "${GIT_TAG}" -m "Release ${VERSION}"
+if git rev-parse "${GIT_TAG}" >/dev/null 2>&1; then
+  echo "  tag ${GIT_TAG} already exists locally, skipping (idempotent)"
+else
+  git tag -a "${GIT_TAG}" -m "Release ${VERSION}"
+fi
 
 # ─── 4. Git push tag ──────────────────────────────────────────────────────────
 echo "[4/5] Pushing tag ${GIT_TAG} to origin..."

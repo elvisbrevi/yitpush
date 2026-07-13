@@ -42,20 +42,6 @@
 
 Resolves #19.
 
-### 📊 Stats (release-script slice)
-- 34 new xUnit tests across 2 new test files (`ReleasePlanTests`, `ReleaseScriptTests`)
-- 1 new testable type (`YitPush.ReleasePlan` + `ReleaseStep` + `PreFlightReport` + `ReleaseFinding` in `Commands/ReleaseCommand.cs`)
-- 1 new bash script (`scripts/release-2.3.0.sh`) that closes out the v2.3.0 release checklist
-- Total test count: **360 passing** (was 326 before this slice)
-
-### ✨ Added
-- **`Commands/ReleaseCommand.cs`** — `ReleasePlan` record with `LoadFromRepo(root)` (reads `<Version>` from `YitPush.csproj`), `RunPreFlight()` (walks the repo and returns a `PreFlightReport`), `GetSteps()` (the ordered 5-step release pipeline), and `RenderBashScript()` (emits the actual shell script). The pre-flight covers: csproj version match, CHANGELOG `## [X.Y.Z]` section, `llms.txt` + `llms-full.txt` version stamp, both SKILL.md copies mention the version and are byte-identical, plus a non-fatal WARN for stale `nupkg/` artifacts. `ReleaseStep.IsCritical` is `true` for pack / nuget push / git tag / git push tag, and `false` for the skill re-publish — the rendered bash wraps non-critical steps in `<cmd> || { echo WARN ...; }` so a transient skills.sh outage never blocks the NuGet release.
-- **`scripts/release-2.3.0.sh`** — executable bash script that mirrors the C# design: derives `VERSION` from `YitPush.csproj`, runs the 6 pre-flight greps (`CHANGELOG`, `LLMS_TXT`, `LLMS_FULL_TXT`, `SKILL_ROOT`, `SKILL_INSTALL`, `SKILL_DRIFT`), warns on stale `nupkg/` artifacts, and then runs `[1/5] dotnet pack`, `[2/5] dotnet nuget push`, `[3/5] git tag -a v2.3.0`, `[4/5] git push origin v2.3.0`, `[5/5] npx skills add` (non-fatal). Supports `--dry-run` for pre-flight only and `-h/--help`. The C# model and the bash script stay in lock-step because both are covered by the same test surface.
-- **`tests/YitPush.Tests/ReleasePlanTests.cs`** — 32 xUnit tests covering `LoadFromRepo` (reads version, returns correct paths), `ParseVersionFromCsproj` (simple, whitespace, missing → throws), `ChangelogSectionExists`, `LlmsFileMentionsVersion`, `SkillFileMentionsVersion`, `SkillFilesAreIdentical`, the full `BuildPreFlightReport` matrix (ready / CHANGELOG missing / skill drift / llms missing / skill version missing / nupkg stale WARN), `GetSteps` (correct order, version substituted into tag + nupkg commands, skill step invokes `npx skills add`, pack step uses `-c Release`), `RenderForShell`, `RenderBashScript` (includes `set -euo pipefail`, the 5 step commands, progress echoes `[1/5]..[5/5]`), `IsCritical` semantics (Pack / NuGetPush / GitTag / GitPushTag are critical, SkillPublish is not), and the `rescue block` pattern that wraps non-critical steps.
-- **`tests/YitPush.Tests/ReleaseScriptTests.cs`** — 2 smoke tests that assert the script exists, is executable (`UserExecute` bit set), and that `bash scripts/release-2.3.0.sh --dry-run` exits 0 against the real repo. The integration test is what proves the C# design and the bash implementation agree.
-
-Resolves #4.
-
 ---
 
 ## [2.3.0] — 2026-07-10 — *the big one* 🎉
@@ -83,12 +69,13 @@ Resolves #4.
 - 🆔 **`--version` / `-V` global flag** + **`--json` on `hu show` / `task show` / `hu list`** — stable flat JSON for `jq`; trailing interactive prompt auto-skipped on redirected stdout.
 
 ### 📊 Stats
-- 15 vertical slices (v0–v14) + epic
-- **326 xUnit tests passing** (was 18 at the start of the v2.3.0 cycle)
+- 15 vertical slices (v0–v14) + release-script slice
+- **371 xUnit tests passing** (was 18 at the start of the v2.3.0 cycle)
 - New subcommands: `pr list/show/comments/reply/create`, `task delete`, `task attach`, `resolve-field`, `refresh-fields`, `diff`
 - New flags: `--conventional`, `--type`, `--scope`, `--detect-breaking`, `--amend`, `--template`, `--no-spinner`, `--title`, `--trio`, `--assigned-to`, `--yes`, `--evidence`, `--field`, `--history`, `--json`, `--version/-V`
 - New TUI: `yp setup` (with `--wizard` / `--tui` escape hatches)
 - New provider: NVIDIA NIM (free tier, OpenAI-compatible)
+- New `scripts/release-2.3.0.sh` (with `--dry-run`) that finalises the release
 - **Breaking-ish change**: `hu task` now creates 1 task by default; pass `--trio` to keep the legacy 3-task behavior
 
 ### 🔄 Changed
@@ -96,6 +83,7 @@ Resolves #4.
 - **`AzureDevOpsFlagParser.Parse(args)` is now the single source of truth** for all Azure DevOps flag parsing. The duplicated manual parser that lived at the top of `AzureDevOpsCommand.cs` is gone. `--description`/`-d`, `--no-link`/`-n`, `--effort`/`-e`, `--effort-real`/`-er`, `--remaining`/`-r`, `--state`/`-s`, `--comment`/`-c`, `--task-titles`/`-t`, `--repo`, `--branch` are all parsed by the same function used by `task update` / `hu show` / `hu list` / `task show`. This eliminates the "Quick mode ignores --task-titles" class of bugs.
 
 ### ✨ Added
+- **`scripts/release-2.3.0.sh`** — executable bash script that finalises the v2.3.0 release in one command. Pre-flight checks: `<Version>` extracted from `YitPush.csproj`, `CHANGELOG` has `## [X.Y.Z]` section, `llms.txt` + `llms-full.txt` mention the version, both `SKILL.md` copies mention the version and are byte-identical, `NUGET_API_KEY` is set in the env. Aggressive pre-build cleanup wipes stale `nupkg/*.nupkg` and `nupkg/*.symbols.nupkg` so the push step only sees the artifact we just built. Steps: `[1/5] dotnet pack -c Release`, `[2/5] dotnet nuget push "./nupkg/YitPush.${VERSION}.nupkg" --api-key "$NUGET_API_KEY" --skip-duplicate`, `[3/5] git tag -a v${VERSION}` (idempotent: skipped if the tag already exists), `[4/5] git push origin v${VERSION}`, `[5/5] npx skills add elvisbrevi/yitpush` (non-fatal, wrapped in `|| { echo WARN...; }`). `VERSION` is overridable via env var for testability; supports `--dry-run` (pre-flight only) and `-h/--help`. C# design lives in `Commands/ReleaseCommand.cs` (`ReleasePlan` + `ReleaseStep` + `PreFlightReport` + `ReleaseFinding`); bash script and C# model are kept in lock-step by the test surface.
 - **`--title <text>`** flag on `yp azure-devops hu task` — patches the single task with the provided title. Highest precedence; overrides `--task-titles` and `--trio`.
 - **`--trio`** flag on `yp azure-devops hu task` — restores the legacy three-task default (Desarrollo / Pruebas Unitarias / Code Review). Mutually exclusive with `--task-titles` (combined use exits 5).
 - **22 new xUnit tests** — `HuTaskPlanTests` (8, covering the new plan computation: single, trio, custom, conflict, whitespace stripping, override precedence) and 14 new cases in `AzureDevOpsFlagParserTests` (all the new flags: --title, -d, -D, -e, -er, -r, -s, -c, -n, --no-link, --repo, --branch, -t, --trio). Total test count: 64 (was 42).
@@ -162,6 +150,8 @@ Resolves #4.
 - **BUG-001 / BUG-002 / BUG-003** (issue #18) — `Custom.EsfuerzoRealHH` vs `Custom.EsfuerzoReal` refname routing is now project-aware via `AzDevOpsFieldRefNameResolver`; the `ValidAzureStates` constant is gone (states are now resolved dynamically per project); the `Done` transition pre-flight blocks the PATCH if `Evidencias de finalización` is empty. Resolves #18.
 - **Spectre.Console markup crash in `yp --help` on the `diff` table** (pre-existing, surfaced by the new diff subcommand shipped in v9): the JSON example contained literal `[...]` markup tags that crashed the markup tokenizer. Now rendered as a plain-text summary.
 - **Spectre.Console crash in `hu show` / `hu list`** when stdout is redirected (the trailing interactive prompt is now auto-skipped in non-interactive contexts).
+- **`SKILL.md` was missing the YAML frontmatter required by the [Agent Skills spec](https://agentskills.io/specification)** — `npx skills add elvisbrevi/yitpush` reported `No valid skills found. Skills require a SKILL.md with name and description.`, so the skill was silently unindexed on skills.sh. Both `SKILL.md` (root) and `skills/yp/SKILL.md` (installable, byte-identical via the existing `SkillFileAlignmentTests.RootSkillMd_and_installable_skillMd_are_byte_identical` test) now lead with `---\nname: yp\ndescription: AI-powered Git commit, PR description, and Azure DevOps management via the yp CLI.\nlicense: MIT\nmetadata:\n  version: "2.3.0"\n  install: dotnet tool install -g YitPush\n  invoke: yp <command> [options]\n---`. The redundant `## Skill Metadata` block is removed. New `SkillFileAlignmentTests.SkillMd_starts_with_valid_yaml_frontmatter` asserts the frontmatter exists, parses, and contains a non-empty `description` ≤1024 chars. `SkillMd_frontmatter_description_mentions_key_capabilities` asserts the description includes `commit`, `PR`, and `Azure DevOps` so agents can match user requests to the skill. `InstallableSkillMd_frontmatter_name_matches_parent_directory` enforces the spec rule `name == parent-dir-name` (`yp` for the installable copy). After the fix, `npx skills add elvisbrevi/yitpush --skill yp --all -y` reports `1 skill found` (verified post-merge).
+- **`scripts/release-2.3.0.sh` push step was globbing `./nupkg/`** — the pre-build step `--skip-duplicate` made the failure silent: a 409 on `YitPush.2.1.2.nupkg` and `YitPush.2.1.1.nupkg` (already on nuget.org) was logged but the current `YitPush.2.3.0.nupkg` was never pushed. The push command now uses an explicit version-specific path (`./nupkg/YitPush.${VERSION}.nupkg`) instead of a directory glob, so a stray stale artifact can never silently skip the current version. Belt-and-braces: a new pre-build cleanup step (`rm -f nupkg/*.nupkg nupkg/*.symbols.nupkg`) wipes stale artifacts before pack. The `nupkg/` directory is build output and not git-tracked (`git ls-files nupkg/` is empty), so `rm -f` is safe. A new pre-flight check `[NUGET_API_KEY]` fails fast with a clear error if the env var is unset (previously: cryptic 401 from nuget.org). New `ReleaseScriptTests.ReleaseScript_push_command_uses_version_specific_path_not_directory_glob` + `ReleaseScript_cleanup_uses_aggressive_nupkg_pattern` + `ReleaseScript_checks_NUGET_API_KEY_in_preflight` + `ReleaseScript_git_tag_step_is_idempotent` + `ReleaseScript_version_can_be_overridden_via_env_var` lock all of this in. Resolves #4 (release-script follow-up).
 
 ### 📝 Notes
 - This unlocks fixing the long-standing BUG-001 (`EsfuerzoRealHH` vs `EsfuerzoReal`) and the `Remaining Work` verification todo in `KNOWN_BUGS.md` without touching the hardcoded constants. The new CLI subcommands let users look up the correct refname on demand while the constants are gradually migrated.
