@@ -10,6 +10,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **TUI for `yp setup`** — the interactive setup now launches a two-column live layout (`AnsiConsole.Live` + `Layout`) by default in a real terminal: left column lists the providers (with a green dot for the ones you've already tested), right column shows the API key status, endpoint, and the model picker, and a footer shows the result of the last save. Keyboard: `←/→` switch provider, `↑/↓` switch model, `T` test connection (re-uses `FetchModelsForProvider`), `Enter` save, `Esc` cancel. The "Test connection" re-uses the same logic as the wizard's validation step, so a tested provider gets a green dot in the list. The TUI auto-falls-back to the legacy 5-step wizard when stdin/stdout is redirected (CI), and the explicit flags `--wizard` and `--tui` let scripts force one or the other regardless of TTY detection. Resolves #15.
+- **`yp setup --wizard`** — forces the legacy 5-step wizard. Auto-selected in CI, so existing scripts keep working.
+- **`yp setup --tui`** — forces the TUI even if the routing would otherwise pick `--wizard` (useful for `script(1)` recordings or test harnesses that capture stdin but still want the visual TUI).
+- **7 new xUnit tests** in `tests/YitPush.Tests/SetupTuiTests.cs` — cover `SetupTui.ShouldUseTui` across the auto-fallback decision matrix: no flags + interactive terminal, explicit `--tui`, explicit `--wizard`, stdin redirected (with and without `--tui`), stdout redirected, unknown args (ignored), and the `--tui --wizard` last-flag-wins tie-break.
 - **`--no-spinner`** flag on `yp commit` and `yp pr` — skips the AnsiConsole.Status() spinner that wraps the AI call and the `git push`; the operation runs inline and the exit code is preserved. Same effect as the new `YITPUSH_NO_SPINNER` environment variable (`1`, `true`, or `yes` — case-insensitive). The spinner is also auto-disabled when stdout is redirected (CI logs), so a piped `yp commit` no longer leaves a frozen frame in the journal.
 - **`YITPUSH_NO_SPINNER`** environment variable — global override for the spinner. Reads `1`, `true`, or `yes` (case-insensitive) and short-circuits the spinner wrapper everywhere it's used.
 - **`Ui.RunWithStatus<T>(string title, Func<StatusContext?, Task<T>> work, bool noSpinner = false)`** — single helper for long operations. When the spinner is enabled it wraps the work in `AnsiConsole.Status().StartAsync`; when it's disabled (flag / env var / redirected stdout) it prints the title once and runs the work inline. Centralized so every long op picks up the same disable behavior.
@@ -19,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - **`CheckForUpdates` no longer renders a yellow Panel** that can interleave with the AnsiConsole.Status() spinner. The check now runs synchronously up-front and emits a single-line `⬆  yp <version> available` hint. The cache lookup is sub-100ms so the perceived startup latency is unchanged.
 - **`yp --help`** adds a `--no-spinner` row under "Global flags" and the `commit` and `pr` option tables.
+- **`yp --help` `setup` row** now mentions the TUI + `--wizard` escape hatch, and the example section adds `yp setup`, `yp setup --wizard`, and `yp setup --tui` lines so the keyboard shortcuts (`←/→`, `↑/↓`, `T`, `Enter`, `Esc`) are discoverable from `--help` alone.
 
 ### Fixed
 - **Spectre.Console markup crash in `yp --help` on the `diff` table** (pre-existing, surfaced by the new diff subcommand shipped in v9): the JSON example contained literal `[...]` markup tags that crashed the markup tokenizer. Now rendered as a plain-text summary.

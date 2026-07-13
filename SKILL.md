@@ -117,12 +117,16 @@ yp diff --json | jq '.files[] | select(.additions > 0) | .path'   # added-only p
 Configures the active AI provider interactively.
 
 ```
-yp setup
+yp setup                # launches the TUI (default in a real terminal)
+yp setup --wizard       # forces the legacy 5-step wizard (auto-selected in CI)
+yp setup --tui          # forces the TUI even if the routing would otherwise pick --wizard
 ```
 
 **When to use**: First-time setup or when changing the AI provider or API key.
 
-**Flow**: select provider → enter API key → select model → validate → save to `~/.yitpush/config.json`
+**TUI flow (default)**: a two-column live layout — left column lists the providers (with a green dot for the ones you've already tested), right column shows the API key status, endpoint, and the model picker. Keyboard: `←/→` switch provider, `↑/↓` switch model, `T` test connection, `Enter` save, `Esc` cancel. The TUI auto-falls-back to the legacy wizard when stdin/stdout is redirected (e.g. CI), so scripts don't need to be updated.
+
+**Wizard flow (--wizard)**: select provider → enter API key → select model → validate → save to `~/.yitpush/config.json`.
 
 Supported providers: **OpenAI**, **Anthropic**, **Google Gemini**, **DeepSeek**, **OpenRouter**, **NVIDIA NIM**. Each provider has a `<PROVIDER>_API_KEY` environment variable that overrides the stored key at runtime (e.g. `NVIDIA_API_KEY` for the NVIDIA NIM provider).
 
