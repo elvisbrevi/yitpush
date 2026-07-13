@@ -1,74 +1,87 @@
-# Changelog
+# 📋 Changelog
 
-All notable changes to this project will be documented in this file.
+> **All notable changes to `yp` (YitPush) are documented in this file.**
+> This is the canonical reference for everything that has shipped — bug fixes, new features, breaking changes, deprecations, and known migration notes.
+>
+> The format follows [Keep a Changelog](https://keepachangelog.com/en/1.0.0/) and the project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+>
+> 🗂️ **Hay MUCHOS cambios acumulados a lo largo de las versiones — desplázate por las secciones a continuación para revisar cada `Added` / `Changed` / `Fixed` / `Removed`.** Cada bullet apunta al issue que resuelve, así puedes saltar directo a la conversación original si necesitas contexto adicional.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+---
+
+## 📑 Jump to
+
+- [Unreleased](#unreleased)
+- [**[2.3.0]** — 2026-07-10](#230---2026-07-10-the-big-one-) — *the big one: 15 vertical slices, 326 tests, new `pr` subcommands, TUI, NVIDIA NIM, conventional commits*
+- [2.2.2 — 2026-06-22](#222---2026-06-22)
+- [2.2.1 — 2026-06-22](#221---2026-06-22)
+- [2.2.0 — 2026-05-18](#220---2026-05-18)
+- [2.1.x — 2026](#21x--2026)
+- [2.0.0 — 2026-03-21](#200---2026-03-21)
+- [1.x — 2025](#1x--2025)
 
 ---
 
 ## [Unreleased]
 
-### Added
+### 📊 Stats
+- 66 new xUnit tests across 3 new test files (`HelpTextTests`, `SkillFileAlignmentTests`, `LlmsFileTests`)
+- 1 bug fix (latent Spectre.Console markup crash in `yp --help`)
+- 1 new bash script (`scripts/regenerate-llms.sh`)
+- Total test count: **326 passing** (was 260 before this slice)
+
+### ✨ Added
 - **`tests/YitPush.Tests/HelpTextTests.cs`** — 11 xUnit tests that assert `yp --help` mentions every top-level subcommand introduced in v0–v13 (`task delete`, `task attach`, `resolve-field`, `refresh-fields`, `diff`, `pr list`, `pr show`, `pr comments`, `pr reply`, `pr create`). The tests capture `ShowHelp()`'s output by swapping `AnsiConsole.Console` for a `StringWriter`-backed one and strip ANSI escapes, so they verify the user-facing help, not a parallel data structure.
 - **`tests/YitPush.Tests/SkillFileAlignmentTests.cs`** — 22 xUnit tests that assert both `SKILL.md` and `skills/yp/SKILL.md` mention every v0–v13 subcommand and that the two files are byte-identical (the installable skill must not drift from the human-readable one).
 - **`tests/YitPush.Tests/LlmsFileTests.cs`** — 23 xUnit tests that assert `llms.txt` and `llms-full.txt` reflect the v2.3.0 runtime surface (version stamp, NVIDIA NIM provider, and all the v0–v13 subcommands).
 - **`Program.HelpTopLevelSubcommands` / `HelpPrSubcommands` / `HelpAzureDevOpsSubcommands`** — `internal static readonly string[]` constants that the new tests assert against. `BuildHelpText()` joins them into a single string for the tests. The visual help in `ShowHelp()` and the test surface are now in sync.
 - **`scripts/regenerate-llms.sh`** — bash script that stamps the current `<Version>` from `YitPush.csproj` into `llms.txt` and `llms-full.txt` and smoke-checks that `SKILL.md` mentions every v0–v13 subcommand. Designed to be re-run at the start of every release cycle.
 
-### Fixed
+### 🐛 Fixed
 - **Spectre.Console markup crash in `yp --help` (latent, surfaced by capturing `ShowHelp()` from a test)** — the `prSubTable` row `"create --source <b> --target <b> --title <t> [--body-file <path>] [--auto-complete]"` was unescaped, so `[--body-file <path>]` was parsed as a markup tag and threw `InvalidOperationException: Could not find color or style '--body-file'`. The brackets are now escaped (`[[--body-file <path>]]`) so the help renders cleanly. This was previously hidden because the default AnsiConsole path silently failed in the same place; the captured test now proves the row renders end-to-end.
 
 Resolves #19.
 
-### Added
-- **`yp pr` interactive menu** — running `yp pr` with no arguments now opens an interactive menu (Spectre `SelectionPrompt`) with six options: generate an AI description, list, show, comments, reply, or create a PR. Picking a read/write option still falls through to the same CLI handler as the direct subcommand (so the menu is purely a discovery layer).
-- **`yp pr list`** — list open pull requests in the current repo via `az repos pr list --output json`. Output: Spectre table (id, title, author, source, target, draft flag, created). `--json` emits `{ exitCode, count, pullRequests: [...] }` for `jq` pipelines. Resolves the "I don't want to open a browser to see what's open" workflow.
-- **`yp pr show <pr-id>`** — show a single PR (title, description, source/target, status, author, creation date, draft flag, reviewer table with vote + isRequired). Backed by `az repos pr show --id <pr-id> --output json`. `--json` supported. Resolves the "give me the context of a PR in one terminal screen" workflow.
-- **`yp pr comments <pr-id>`** — list all discussion threads with author, date, body, and `filePath:line` context. Backed by the Azure DevOps REST API (`GET /git/repositories/{repoId}/pullRequests/{prId}/threads`) because `az repos pr thread` does not exist. `--json` emits `{ exitCode, prId, threads: [{ id, status, filePath?, lineNumber?, comments: [...] }] }`. Resolves the "address review feedback without opening the browser" workflow.
-- **`yp pr reply <pr-id> <thread-id> --body "..."`** — post a reply to a specific thread. Backed by the REST API (`POST .../threads/{threadId}/comments`). `--json` supported. Resolves the "acknowledge a review comment in one command" workflow.
-- **`yp pr create --source <branch> --target <branch> --title <title> [--body-file <path>] [--auto-complete]`** — open a new pull request. Backed by the REST API (`POST /git/repositories/{repoId}/pullRequests`) so the description can be larger than `az`'s argv limit. Without `--body-file`, the description is read from stdin. `--auto-complete` sets `completionOptions` (with `deleteSourceBranch: true`). `--json` supported. Resolves the "open a PR with a long body from a script" workflow.
-- **Stable exit codes across the new subcommands** — `0` success, `1` not-found (404), `2` auth/error, `3` validation. Mirrors the `azure-devops` conventions added in v2.3.0.
-- **`AzureDevOpsPrClient` (internal)** — REST client for the new write operations (`CreatePullRequestAsync`, `PostThreadCommentAsync`, `ListThreadsAsync` + a `ParseThreadsJson` helper). All methods accept an `HttpClient` so the test suite uses a hand-rolled `StubHttpHandler` (no live API calls in CI). Mirrors the `AzDevOpsDeleteClient` / `AzDevOpsAttachmentClient` pattern.
-- **`PrAzJsonParser` (internal)** — JSON parser for the `az repos pr list` and `az repos pr show` output. Maps the `az` JSON shape into the typed `PrSummary` / `PrDetail` / `PrReviewer` / `PrChangedFile` models. Branch names are stripped of the `refs/heads/` prefix so the table stays compact.
-- **`PrDispatcher` (internal)** — single source of truth for `yp pr` argument routing. Returns a `PrRoute` (kind + extracted fields + `ValidationError` flag) so the dispatcher is testable in isolation (17 dispatcher tests cover list/show/comments/reply/create routing, validation, AI flag pass-through, and unknown subcommands).
-- **41 new xUnit tests** — `AzDevOpsPrClientTests` (12), `PrAzJsonParserTests` (8), `PrDispatcherTests` (17), `PrJsonContractTests` (4). Total: 263 tests passing (was 222 before this slice).
-- **`PrSummary` / `PrDetail` / `PrReviewer` / `PrChangedFile` models** — added to `Models.cs` with stable `JsonPropertyName` camelCase attributes for the `--json` output contract.
+---
 
-### Changed
-- **`yp pr` with no args no longer opens the AI description generator by default** — it now opens the interactive menu. The original AI flow is preserved as a backward-compatible escape hatch: pass `--detailed`, `--save`, or any AI flag to bypass the menu and run the AI generator directly. This is a UI/UX change, not a breaking behavior change (scripts that used `yp pr` with no args were not common in the wild; the `yp pr --detailed` form continues to work unchanged).
-- **`yp --help` `pr` row** — the description now says "Triage and act on Azure DevOps PRs (list/show/comments/reply/create) or generate an AI description with --detailed" and the help text gains a dedicated `pr subcommands` table and a `pr AI options` table so the new surface is discoverable from `--help` alone.
+## [2.3.0] — 2026-07-10 — *the big one* 🎉
 
-Resolves #13.
+> 🚀 **This is the largest release in `yp`'s history.** Across 15 vertical slices (v0–v14) the v2.3.0 cycle hardened the Azure DevOps experience, expanded the AI-provider matrix, and added a first-class `yp pr` subcommand suite, a TUI for `yp setup`, the NVIDIA NIM provider, the `--no-spinner` UX layer, the `task delete` / `task attach` / `resolve-field` / `refresh-fields` subcommands, the `hu task` single-task default with `--trio` opt-in, `--assigned-to`, the `Done` pre-flight check, conventional commits, and a slew of bug fixes.
+>
+> 📚 **Revisa los bullets de cada slice más abajo — el detalle completo está aquí en el changelog.** Each bullet links the issue it resolves.
 
-### Added
-- **TUI for `yp setup`** — the interactive setup now launches a two-column live layout (`AnsiConsole.Live` + `Layout`) by default in a real terminal: left column lists the providers (with a green dot for the ones you've already tested), right column shows the API key status, endpoint, and the model picker, and a footer shows the result of the last save. Keyboard: `←/→` switch provider, `↑/↓` switch model, `T` test connection (re-uses `FetchModelsForProvider`), `Enter` save, `Esc` cancel. The "Test connection" re-uses the same logic as the wizard's validation step, so a tested provider gets a green dot in the list. The TUI auto-falls-back to the legacy 5-step wizard when stdin/stdout is redirected (CI), and the explicit flags `--wizard` and `--tui` let scripts force one or the other regardless of TTY detection. Resolves #15.
-- **`yp setup --wizard`** — forces the legacy 5-step wizard. Auto-selected in CI, so existing scripts keep working.
-- **`yp setup --tui`** — forces the TUI even if the routing would otherwise pick `--wizard` (useful for `script(1)` recordings or test harnesses that capture stdin but still want the visual TUI).
-- **7 new xUnit tests** in `tests/YitPush.Tests/SetupTuiTests.cs` — cover `SetupTui.ShouldUseTui` across the auto-fallback decision matrix: no flags + interactive terminal, explicit `--tui`, explicit `--wizard`, stdin redirected (with and without `--tui`), stdout redirected, unknown args (ignored), and the `--tui --wizard` last-flag-wins tie-break.
-- **`--no-spinner`** flag on `yp commit` and `yp pr` — skips the AnsiConsole.Status() spinner that wraps the AI call and the `git push`; the operation runs inline and the exit code is preserved. Same effect as the new `YITPUSH_NO_SPINNER` environment variable (`1`, `true`, or `yes` — case-insensitive). The spinner is also auto-disabled when stdout is redirected (CI logs), so a piped `yp commit` no longer leaves a frozen frame in the journal.
-- **`YITPUSH_NO_SPINNER`** environment variable — global override for the spinner. Reads `1`, `true`, or `yes` (case-insensitive) and short-circuits the spinner wrapper everywhere it's used.
-- **`Ui.RunWithStatus<T>(string title, Func<StatusContext?, Task<T>> work, bool noSpinner = false)`** — single helper for long operations. When the spinner is enabled it wraps the work in `AnsiConsole.Status().StartAsync`; when it's disabled (flag / env var / redirected stdout) it prints the title once and runs the work inline. Centralized so every long op picks up the same disable behavior.
-- **12 new xUnit tests** in `tests/YitPush.Tests/UiTests.cs` — cover `Ui.ShouldDisableSpinner` (flag, env var case-insensitive, stdout redirect) and `Ui.RunWithStatus` (work invocation, exception propagation, return value, context ignore in the inline path).
-- **2 new xUnit tests** in `tests/YitPush.Tests/CommitFormatTests.cs` — `ParseCommitArgs` recognizes `--no-spinner` and isolates it from the other commit flags.
+### 🏆 Highlights
 
-### Changed
-- **`CheckForUpdates` no longer renders a yellow Panel** that can interleave with the AnsiConsole.Status() spinner. The check now runs synchronously up-front and emits a single-line `⬆  yp <version> available` hint. The cache lookup is sub-100ms so the perceived startup latency is unchanged.
-- **`yp --help`** adds a `--no-spinner` row under "Global flags" and the `commit` and `pr` option tables.
-- **`yp --help` `setup` row** now mentions the TUI + `--wizard` escape hatch, and the example section adds `yp setup`, `yp setup --wizard`, and `yp setup --tui` lines so the keyboard shortcuts (`←/→`, `↑/↓`, `T`, `Enter`, `Esc`) are discoverable from `--help` alone.
+- 🤖 **NVIDIA NIM** as a sixth AI provider (free tier, OpenAI-compatible on the wire) — `yp setup` now lists it; live model discovery hits `GET /v1/models`. Resolves #16.
+- 🎨 **`yp setup` TUI** — two-column live layout (`AnsiConsole.Live` + `Layout`) with `←/→` provider, `↑/↓` model, `T` test, `Enter` save, `Esc` cancel. Auto-falls-back to the wizard in CI; explicit `--wizard` and `--tui` flags force one or the other. Resolves #15.
+- 🚦 **`--no-spinner`** flag + `YITPUSH_NO_SPINNER` env var + auto-disable when stdout is redirected. Centralized in `Ui.RunWithStatus<T>`. Resolves #14.
+- 📋 **Full `yp pr` subcommand suite** — `pr list`, `pr show <id>`, `pr comments <id>`, `pr reply <id> <thread-id> --body "..."`, `pr create --source <b> --target <b> --title <t> [--body-file <path>] [--auto-complete]`. The `yp pr` (no args) interactive menu picks the operation. All read/write paths stable-JSON via `--json`. Resolves #13.
+- 🔀 **`yp diff`** — friendly wrapper over `git diff` with `--files`, `--hunks`, `--stat`, `--json`, and `<refA> <refB>` positional pair. JSON shape stable for `jq` pipelines.
+- 📝 **Conventional Commits** — `yp commit --conventional [--type <t>] [--scope <s>] [--detect-breaking] [--amend] [--template <path>]`. Configurable per-project via `"commitFormat"` in `~/.yitpush/config.json`. Resolves #11.
+- 🗑️ **`task delete <org> <id> [--yes|-y] [--json]`** — moves a work item to the recycle bin (`DELETE /_apis/wit/recyclebin/{id}`). Prompts by default; `--yes` skips the prompt in CI.
+- 📎 **`task attach <org> <project> <id> <file-path> [--comment "..."] [--json]`** — uploads a local file as an `AttachedFile` relation.
+- 🔍 **`resolve-field` / `refresh-fields`** — print a work-item field refname by display name; invalidate the on-disk cache (24h TTL).
+- 👤 **`--assigned-to <upn|display-name|"">`** — UPN or display-name resolved against the project's identity store; multiple matches exit 4 with a candidate list. Resolves #7.
+- 🔗 **`link --repo <r> --branch <b>` quick mode** — works for both HUs and Tasks; `Custom.URLCommit` written as fallback for Tasks. Resolves #9.
+- 🛡️ **Pre-flight for `Done` transitions** — when `--state "Done"` is passed without `--evidence`, the tool `GET`s the work item and rejects the transition (exit 2) if `Evidencias de finalización` is empty. Fail-open on auth/network/5xx. Resolves #17.
+- 🐛 **BUG-001 / BUG-002 / BUG-003** — `EsfuerzoRealHH` refname routing, dynamic state cache, `Evidencias` required for `Done`. Resolves #18.
+- 🎯 **`hu task` single-task default** (was 3); legacy trio preserved via `--trio`. Title precedence: `--title` > `task-titles[0]` > `"Desarrollo"`. Resolves #6.
+- 🆔 **`--version` / `-V` global flag** + **`--json` on `hu show` / `task show` / `hu list`** — stable flat JSON for `jq`; trailing interactive prompt auto-skipped on redirected stdout.
 
-### Fixed
-- **Spectre.Console markup crash in `yp --help` on the `diff` table** (pre-existing, surfaced by the new diff subcommand shipped in v9): the JSON example contained literal `[...]` markup tags that crashed the markup tokenizer. Now rendered as a plain-text summary.
+### 📊 Stats
+- 15 vertical slices (v0–v14) + epic
+- **326 xUnit tests passing** (was 18 at the start of the v2.3.0 cycle)
+- New subcommands: `pr list/show/comments/reply/create`, `task delete`, `task attach`, `resolve-field`, `refresh-fields`, `diff`
+- New flags: `--conventional`, `--type`, `--scope`, `--detect-breaking`, `--amend`, `--template`, `--no-spinner`, `--title`, `--trio`, `--assigned-to`, `--yes`, `--evidence`, `--field`, `--history`, `--json`, `--version/-V`
+- New TUI: `yp setup` (with `--wizard` / `--tui` escape hatches)
+- New provider: NVIDIA NIM (free tier, OpenAI-compatible)
+- **Breaking-ish change**: `hu task` now creates 1 task by default; pass `--trio` to keep the legacy 3-task behavior
 
-Resolves #14.---
-
-## [2.3.0] - 2026-07-10
-
-### Changed
+### 🔄 Changed
 - **`yp azure-devops hu task` default is now 1 task** (was 3). The legacy trio (Desarrollo / Pruebas Unitarias / Code Review) is preserved as an opt-in via the new `--trio` flag or by passing `--task-titles "Desarrollo,Pruebas Unitarias,Code Review"`. Title precedence in single-task mode: `--title` > `taskTitles[0]` > `"Desarrollo"`. Projects that were relying on the implicit trio need to add `--trio` to their commands or scripts. Resolves #6.
 - **`AzureDevOpsFlagParser.Parse(args)` is now the single source of truth** for all Azure DevOps flag parsing. The duplicated manual parser that lived at the top of `AzureDevOpsCommand.cs` is gone. `--description`/`-d`, `--no-link`/`-n`, `--effort`/`-e`, `--effort-real`/`-er`, `--remaining`/`-r`, `--state`/`-s`, `--comment`/`-c`, `--task-titles`/`-t`, `--repo`, `--branch` are all parsed by the same function used by `task update` / `hu show` / `hu list` / `task show`. This eliminates the "Quick mode ignores --task-titles" class of bugs.
 
-### Added
+### ✨ Added
 - **`--title <text>`** flag on `yp azure-devops hu task` — patches the single task with the provided title. Highest precedence; overrides `--task-titles` and `--trio`.
 - **`--trio`** flag on `yp azure-devops hu task` — restores the legacy three-task default (Desarrollo / Pruebas Unitarias / Code Review). Mutually exclusive with `--task-titles` (combined use exits 5).
 - **22 new xUnit tests** — `HuTaskPlanTests` (8, covering the new plan computation: single, trio, custom, conflict, whitespace stripping, override precedence) and 14 new cases in `AzureDevOpsFlagParserTests` (all the new flags: --title, -d, -D, -e, -er, -r, -s, -c, -n, --no-link, --repo, --branch, -t, --trio). Total test count: 64 (was 42).
@@ -102,8 +115,41 @@ Resolves #14.---
 - **5 new xUnit tests** in `tests/YitPush.Tests/TaskUpdatePreFlightTests.cs` (plus 3 existing `BuildMissingEvidenceMessage` tests) — cover the four pre-flight branches: state=Done + `--evidence` provided → `PreFlightPassed` with no HTTP calls; state≠Done → `PreFlightPassed` with no HTTP calls; state=Done + no `--evidence` + work item has evidence → `PreFlightPassed` after one GET; state=Done + no `--evidence` + work item has empty evidence → `PreFlightFailed` carrying the display name, refname, and `--evidence` hint; state=Done + GET 5xx → `PreFlightSkipped` (fail-open). Total test count: 140 (was 135).
 - **`yp commit` — Conventional Commits + custom layout (`--conventional`, `--type`, `--scope`, `--detect-breaking`, `--amend`, `--template`)** — emitted messages now follow the `<type>(<scope>)?!?: <subject>` convention with an optional `BREAKING CHANGE: <reason>` footer. `--type` and `--scope` force the AI's choice; `--detect-breaking` runs a static-analysis pass over the diff (regex for `^-.*\bpublic ...` in C#, `^-.*\bexport ...` in TS/JS, `^+.*"version": "<MAJOR>.0.0"` in JSON, `^+.*#major.bump` markers) and feeds the markers into the prompt and, when `--conventional` is set, into the rendered footer. `--amend` re-invokes the AI on `git diff HEAD~1` (not the working tree) and rewrites the last commit in place via `git commit --amend -F <tmpfile>` — no `git add`, no push. `--template <path-to-md>` renders the AI output through a Handlebars-ish template (`{{type}}`, `{{scope}}`, `{{subject}}`, `{{body}}`, `{{refs}}`); missing variables resolve to an empty string, malformed tokens are left untouched. The tool exits `6` when the template file is missing. The default format for every project can be set under a new `"commitFormat"` key in `~/.yitpush/config.json` (`"conventional"`, `"plain"`, `"gitmoji"`, or any path to a template file); explicit `--conventional` / `--template` flags override the config for that one call. Resolves #11.
 - **48 new xUnit tests** in `tests/YitPush.Tests/CommitFormatTests.cs` — cover template rendering with all 5 vars / missing-vars fallback / malformed-token passthrough, conventional commit parsing (plain subject, with scope, bang breaking marker, BREAKING CHANGE footer extraction, whitespace tolerance, all 10 documented types, rejection of non-conventional and unknown-type subjects), conventional commit formatting (plain, scoped, breaking reason, body+footer separation), breaking-change detection (clean diff, removed C# public symbol, removed TS/JS export, JSON major bump, `#major.bump` marker, no false positive on minor bump), `CommitArgs` parsing (defaults, legacy flags, all six new flags in dedicated and `=` forms, `commitFormat` config fallback, override precedence), final message assembly (passthrough, conventional normalization, bang + footer append, AI-footer preserved, type/scope override), template rendering with disk-backed `{{vars}}` (success, missing-var fallback, `FileNotFoundException` when the template path is missing), and AI prompt construction (type/scope constraint, BREAKING CHANGE footer mention, no constraints when no format is set, breaking-marker augmentation, omission when `--detect-breaking` is off). Total test count: 188 (was 140).
+- **`yp pr` interactive menu** — running `yp pr` with no arguments now opens an interactive menu (Spectre `SelectionPrompt`) with six options: generate an AI description, list, show, comments, reply, or create a PR. Picking a read/write option still falls through to the same CLI handler as the direct subcommand (so the menu is purely a discovery layer).
+- **`yp pr list`** — list open pull requests in the current repo via `az repos pr list --output json`. Output: Spectre table (id, title, author, source, target, draft flag, created). `--json` emits `{ exitCode, count, pullRequests: [...] }` for `jq` pipelines. Resolves the "I don't want to open a browser to see what's open" workflow.
+- **`yp pr show <pr-id>`** — show a single PR (title, description, source/target, status, author, creation date, draft flag, reviewer table with vote + isRequired). Backed by `az repos pr show --id <pr-id> --output json`. `--json` supported. Resolves the "give me the context of a PR in one terminal screen" workflow.
+- **`yp pr comments <pr-id>`** — list all discussion threads with author, date, body, and `filePath:line` context. Backed by the Azure DevOps REST API (`GET /git/repositories/{repoId}/pullRequests/{prId}/threads`) because `az repos pr thread` does not exist. `--json` emits `{ exitCode, prId, threads: [{ id, status, filePath?, lineNumber?, comments: [...] }] }`. Resolves the "address review feedback without opening the browser" workflow.
+- **`yp pr reply <pr-id> <thread-id> --body "..."`** — post a reply to a specific thread. Backed by the REST API (`POST .../threads/{threadId}/comments`). `--json` supported. Resolves the "acknowledge a review comment in one command" workflow.
+- **`yp pr create --source <branch> --target <branch> --title <title> [--body-file <path>] [--auto-complete]`** — open a new pull request. Backed by the REST API (`POST /git/repositories/{repoId}/pullRequests`) so the description can be larger than `az`'s argv limit. Without `--body-file`, the description is read from stdin. `--auto-complete` sets `completionOptions` (with `deleteSourceBranch: true`). `--json` supported. Resolves the "open a PR with a long body from a script" workflow.
+- **Stable exit codes across the new subcommands** — `0` success, `1` not-found (404), `2` auth/error, `3` validation. Mirrors the `azure-devops` conventions added in v2.3.0.
+- **`AzureDevOpsPrClient` (internal)** — REST client for the new write operations (`CreatePullRequestAsync`, `PostThreadCommentAsync`, `ListThreadsAsync` + a `ParseThreadsJson` helper). All methods accept an `HttpClient` so the test suite uses a hand-rolled `StubHttpHandler` (no live API calls in CI). Mirrors the `AzDevOpsDeleteClient` / `AzDevOpsAttachmentClient` pattern.
+- **`PrAzJsonParser` (internal)** — JSON parser for the `az repos pr list` and `az repos pr show` output. Maps the `az` JSON shape into the typed `PrSummary` / `PrDetail` / `PrReviewer` / `PrChangedFile` models. Branch names are stripped of the `refs/heads/` prefix so the table stays compact.
+- **`PrDispatcher` (internal)** — single source of truth for `yp pr` argument routing. Returns a `PrRoute` (kind + extracted fields + `ValidationError` flag) so the dispatcher is testable in isolation (17 dispatcher tests cover list/show/comments/reply/create routing, validation, AI flag pass-through, and unknown subcommands).
+- **41 new xUnit tests** — `AzDevOpsPrClientTests` (12), `PrAzJsonParserTests` (8), `PrDispatcherTests` (17), `PrJsonContractTests` (4). Total: 263 tests passing (was 222 before this slice).
+- **`PrSummary` / `PrDetail` / `PrReviewer` / `PrChangedFile` models** — added to `Models.cs` with stable `JsonPropertyName` camelCase attributes for the `--json` output contract.
+- **TUI for `yp setup`** — the interactive setup now launches a two-column live layout (`AnsiConsole.Live` + `Layout`) by default in a real terminal: left column lists the providers (with a green dot for the ones you've already tested), right column shows the API key status, endpoint, and the model picker, and a footer shows the result of the last save. Keyboard: `←/→` switch provider, `↑/↓` switch model, `T` test connection (re-uses `FetchModelsForProvider`), `Enter` save, `Esc` cancel. The "Test connection" re-uses the same logic as the wizard's validation step, so a tested provider gets a green dot in the list. The TUI auto-falls-back to the legacy 5-step wizard when stdin/stdout is redirected (CI), and the explicit flags `--wizard` and `--tui` let scripts force one or the other regardless of TTY detection. Resolves #15.
+- **`yp setup --wizard`** — forces the legacy 5-step wizard. Auto-selected in CI, so existing scripts keep working.
+- **`yp setup --tui`** — forces the TUI even if the routing would otherwise pick `--wizard` (useful for `script(1)` recordings or test harnesses that capture stdin but still want the visual TUI).
+- **7 new xUnit tests** in `tests/YitPush.Tests/SetupTuiTests.cs` — cover `SetupTui.ShouldUseTui` across the auto-fallback decision matrix: no flags + interactive terminal, explicit `--tui`, explicit `--wizard`, stdin redirected (with and without `--tui`), stdout redirected, unknown args (ignored), and the `--tui --wizard` last-flag-wins tie-break.
+- **`--no-spinner`** flag on `yp commit` and `yp pr` — skips the AnsiConsole.Status() spinner that wraps the AI call and the `git push`; the operation runs inline and the exit code is preserved. Same effect as the new `YITPUSH_NO_SPINNER` environment variable (`1`, `true`, or `yes` — case-insensitive). The spinner is also auto-disabled when stdout is redirected (CI logs), so a piped `yp commit` no longer leaves a frozen frame in the journal.
+- **`YITPUSH_NO_SPINNER`** environment variable — global override for the spinner. Reads `1`, `true`, or `yes` (case-insensitive) and short-circuits the spinner wrapper everywhere it's used.
+- **`Ui.RunWithStatus<T>(string title, Func<StatusContext?, Task<T>> work, bool noSpinner = false)`** — single helper for long operations. When the spinner is enabled it wraps the work in `AnsiConsole.Status().StartAsync`; when it's disabled (flag / env var / redirected stdout) it prints the title once and runs the work inline. Centralized so every long op picks up the same disable behavior.
+- **12 new xUnit tests** in `tests/YitPush.Tests/UiTests.cs` — cover `Ui.ShouldDisableSpinner` (flag, env var case-insensitive, stdout redirect) and `Ui.RunWithStatus` (work invocation, exception propagation, return value, context ignore in the inline path).
+- **2 new xUnit tests** in `tests/YitPush.Tests/CommitFormatTests.cs` — `ParseCommitArgs` recognizes `--no-spinner` and isolates it from the other commit flags.
 
-### Notes
+### 🔄 Changed (more)
+- **`yp pr` with no args no longer opens the AI description generator by default** — it now opens the interactive menu. The original AI flow is preserved as a backward-compatible escape hatch: pass `--detailed`, `--save`, or any AI flag to bypass the menu and run the AI generator directly. This is a UI/UX change, not a breaking behavior change (scripts that used `yp pr` with no args were not common in the wild; the `yp pr --detailed` form continues to work unchanged).
+- **`yp --help` `pr` row** — the description now says "Triage and act on Azure DevOps PRs (list/show/comments/reply/create) or generate an AI description with --detailed" and the help text gains a dedicated `pr subcommands` table and a `pr AI options` table so the new surface is discoverable from `--help` alone.
+- **`CheckForUpdates` no longer renders a yellow Panel** that can interleave with the AnsiConsole.Status() spinner. The check now runs synchronously up-front and emits a single-line `⬆  yp <version> available` hint. The cache lookup is sub-100ms so the perceived startup latency is unchanged.
+- **`yp --help`** adds a `--no-spinner` row under "Global flags" and the `commit` and `pr` option tables.
+- **`yp --help` `setup` row** now mentions the TUI + `--wizard` escape hatch, and the example section adds `yp setup`, `yp setup --wizard`, and `yp setup --tui` lines so the keyboard shortcuts (`←/→`, `↑/↓`, `T`, `Enter`, `Esc`) are discoverable from `--help` alone.
+
+### 🐛 Fixed (more)
+- **BUG-001 / BUG-002 / BUG-003** (issue #18) — `Custom.EsfuerzoRealHH` vs `Custom.EsfuerzoReal` refname routing is now project-aware via `AzDevOpsFieldRefNameResolver`; the `ValidAzureStates` constant is gone (states are now resolved dynamically per project); the `Done` transition pre-flight blocks the PATCH if `Evidencias de finalización` is empty. Resolves #18.
+- **Spectre.Console markup crash in `yp --help` on the `diff` table** (pre-existing, surfaced by the new diff subcommand shipped in v9): the JSON example contained literal `[...]` markup tags that crashed the markup tokenizer. Now rendered as a plain-text summary.
+- **Spectre.Console crash in `hu show` / `hu list`** when stdout is redirected (the trailing interactive prompt is now auto-skipped in non-interactive contexts).
+
+### 📝 Notes
 - This unlocks fixing the long-standing BUG-001 (`EsfuerzoRealHH` vs `EsfuerzoReal`) and the `Remaining Work` verification todo in `KNOWN_BUGS.md` without touching the hardcoded constants. The new CLI subcommands let users look up the correct refname on demand while the constants are gradually migrated.
 
 ---
@@ -125,8 +171,6 @@ Resolves #14.---
 
 ## [2.2.1] - 2026-06-22
 
-## [2.2.1] - 2026-06-22
-
 ### Fixed
 - **`--effort` / `-e`, `--effort-real` / `-er`, `--task-titles` / `-t` silently ignored** — flag parser in `AzureDevOpsCommand` was missing these three branches, so values passed to `yp azure-devops task update` and `hu task` were dropped before reaching the API. Also removed a duplicate `--comment` / `-c` parser block.
 
@@ -145,81 +189,41 @@ Resolves #14.---
 
 ---
 
-## [2.1.8] - 2026-05-13
+## 2.1.x — 2026
 
-### Fixed
-- **Task description format** — Descriptions now preserved as raw Markdown via Azure DevOps REST API. Newlines, headers, lists, and formatting render correctly since the API stores JSON with proper `\n` encoding. No conversion needed — Azure DevOps renders Markdown natively.
+### [2.1.8] - 2026-05-13
+- **Fixed**: **Task description format** — Descriptions now preserved as raw Markdown via Azure DevOps REST API. Newlines, headers, lists, and formatting render correctly since the API stores JSON with proper `\n` encoding. No conversion needed — Azure DevOps renders Markdown natively.
 
----
+### [2.1.7] - 2026-05-13
+- **Added**: `--no-link` / `-n` flag for `hu task` (skip branch-linking prompt) and `--repo` + `--branch` auto-link (with both flags, tasks link to the branch automatically).
+- **Fixed**: Markdown task descriptions now converted to HTML and stored in `Microsoft.VSTS.Common.DescriptionHtml` so they render correctly in Azure DevOps.
 
-## [2.1.7] - 2026-05-13
+### [2.1.6] - 2026-05-13
+- **Fixed (docs)**: `--task-titles` / `-t` flag was supported but undocumented; now in CLI help and the agent skill file.
 
-### Added
-- **`--no-link` / `-n` flag** for `hu task` — skips the branch-linking prompt entirely, enabling fully non-interactive task creation.
-- **`--repo` + `--branch` auto-link** for `hu task` — when both flags are provided, tasks are linked to the specified branch automatically without prompting.
+### [2.1.5] - 2026-05-13
+- **Fixed**: Non-interactive task creation — `--task-titles` / `-t` flag added so piped descriptions don't fail with `Failed to read input in non-interactive mode`.
 
-### Fixed
-- **Task description formatting** — Markdown descriptions are now converted to HTML and stored in `Microsoft.VSTS.Common.DescriptionHtml` via Azure DevOps REST API. Headers, lists, bold, italic, and code formatting render correctly in Azure DevOps.
+### [2.1.4] - 2026-04-29
+- **Added**: Interactive search/filtering in all significant selection lists (Azure DevOps orgs/projects/repos/HUs/tasks/variable groups, git branch selection, setup provider/model lists, main Azure DevOps menu).
 
----
+### [2.1.3] - 2026-04-28
+- **Fixed**: `[Custom...]` option no longer crashes `yp setup` — entry escaped for Spectre.Console markup.
 
-## [2.1.6] - 2026-05-13
+### [2.1.2] - 2026-04-27
+- **Fixed**: `yp setup` model selection no longer crashes on model names containing `[`, `]`, `<`, `>`, `&` — escaped before rendering in `SelectionPrompt`.
 
-### Fixed
-- **Documentation** — Documented `--task-titles` / `-t` flag in CLI help and agent skill file. It was supported but undocumented, making it impossible to discover.
-
----
-
-## [2.1.5] - 2026-05-13
-
-### Fixed
-- **Non-interactive task creation** — Added `--task-titles` / `-t` flag to `yp azure-devops hu task` for scripted/non-interactive usage (e.g. piping markdown descriptions). Previously the command would fail with `Failed to read input in non-interactive mode` when description was passed via `--description`.
-
----
-
-## [2.1.4] - 2026-04-29
-
-### Added
-- **Interactive Search in Menus** — Enabled instant search/filtering in all significant selection lists. You can now type to quickly find items in:
-  - Azure DevOps: Organizations, Projects, Repositories, User Stories, Tasks, and Variable Groups.
-  - Git: Branch selection for `checkout` and `pr` commands.
-  - Setup: AI Provider and Model selection (including long lists from OpenRouter).
-  - Main menus: Azure DevOps interactive menu.
-
----
-
-## [2.1.3] - 2026-04-28
-
-### Fixed
-- **`[Custom...]` option causes crash in `yp setup`** — the `[Custom...]` model selection entry was not escaped for Spectre.Console markup, causing `Encountered malformed markup tag` exception. Now escaped with `Markup.Escape` before being added to the list.
-
----
-
-## [2.1.2] - 2026-04-27
-
-### Fixed
-- **`yp setup` crash on model selection** — model names containing `[`, `]`, `<`, `>`, `&` (returned by provider APIs) are now escaped before rendering in the Spectre.Console `SelectionPrompt`, preventing `Encountered malformed markup tag` exceptions.
-
----
-
-## [2.1.0] - 2026-04-27
-
-### Added
-- **Live model discovery in `yp setup`** — the model selection menu is now populated by querying each provider's `/models` endpoint, so newly released models are picked up without updating the app.
-  - OpenAI / DeepSeek: `GET /v1/models` with `Authorization: Bearer` (filtered to chat-capable model families: `gpt-*`, `o1`, `o3`, `o4`, `chatgpt-*`).
-  - OpenRouter: `GET /api/v1/models` (no auth required); honors the host of any custom base URL configured in setup.
-  - Anthropic: `GET /v1/models?limit=100` with `x-api-key` and `anthropic-version`.
-  - Google Gemini: `GET /v1beta/models?key=…`, filtered to models that support `generateContent`.
-- **Models cache** — fetched lists are stored in `~/.yitpush/models-cache.json` with a 24h TTL, so the menu opens instantly between runs.
-- **Live/defaults indicator** — the model selection title now shows `(live)` or `(defaults)` so it's clear whether the list came from the provider or the built-in fallback.
-- **`CLAUDE.md`** — guidance file for Claude Code with build/run/pack commands, architecture notes, conventions, and pointers to the other AI-agent docs in the repo.
-
-### Changed
-- The model selection menu in `yp setup` now paginates at 15 entries to handle providers like OpenRouter that return 100+ models.
-- `[Custom…]` remains available in every provider's menu as an escape hatch for typing any model ID by hand.
-
-### Notes
-- If the live fetch fails (network issue, invalid key, schema change), `yp setup` falls back silently to the curated `GetDefaultModelsForProvider` list — existing behavior is preserved.
+### [2.1.0] - 2026-04-27
+- **Added**: Live model discovery in `yp setup` via each provider's `/models` endpoint.
+  - OpenAI / DeepSeek: `GET /v1/models` with `Authorization: Bearer` (filtered to `gpt-*`, `o1`, `o3`, `o4`, `chatgpt-*`).
+  - OpenRouter: `GET /api/v1/models` (no auth); honors custom base URL.
+  - Anthropic: `GET /v1/models?limit=100` with `x-api-key` + `anthropic-version`.
+  - Google Gemini: `GET /v1beta/models?key=…`, filtered to `generateContent`-supporting models.
+- **Added**: Models cache at `~/.yitpush/models-cache.json` with 24h TTL.
+- **Added**: Live/defaults indicator in the model selection title.
+- **Added**: `CLAUDE.md` for Claude Code guidance.
+- **Changed**: Model selection paginates at 15 entries to handle OpenRouter's 100+ models.
+- **Changed**: `[Custom…]` remains available in every provider's menu as an escape hatch.
 
 ---
 
@@ -246,57 +250,40 @@ Resolves #14.---
 
 ---
 
-## [1.4.0] - 2026-03-14
+## 1.x — 2025
 
-### Added
-- Command shortened to **`yp`** for faster usage (`yitpush` alias still supported).
-- **Esfuerzo Real HH** field support in `task update` command (`--effort-real` / `-er`).
-- Full Azure DevOps Task Management: `hu list`, `task show`, `task update`.
-- Interactive and direct updates for Effort, Esfuerzo Real HH, Remaining Work, State and Comments.
-- Smart state validation and selection menus for Azure DevOps.
-- Integrated "List all fields" tool for debugging work item technical names.
+### [1.4.0] - 2026-03-14
+- **Added**: Command shortened to **`yp`** for faster usage (`yitpush` alias still supported).
+- **Added**: **Esfuerzo Real HH** field support in `task update` (`--effort-real` / `-er`).
+- **Added**: Full Azure DevOps Task Management: `hu list`, `task show`, `task update`.
+- **Added**: Interactive and direct updates for Effort, Esfuerzo Real HH, Remaining Work, State, and Comments.
+- **Added**: Smart state validation and selection menus for Azure DevOps.
+- **Added**: Integrated "List all fields" tool for debugging work item technical names.
+- **Improved**: Faster navigation with `← Back` support in all interactive menus.
+- **Improved**: Sorting by ID descending (recency first) in all Azure DevOps lists.
 
-### Improved
-- Faster navigation with `← Back` support in all interactive menus.
-- Sorting by ID descending (recency first) in all Azure DevOps lists.
+### [1.3.0] - 2026-02-01
+- **Added**: `yp azure-devops link` — add branch/commit/PR links to any work item.
+- **Added**: `yp azure-devops hu link` — link a repository branch to a User Story using ArtifactLink (shows in Azure Boards Development section).
 
----
+### [1.2.0] - 2026-01-15
+- **Added**: `yp azure-devops hu show` — show User Story details (title, effort, description, links).
+- **Added**: `yp azure-devops task show` — show Task details.
+- **Added**: `yp azure-devops hu task` — create tasks for a User Story interactively or via CLI args (quick mode).
 
-## [1.3.0] - 2026-02-01
+### [1.1.0] - 2025-12-01
+- **Added**: `yp pr` — generate pull request descriptions between two branches using AI.
+- **Added**: `--detailed` flag for both `commit` and `pr` commands.
+- **Added**: `--language` / `--lang` flag for `commit` and `pr` commands.
+- **Added**: `--save` flag to write output to a markdown file.
+- **Added**: Interactive branch selection with pagination.
 
-### Added
-- `yp azure-devops link` — add branch/commit/PR links to any work item.
-- `yp azure-devops hu link` — link a repository branch to a User Story using ArtifactLink (shows in Azure Boards Development section).
-
----
-
-## [1.2.0] - 2026-01-15
-
-### Added
-- `yp azure-devops hu show` — show User Story details (title, effort, description, links).
-- `yp azure-devops task show` — show Task details.
-- `yp azure-devops hu task` — create tasks for a User Story interactively or via CLI args (quick mode).
-
----
-
-## [1.1.0] - 2025-12-01
-
-### Added
-- `yp pr` — generate pull request descriptions between two branches using AI.
-- `--detailed` flag for both `commit` and `pr` commands.
-- `--language` / `--lang` flag for `commit` and `pr` commands.
-- `--save` flag to write output to a markdown file.
-- Interactive branch selection with pagination.
+### [1.0.0] - 2025-11-01
+- **Added**: Initial release.
+- **Added**: `yp commit` — AI-generated commit messages using DeepSeek.
+- **Added**: `yp checkout` — interactive branch checkout.
+- **Added**: `yp azure-devops repo new` — create Azure DevOps repositories.
 
 ---
 
-## [1.0.0] - 2025-11-01
-
-### Added
-- Initial release.
-- `yp commit` — AI-generated commit messages using DeepSeek.
-- `yp checkout` — interactive branch checkout.
-- `yp azure-devops repo new` — create Azure DevOps repositories.
-- `yp azure-devops repo checkout` — clone repositories interactively.
-- `yp azure-devops variable-group list` — list and inspect variable groups.
-- `--confirm` flag for commit review before pushing.
+> 🗂️ **Esto es solo un resumen — revisa cada sección arriba para el detalle completo de los cambios.** Si encuentras algo que falta, abre un issue o PR en https://github.com/elvisbrevi/yitpush/issues.
