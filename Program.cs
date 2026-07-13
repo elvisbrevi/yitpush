@@ -151,7 +151,7 @@ partial class Program
         commitTable.AddRow("--detect-breaking", "Scan the diff for breaking changes (removed public symbol in C#, removed export in TS/JS, major JSON version bump, `#major.bump` marker) and feed them to the AI");
         commitTable.AddRow("--amend", "Regenerate the message for the LAST commit and rewrite it in place (`git commit --amend`); skips the working-tree flow and does NOT push");
         commitTable.AddRow("--template <path-to-md>", "Render the AI output through a Handlebars-ish template (`{{type}}`, `{{scope}}`, `{{subject}}`, `{{body}}`, `{{refs}}`); exits 6 if the file is missing");
-        commitTable.AddRow("--no-spinner", "Skip the spinner that wraps the AI call and the `git push` (also honored via [cyan]YITPUSH_NO_SPINNER=1[/])");
+        commitTable.AddRow("--no-spinner", "Skip the spinner that wraps the AI call and the `git push` (also honored via YITPUSH_NO_SPINNER=1)");
 
         AnsiConsole.Write(commitTable);
 
@@ -165,7 +165,7 @@ partial class Program
         prTable.AddRow("--detailed", "Generate detailed PR description");
         prTable.AddRow("--language <lang>, --lang, -l", "Output language (e.g., english, spanish, french)");
         prTable.AddRow("--save", "Save PR description to a markdown file");
-        prTable.AddRow("--no-spinner", "Skip the spinner that wraps the AI call (also honored via [cyan]YITPUSH_NO_SPINNER=1[/])");
+        prTable.AddRow("--no-spinner", "Skip the spinner that wraps the AI call (also honored via YITPUSH_NO_SPINNER=1)");
 
         AnsiConsole.Write(prTable);
 
@@ -179,7 +179,7 @@ partial class Program
         diffTable.AddRow("--files", "Show only the list of changed files (a colorful `git diff --stat`)");
         diffTable.AddRow("--hunks", "Show only the changed lines, no context (`git diff -U0`)");
         diffTable.AddRow("--stat", "Alias of `--files` (kept for parity with `git diff --stat`)");
-        diffTable.AddRow("--json", "Emit `{ files: [{ path, additions, deletions, hunks: [...] }] }` on stdout (no ANSI)");
+        diffTable.AddRow("--json", "Emit a stable JSON object on stdout (no ANSI); see the yp diff docs for the exact shape");
         diffTable.AddRow("--no-color", "Disable Spectre coloring (also auto-applied when stdout is redirected)");
         diffTable.AddRow("<refA> <refB>", "Diff branch/tag/commit to another (`git diff <refA>..<refB>`)");
 
@@ -230,7 +230,7 @@ partial class Program
         AnsiConsole.MarkupLine("  yp diff                                         [dim]# Working-tree diff with syntax coloring[/]");
         AnsiConsole.MarkupLine("  yp diff --files                                 [dim]# Just the file list with +N -M per file[/]");
         AnsiConsole.MarkupLine("  yp diff feature/abc main --stat                 [dim]# Branch-to-branch stat[/]");
-        AnsiConsole.MarkupLine("  yp diff --json | jq '.files[0].hunks[0].afterLine' [dim]# Pipe the diff to another tool[/]");
+        AnsiConsole.MarkupLine("  yp diff --json | jq '.files[[0]].hunks[[0]].afterLine' [dim]# Pipe the diff to another tool[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu task                         [dim]# Create tasks interactively[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu show MyOrg 12345             [dim]# Show HU details[/]");
         AnsiConsole.MarkupLine("  yp azure-devops task show MyOrg 67890           [dim]# Show Task details[/]");
