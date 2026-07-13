@@ -95,3 +95,39 @@ class ModelsCache
     [JsonPropertyName("providers")]
     public Dictionary<string, ModelsCacheEntry> Providers { get; set; } = new();
 }
+
+public class DiffHunk
+{
+    [JsonPropertyName("beforeLine")]
+    public int BeforeLine { get; set; }
+
+    [JsonPropertyName("afterLine")]
+    public int AfterLine { get; set; }
+
+    [JsonPropertyName("content")]
+    public string Content { get; set; } = string.Empty;
+}
+
+public class DiffFile
+{
+    [JsonPropertyName("path")]
+    public string Path { get; set; } = string.Empty;
+
+    [JsonPropertyName("oldPath")]
+    public string? OldPath { get; set; }
+
+    [JsonPropertyName("additions")]
+    public int Additions { get; set; }
+
+    [JsonPropertyName("deletions")]
+    public int Deletions { get; set; }
+
+    [JsonPropertyName("isBinary")]
+    public bool IsBinary { get; set; }
+
+    [JsonPropertyName("isRename")]
+    public bool IsRename { get; set; }
+
+    [JsonPropertyName("hunks")]
+    public List<DiffHunk> Hunks { get; set; } = new();
+}

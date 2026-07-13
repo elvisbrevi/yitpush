@@ -74,7 +74,23 @@ export OPENROUTER_API_KEY='...'
 | `yp commit` | Stage, commit and push with an AI-generated message |
 | `yp checkout` | Interactive branch checkout |
 | `yp pr` | Generate a pull request description between two branches |
+| `yp diff` | Show working-tree or branch-to-branch diff (supports `--files`, `--hunks`, `--stat`, `--json`) |
 | `yp --version` / `yp -V` | Print the assembly version (e.g. `2.3.0`) and exit 0 — safe to pipe |
+
+#### `yp diff` — friendly diff viewer
+
+`yp diff` wraps `git diff` with flags for the common agent and human workflows. The `--json` output is stable and safe to pipe into `jq` or any other tool:
+
+```bash
+yp diff                                       # working-tree diff, syntax-colored
+yp diff --files                               # just the file list with +N -M per file
+yp diff --hunks                               # changed lines only, no context (git diff -U0)
+yp diff feature/abc main --stat               # branch-to-branch stat
+yp diff --json | jq '.files[0].hunks[0].afterLine'        # first added line of the first hunk
+yp diff --json | jq '.files[] | select(.additions > 0) | .path'  # only added paths
+```
+
+Flags: `--files` / `--stat` (file list), `--hunks` (changed lines only), `--json` (stable JSON: `{ files: [{ path, oldPath?, additions, deletions, isBinary, isRename, hunks: [{ beforeLine, afterLine, content }] }] }`), `--no-color` (auto-applied when stdout is redirected), and an optional `<refA> <refB>` positional pair for `git diff <refA>..<refB>`.
 
 ### Azure DevOps Commands
 | Command | Description |

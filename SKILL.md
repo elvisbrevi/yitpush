@@ -80,6 +80,36 @@ yp pr -l french --save
 
 ---
 
+### tool: diff
+
+Friendly wrapper over `git diff` for the common agent and human workflows. Wraps the working-tree diff (default: `git diff HEAD`) with syntax-friendly coloring (`+` lines green, `-` lines red via Spectre.Console `Markup`), or emits a structured JSON payload for piping to other tools.
+
+```
+yp diff [--files] [--hunks] [--stat] [--json] [--no-color] [<refA> <refB>]
+```
+
+**When to use**: User wants to inspect a diff without going through AI generation. Use `--json` when the consumer is another tool (`jq`, a CI script, an LLM that needs structured input) — the JSON shape is stable: `{ files: [{ path, oldPath?, additions, deletions, isBinary, isRename, hunks: [{ beforeLine, afterLine, content }] }] }`.
+
+**Parameters**:
+- (no flag) — print the working-tree diff with `+`/`-` coloring, exit 0
+- `--files` / `--stat` — print only the list of changed files with `+N -M` per file (a colorful `git diff --stat`)
+- `--hunks` — print only the changed lines, no context (`git diff -U0` semantics)
+- `<refA> <refB>` — diff branch/tag/commit to another (`git diff <refA>..<refB>`)
+- `--json` — emit the stable JSON shape on stdout (no ANSI escapes); `--no-color` is auto-applied when stdout is redirected so the output is pipeline-friendly
+- `--no-color` — disable Spectre coloring manually
+
+**Examples**:
+```bash
+yp diff                                         # working-tree diff, colored
+yp diff --files                                 # just the file list
+yp diff --hunks                                 # changed lines only
+yp diff feature/abc main --stat                 # branch-to-branch stat
+yp diff --json | jq '.files[0].hunks[0].afterLine'   # pipe the diff to jq
+yp diff --json | jq '.files[] | select(.additions > 0) | .path'   # added-only paths
+```
+
+---
+
 ### tool: setup
 
 Configures the active AI provider interactively.
