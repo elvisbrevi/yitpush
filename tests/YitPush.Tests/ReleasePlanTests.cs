@@ -292,6 +292,33 @@ public class ReleasePlanTests
     }
 
     [Fact]
+    public void BuildPreFlightReport_stale_nupkg_listing_yields_WARN_not_FAIL()
+    {
+        var version = "9.9.9-test";
+        var csproj = $"<Project><PropertyGroup><Version>{version}</Version></PropertyGroup></Project>";
+        var changelog = $"# Changelog\n\n## [{version}]\n";
+        var llms = $"version: {version}\n";
+        var skill = $"version: {version}\n";
+
+        var report = ReleasePlan.BuildPreFlightReport(
+            version: version,
+            csprojContent: csproj,
+            changelogContent: changelog,
+            llmsTxtContent: llms,
+            llmsFullTxtContent: llms,
+            rootSkillContent: skill,
+            installableSkillContent: skill,
+            nupkgDirListing: new[] { "YitPush.2.1.1.nupkg", "YitPush.2.1.2.nupkg" });
+
+        Assert.True(report.IsReadyToShip,
+            "Stale nupkg/ files are a WARN, not a FAIL — release is still ready to ship.");
+        Assert.Contains(report.Findings,
+            f => f.Severity == ReleaseFindingSeverity.Warn && f.Category == "NUPKG_STALE");
+        Assert.DoesNotContain(report.Findings,
+            f => f.Severity == ReleaseFindingSeverity.Fail && f.Category == "NUPKG_STALE");
+    }
+
+    [Fact]
     public void GetSteps_returns_pack_tag_push_and_skill_in_order()
     {
         var plan = ReleasePlan.LoadFromRepo(RepoRoot);
