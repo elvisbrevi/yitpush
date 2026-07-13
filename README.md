@@ -171,22 +171,33 @@ yp commit --template ~/.yitpush/commit.md                 # Render output throug
 
 The default commit format can also be set per project in `~/.yitpush/config.json` under the `"commitFormat"` key (`"conventional"`, `"plain"`, `"gitmoji"`, or a path to a template file). An explicit `--conventional` or `--template` flag on a single invocation overrides the stored default.
 
-### 📋 Pull Request Descriptions
-`yp pr` interactively selects two branches and generates a ready-to-paste PR description.
+### 📋 Pull Request Management
+Triage and act on Azure DevOps PRs from the terminal. Running `yp pr` with no args opens an interactive menu with six options: generate an AI description, list, show, comments, reply, or create a PR.
 
 ```bash
-yp pr                              # Generate PR description
-yp pr --detailed                   # Detailed with testing notes
-yp pr --language spanish           # Output in Spanish
-yp pr -l french                    # Short flag for language
-yp pr --save                       # Save to markdown file
+yp pr                                                       # interactive menu
+yp pr list                                                  # list open PRs
+yp pr show 12345                                            # show PR details (title, description, reviewers)
+yp pr comments 12345                                        # list discussion threads with file/line context
+yp pr reply 12345 678 --body "Fixed in commit abc"         # reply to a thread (REST API)
+yp pr create --source feature/x --target main --title "feat: x" --body-file desc.md  # open a PR (REST API)
+yp pr create --source feature/x --target main --title "feat: x" --body-file desc.md --auto-complete  # + auto-complete
+yp pr --detailed                                            # AI description (backward compat)
 ```
 
-| Flag | Description |
-|------|-------------|
-| `--detailed` | Generate detailed PR description |
-| `--language <lang>`, `--lang`, `-l` | Output language (default: english) |
-| `--save` | Save PR description to a markdown file |
+| Subcommand | Description |
+|-----------|-------------|
+| `list` | List open PRs in a Spectre table — `--json` for a stable envelope (`{ exitCode, count, pullRequests: [...] }`) |
+| `show <pr-id>` | Show title, description, source/target, status, author, reviewers — `--json` supported |
+| `comments <pr-id>` | List all discussion threads (REST API: `az repos pr thread` does not exist) with author, date, body, file path, line — `--json` supported |
+| `reply <pr-id> <thread-id> --body "..."` | Post a reply to a specific thread via the REST API — `--json` supported |
+| `create --source <b> --target <b> --title <t> [--body-file <path>] [--auto-complete]` | Open a new PR via the REST API so the description can be larger than `az`'s argv limit. Without `--body-file` the description is read from stdin. `--auto-complete` sets `completionOptions` (`deleteSourceBranch: true`). `--json` supported |
+
+**Exit codes**: `0` success, `1` not-found (404), `2` auth/error, `3` validation.
+
+Read operations (`list`, `show`) go through `az repos pr` so the CLI's auth + defaults are reused; write operations (`reply`, `create`) and threads (`comments`) go through the Azure DevOps REST API so the description can be larger than `az`'s argv limit and because `az repos pr thread` does not exist.
+
+The original AI-description flow (`yp pr --detailed -l spanish --save`) is preserved as a backward-compatible escape hatch.
 
 ### 🔷 Azure DevOps Integration
 

@@ -59,25 +59,45 @@ The default commit format can also be set per project in `~/.yitpush/config.json
 
 ### tool: pr
 
-Interactively selects two branches, generates a pull request description and copies it to the clipboard.
+Triage and act on Azure DevOps pull requests from the terminal, or generate an AI-powered PR description for the current branch.
 
 ```
-yp pr [--detailed] [--language <lang>] [--save]
+yp pr                                     # interactive menu (default)
+yp pr list                                # list open PRs in the current repo
+yp pr show <pr-id>                        # show a PR's details
+yp pr comments <pr-id>                    # list discussion threads (REST API)
+yp pr reply <pr-id> <thread-id> --body "..."   # reply to a thread (REST API)
+yp pr create --source <b> --target <b> --title <t> [--body-file <path>] [--auto-complete]  # open a PR via REST API
+yp pr [--detailed] [--language <lang>] [--save]   # AI-generated description (backward compat)
 ```
 
-**When to use**: User wants to draft a PR description for a branch.
+**When to use**:
+- User wants to act on a PR from the terminal without opening a browser
+- User wants to list/show/comment/reply to PRs from CI scripts (use `--json` for a stable envelope)
+- User wants to open a new PR with a description larger than `az`'s argv limit (use `yp pr create --body-file ...`)
 
-**Parameters**:
-- `--detailed` — include summary, change list, files changed, and testing notes
-- `--language <lang>` / `-l <lang>` — language for the output
-- `--save` — save description to `pr-description-<from>-to-<to>.md`
-- `--no-spinner` — skip the AnsiConsole.Status() spinner that wraps the AI call. Same effect as `YITPUSH_NO_SPINNER=1`. Auto-disabled when stdout is redirected.
+**Subcommands**:
+- `yp pr list` — lists open PRs in the current repo. Output: Spectre table (id, title, author, source, target, draft, created). `--json` emits `{ exitCode, count, pullRequests: [...] }`.
+- `yp pr show <pr-id>` — shows title, description, source/target, status, author, and the reviewer table. `--json` emits `{ exitCode, pullRequest: { id, title, description, ..., reviewers: [...], changedFiles: [...] } }`.
+- `yp pr comments <pr-id>` — shows all discussion threads with author, date, body, and file/line context. Uses the REST API (`az repos pr thread` does not exist). `--json` emits `{ exitCode, prId, threads: [...] }`.
+- `yp pr reply <pr-id> <thread-id> --body "..."` — posts a reply to a specific thread. REST API. `--json` emits `{ exitCode, prId, threadId, error? }`.
+- `yp pr create --source <branch> --target <branch> --title <title> [--body-file <path>] [--auto-complete]` — opens a PR via REST API. If `--body-file` is not provided, the description is read from stdin. `--auto-complete` sets `completionOptions` (with `deleteSourceBranch: true`). `--json` emits `{ exitCode, pullRequestId, error? }`.
+
+**Exit codes**: `0` success, `1` not-found (404), `2` auth/error, `3` validation.
+
+**Backward-compat AI mode**: `yp pr` with no args now opens the interactive menu. To force the original AI description generator, pass `--detailed` or any AI flag (e.g. `yp pr --detailed -l french --save`).
 
 **Examples**:
 ```bash
-yp pr
-yp pr --detailed
-yp pr -l french --save
+yp pr                                              # interactive menu
+yp pr list                                         # all open PRs
+yp pr show 12345                                   # one PR's details
+yp pr comments 12345                               # all threads on a PR
+yp pr reply 12345 678 --body "Fixed in commit abc" # reply to a thread
+yp pr create --source feature/x --target main --title "feat: x" --body-file desc.md
+yp pr create --source feature/x --target main --title "feat: x" --body-file desc.md --auto-complete
+yp pr list --json | jq '.pullRequests[].id'        # machine-readable list
+yp pr --detailed -l spanish                        # AI description (backward compat)
 ```
 
 ---

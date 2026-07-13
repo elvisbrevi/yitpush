@@ -121,7 +121,7 @@ partial class Program
 
         commandsTable.AddRow("setup", "Configure AI provider in the TUI (auto-falls-back to --wizard in CI); pass --wizard to force the legacy flow");
         commandsTable.AddRow("commit", "Stage, commit and push changes with an AI-generated message");
-        commandsTable.AddRow("pr", "Generate a pull request description between two branches");
+        commandsTable.AddRow("pr", "Triage and act on Azure DevOps PRs (list/show/comments/reply/create) or generate an AI description with --detailed");
         commandsTable.AddRow("checkout", "Interactive branch checkout");
         commandsTable.AddRow("azure-devops", "Manage Azure DevOps resources");
         commandsTable.AddRow("diff", "Show working-tree or branch-to-branch diff (supports --stat, --hunks, --files, --json)");
@@ -155,19 +155,35 @@ partial class Program
 
         AnsiConsole.Write(commitTable);
 
-        AnsiConsole.MarkupLine("\n[bold cyan]pr[/] options:");
-        var prTable = new Table()
+        AnsiConsole.MarkupLine("\n[bold cyan]pr[/] subcommands:");
+        var prSubTable = new Table()
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Grey)
+            .AddColumn(new TableColumn("[bold]Subcommand[/]").NoWrap())
+            .AddColumn(new TableColumn("[bold]Description[/]"));
+
+        prSubTable.AddRow("(no args)", "Interactive menu (list/show/comments/reply/create/generate AI description)");
+        prSubTable.AddRow("list", "List open pull requests in the current repo (Spectre table or --json)");
+        prSubTable.AddRow("show <pr-id>", "Show a single PR (title, description, reviewers, status) — --json supported");
+        prSubTable.AddRow("comments <pr-id>", "List all discussion threads with file/line context (REST API) — --json supported");
+        prSubTable.AddRow("reply <pr-id> <thread-id> --body \"...\"", "Post a reply to a thread via the REST API — --json supported");
+        prSubTable.AddRow("create --source <b> --target <b> --title <t> [--body-file <path>] [--auto-complete]", "Open a new PR via the REST API (description can be larger than az's argv limit) — --json supported");
+
+        AnsiConsole.Write(prSubTable);
+
+        AnsiConsole.MarkupLine("\n[bold cyan]pr[/] AI options (backward compatible, no subcommand):");
+        var prAiTable = new Table()
             .Border(TableBorder.Rounded)
             .BorderColor(Color.Grey)
             .AddColumn(new TableColumn("[bold]Flag[/]").NoWrap())
             .AddColumn(new TableColumn("[bold]Description[/]"));
 
-        prTable.AddRow("--detailed", "Generate detailed PR description");
-        prTable.AddRow("--language <lang>, --lang, -l", "Output language (e.g., english, spanish, french)");
-        prTable.AddRow("--save", "Save PR description to a markdown file");
-        prTable.AddRow("--no-spinner", "Skip the spinner that wraps the AI call (also honored via YITPUSH_NO_SPINNER=1)");
+        prAiTable.AddRow("--detailed", "Generate a detailed PR description (with summary, files changed, testing notes)");
+        prAiTable.AddRow("--language <lang>, --lang, -l", "Output language (e.g., english, spanish, french)");
+        prAiTable.AddRow("--save", "Save PR description to a markdown file");
+        prAiTable.AddRow("--no-spinner", "Skip the spinner that wraps the AI call (also honored via YITPUSH_NO_SPINNER=1)");
 
-        AnsiConsole.Write(prTable);
+        AnsiConsole.Write(prAiTable);
 
         AnsiConsole.MarkupLine("\n[bold cyan]diff[/] options:");
         var diffTable = new Table()
@@ -226,8 +242,13 @@ partial class Program
         AnsiConsole.MarkupLine("  yp commit --conventional --detect-breaking      [dim]# Conventional + scan diff for breaking changes[/]");
         AnsiConsole.MarkupLine("  yp commit --amend                               [dim]# Regenerate last commit's message (no push)[/]");
         AnsiConsole.MarkupLine("  yp commit --template ~/.yitpush/commit.md      [dim]# Render AI output through a custom template[/]");
-        AnsiConsole.MarkupLine("  yp pr                                           [dim]# Generate PR description[/]");
-        AnsiConsole.MarkupLine("  yp pr --detailed -l french                      [dim]# Detailed PR description in French[/]");
+        AnsiConsole.MarkupLine("  yp pr                                           [dim]# Interactive menu (list/show/comments/reply/create + AI)[/]");
+        AnsiConsole.MarkupLine("  yp pr list                                      [dim]# List open PRs in a Spectre table[/]");
+        AnsiConsole.MarkupLine("  yp pr show 12345                                [dim]# Show PR details (title, description, reviewers)[/]");
+        AnsiConsole.MarkupLine("  yp pr comments 12345                            [dim]# List discussion threads with file/line context[/]");
+        AnsiConsole.MarkupLine("  yp pr reply 12345 678 --body \"Fixed in abc\"     [dim]# Reply to a thread (REST API)[/]");
+        AnsiConsole.MarkupLine("  yp pr create --source feature/x --target main --title \"feat: x\" --body-file desc.md  [dim]# Open a PR via REST API[/]");
+        AnsiConsole.MarkupLine("  yp pr --detailed -l french                      [dim]# Detailed PR description in French (AI)[/]");
         AnsiConsole.MarkupLine("  yp checkout                                     [dim]# Switch branch interactively[/]");
         AnsiConsole.MarkupLine("  yp diff                                         [dim]# Working-tree diff with syntax coloring[/]");
         AnsiConsole.MarkupLine("  yp diff --files                                 [dim]# Just the file list with +N -M per file[/]");
