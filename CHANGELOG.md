@@ -42,6 +42,20 @@
 
 Resolves #19.
 
+### 📊 Stats (release-script slice)
+- 34 new xUnit tests across 2 new test files (`ReleasePlanTests`, `ReleaseScriptTests`)
+- 1 new testable type (`YitPush.ReleasePlan` + `ReleaseStep` + `PreFlightReport` + `ReleaseFinding` in `Commands/ReleaseCommand.cs`)
+- 1 new bash script (`scripts/release-2.3.0.sh`) that closes out the v2.3.0 release checklist
+- Total test count: **360 passing** (was 326 before this slice)
+
+### ✨ Added
+- **`Commands/ReleaseCommand.cs`** — `ReleasePlan` record with `LoadFromRepo(root)` (reads `<Version>` from `YitPush.csproj`), `RunPreFlight()` (walks the repo and returns a `PreFlightReport`), `GetSteps()` (the ordered 5-step release pipeline), and `RenderBashScript()` (emits the actual shell script). The pre-flight covers: csproj version match, CHANGELOG `## [X.Y.Z]` section, `llms.txt` + `llms-full.txt` version stamp, both SKILL.md copies mention the version and are byte-identical, plus a non-fatal WARN for stale `nupkg/` artifacts. `ReleaseStep.IsCritical` is `true` for pack / nuget push / git tag / git push tag, and `false` for the skill re-publish — the rendered bash wraps non-critical steps in `<cmd> || { echo WARN ...; }` so a transient skills.sh outage never blocks the NuGet release.
+- **`scripts/release-2.3.0.sh`** — executable bash script that mirrors the C# design: derives `VERSION` from `YitPush.csproj`, runs the 6 pre-flight greps (`CHANGELOG`, `LLMS_TXT`, `LLMS_FULL_TXT`, `SKILL_ROOT`, `SKILL_INSTALL`, `SKILL_DRIFT`), warns on stale `nupkg/` artifacts, and then runs `[1/5] dotnet pack`, `[2/5] dotnet nuget push`, `[3/5] git tag -a v2.3.0`, `[4/5] git push origin v2.3.0`, `[5/5] npx skills add` (non-fatal). Supports `--dry-run` for pre-flight only and `-h/--help`. The C# model and the bash script stay in lock-step because both are covered by the same test surface.
+- **`tests/YitPush.Tests/ReleasePlanTests.cs`** — 32 xUnit tests covering `LoadFromRepo` (reads version, returns correct paths), `ParseVersionFromCsproj` (simple, whitespace, missing → throws), `ChangelogSectionExists`, `LlmsFileMentionsVersion`, `SkillFileMentionsVersion`, `SkillFilesAreIdentical`, the full `BuildPreFlightReport` matrix (ready / CHANGELOG missing / skill drift / llms missing / skill version missing / nupkg stale WARN), `GetSteps` (correct order, version substituted into tag + nupkg commands, skill step invokes `npx skills add`, pack step uses `-c Release`), `RenderForShell`, `RenderBashScript` (includes `set -euo pipefail`, the 5 step commands, progress echoes `[1/5]..[5/5]`), `IsCritical` semantics (Pack / NuGetPush / GitTag / GitPushTag are critical, SkillPublish is not), and the `rescue block` pattern that wraps non-critical steps.
+- **`tests/YitPush.Tests/ReleaseScriptTests.cs`** — 2 smoke tests that assert the script exists, is executable (`UserExecute` bit set), and that `bash scripts/release-2.3.0.sh --dry-run` exits 0 against the real repo. The integration test is what proves the C# design and the bash implementation agree.
+
+Resolves #4.
+
 ---
 
 ## [2.3.0] — 2026-07-10 — *the big one* 🎉
