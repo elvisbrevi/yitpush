@@ -40,6 +40,7 @@ yp commit --amend [flags]
 - `--detect-breaking` — scan the diff for breaking changes (removed public symbol in C#, removed export in TS/JS, JSON major-version bump, `#major.bump` markers) and feed them into the AI prompt; with `--conventional` the first detected marker is also appended as a `BREAKING CHANGE:` footer
 - `--amend` — regenerate the last commit's message via `git commit --amend`; skips the working-tree flow and does NOT push
 - `--template <path-to-md>` — render the AI output through a Handlebars-ish template (`{{type}}`, `{{scope}}`, `{{subject}}`, `{{body}}`, `{{refs}}`); missing variables resolve to an empty string, malformed tokens (`{{1abc}}`, `{{a.b}}`, `{{}}`) are left untouched; the tool exits `6` when the file is missing
+- `--no-spinner` — skip the AnsiConsole.Status() spinner that wraps the AI call and the `git push`; the operation runs inline and the exit code is preserved. Same effect as setting `YITPUSH_NO_SPINNER=1` (or `true`/`yes`) in the environment. The spinner is also auto-disabled when stdout is redirected (CI logs).
 
 **Examples**:
 ```bash
@@ -70,6 +71,7 @@ yp pr [--detailed] [--language <lang>] [--save]
 - `--detailed` — include summary, change list, files changed, and testing notes
 - `--language <lang>` / `-l <lang>` — language for the output
 - `--save` — save description to `pr-description-<from>-to-<to>.md`
+- `--no-spinner` — skip the AnsiConsole.Status() spinner that wraps the AI call. Same effect as `YITPUSH_NO_SPINNER=1`. Auto-disabled when stdout is redirected.
 
 **Examples**:
 ```bash

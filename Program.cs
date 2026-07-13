@@ -49,21 +49,21 @@ partial class Program
         }
         catch { }
 
-        // Start version check in background — won't block the main command
-        var versionCheckTask = Task.Run(CheckForUpdates);
+        // Await the version check up-front. It is fast on cache hit (<100ms) and
+        // serializing it guarantees the upgrade hint never collides with the
+        // AnsiConsole.Status() spinner wrapped around the long-running commands.
+        await CheckForUpdates();
 
         if (args.Length == 0 || args[0] is "--help" or "-h" or "-help" or "help")
         {
             Console.WriteLine();
             ShowHelp();
-            await versionCheckTask;
             return 0;
         }
 
         if (args[0] is "--version" or "-V")
         {
             Console.WriteLine(GetInformationalVersion());
-            await versionCheckTask;
             return 0;
         }
 
@@ -92,7 +92,6 @@ partial class Program
                 result = 1; break;
         }
 
-        await versionCheckTask;
         return result;
     }
 
@@ -133,6 +132,7 @@ partial class Program
         AnsiConsole.MarkupLine("\n[bold cyan]Global flags[/] (work without a subcommand):");
         AnsiConsole.MarkupLine("  [cyan]--version, -V[/]  Print the assembly version and exit 0");
         AnsiConsole.MarkupLine("  [cyan]--help, -h[/]     Show this help");
+        AnsiConsole.MarkupLine("  [cyan]--no-spinner[/]   Skip the AnsiConsole.Status() spinner for the long ops in this command (also honored via the [cyan]YITPUSH_NO_SPINNER[/] env var; auto-applied when stdout is redirected)");
 
         AnsiConsole.MarkupLine("\n[bold cyan]commit[/] options:");
         var commitTable = new Table()
@@ -151,6 +151,7 @@ partial class Program
         commitTable.AddRow("--detect-breaking", "Scan the diff for breaking changes (removed public symbol in C#, removed export in TS/JS, major JSON version bump, `#major.bump` marker) and feed them to the AI");
         commitTable.AddRow("--amend", "Regenerate the message for the LAST commit and rewrite it in place (`git commit --amend`); skips the working-tree flow and does NOT push");
         commitTable.AddRow("--template <path-to-md>", "Render the AI output through a Handlebars-ish template (`{{type}}`, `{{scope}}`, `{{subject}}`, `{{body}}`, `{{refs}}`); exits 6 if the file is missing");
+        commitTable.AddRow("--no-spinner", "Skip the spinner that wraps the AI call and the `git push` (also honored via YITPUSH_NO_SPINNER=1)");
 
         AnsiConsole.Write(commitTable);
 
@@ -164,6 +165,7 @@ partial class Program
         prTable.AddRow("--detailed", "Generate detailed PR description");
         prTable.AddRow("--language <lang>, --lang, -l", "Output language (e.g., english, spanish, french)");
         prTable.AddRow("--save", "Save PR description to a markdown file");
+        prTable.AddRow("--no-spinner", "Skip the spinner that wraps the AI call (also honored via YITPUSH_NO_SPINNER=1)");
 
         AnsiConsole.Write(prTable);
 
@@ -177,7 +179,7 @@ partial class Program
         diffTable.AddRow("--files", "Show only the list of changed files (a colorful `git diff --stat`)");
         diffTable.AddRow("--hunks", "Show only the changed lines, no context (`git diff -U0`)");
         diffTable.AddRow("--stat", "Alias of `--files` (kept for parity with `git diff --stat`)");
-        diffTable.AddRow("--json", "Emit `{ files: [{ path, additions, deletions, hunks: [...] }] }` on stdout (no ANSI)");
+        diffTable.AddRow("--json", "Emit a stable JSON object on stdout (no ANSI); see the yp diff docs for the exact shape");
         diffTable.AddRow("--no-color", "Disable Spectre coloring (also auto-applied when stdout is redirected)");
         diffTable.AddRow("<refA> <refB>", "Diff branch/tag/commit to another (`git diff <refA>..<refB>`)");
 
@@ -228,7 +230,7 @@ partial class Program
         AnsiConsole.MarkupLine("  yp diff                                         [dim]# Working-tree diff with syntax coloring[/]");
         AnsiConsole.MarkupLine("  yp diff --files                                 [dim]# Just the file list with +N -M per file[/]");
         AnsiConsole.MarkupLine("  yp diff feature/abc main --stat                 [dim]# Branch-to-branch stat[/]");
-        AnsiConsole.MarkupLine("  yp diff --json | jq '.files[0].hunks[0].afterLine' [dim]# Pipe the diff to another tool[/]");
+        AnsiConsole.MarkupLine("  yp diff --json | jq '.files[[0]].hunks[[0]].afterLine' [dim]# Pipe the diff to another tool[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu task                         [dim]# Create tasks interactively[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu show MyOrg 12345             [dim]# Show HU details[/]");
         AnsiConsole.MarkupLine("  yp azure-devops task show MyOrg 67890           [dim]# Show Task details[/]");
@@ -325,13 +327,12 @@ partial class Program
                 Version.TryParse(current, out var currentVer) &&
                 latest > currentVer)
             {
-                Console.WriteLine();
-                AnsiConsole.Write(new Panel(
-                    $"[yellow]A new version of yp is available:[/] [bold green]{latestVersion}[/]  [dim](current: {current})[/]\n" +
-                    (releaseNotes != null ? $"[dim]{releaseNotes.Trim()}[/]\n" : "") +
-                    "Update with: [cyan]dotnet tool update -g YitPush[/]")
-                    .BorderColor(Color.Yellow)
-                    .Padding(1, 0));
+                // Single-line hint. Kept tiny on purpose so it does not fight
+                // the AnsiConsole.Status() spinner that wraps the long ops in
+                // the main command (issue #14).
+                AnsiConsole.MarkupLine(
+                    $"[yellow]⬆  yp {latestVersion} available[/] [dim](current: {current})[/]  " +
+                    "[dim]— update with:[/] [cyan]dotnet tool update -g YitPush[/]");
             }
         }
         catch { /* Silent — version check is non-critical */ }

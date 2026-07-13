@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [Unreleased]
+
+### Added
+- **`--no-spinner`** flag on `yp commit` and `yp pr` — skips the AnsiConsole.Status() spinner that wraps the AI call and the `git push`; the operation runs inline and the exit code is preserved. Same effect as the new `YITPUSH_NO_SPINNER` environment variable (`1`, `true`, or `yes` — case-insensitive). The spinner is also auto-disabled when stdout is redirected (CI logs), so a piped `yp commit` no longer leaves a frozen frame in the journal.
+- **`YITPUSH_NO_SPINNER`** environment variable — global override for the spinner. Reads `1`, `true`, or `yes` (case-insensitive) and short-circuits the spinner wrapper everywhere it's used.
+- **`Ui.RunWithStatus<T>(string title, Func<StatusContext?, Task<T>> work, bool noSpinner = false)`** — single helper for long operations. When the spinner is enabled it wraps the work in `AnsiConsole.Status().StartAsync`; when it's disabled (flag / env var / redirected stdout) it prints the title once and runs the work inline. Centralized so every long op picks up the same disable behavior.
+- **12 new xUnit tests** in `tests/YitPush.Tests/UiTests.cs` — cover `Ui.ShouldDisableSpinner` (flag, env var case-insensitive, stdout redirect) and `Ui.RunWithStatus` (work invocation, exception propagation, return value, context ignore in the inline path).
+- **2 new xUnit tests** in `tests/YitPush.Tests/CommitFormatTests.cs` — `ParseCommitArgs` recognizes `--no-spinner` and isolates it from the other commit flags.
+
+### Changed
+- **`CheckForUpdates` no longer renders a yellow Panel** that can interleave with the AnsiConsole.Status() spinner. The check now runs synchronously up-front and emits a single-line `⬆  yp <version> available` hint. The cache lookup is sub-100ms so the perceived startup latency is unchanged.
+- **`yp --help`** adds a `--no-spinner` row under "Global flags" and the `commit` and `pr` option tables.
+
+### Fixed
+- **Spectre.Console markup crash in `yp --help` on the `diff` table** (pre-existing, surfaced by the new diff subcommand shipped in v9): the JSON example contained literal `[...]` markup tags that crashed the markup tokenizer. Now rendered as a plain-text summary.
+
+Resolves #14.
+
+---
+
 ## [2.3.0] - 2026-07-10
 
 ### Changed

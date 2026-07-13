@@ -396,11 +396,30 @@ public class CommitFormatTests
         Assert.False(ca.Conventional);
         Assert.False(ca.DetectBreaking);
         Assert.False(ca.Amend);
+        Assert.False(ca.NoSpinner);
         Assert.Null(ca.Type);
         Assert.Null(ca.Scope);
         Assert.Null(ca.TemplatePath);
         Assert.Null(ca.Format);
         Assert.Equal("english", ca.Language);
+    }
+
+    [Fact]
+    public void ParseCommitArgs_no_spinner_flag_is_recognized()
+    {
+        var ca = InvokeParseArgs(new[] { "--no-spinner" });
+
+        Assert.True(ca.NoSpinner);
+    }
+
+    [Fact]
+    public void ParseCommitArgs_no_spinner_flag_does_not_affect_other_flags()
+    {
+        var ca = InvokeParseArgs(new[] { "--conventional", "--no-spinner", "--confirm" });
+
+        Assert.True(ca.NoSpinner);
+        Assert.True(ca.Conventional);
+        Assert.True(ca.RequireConfirmation);
     }
 
     [Fact]
