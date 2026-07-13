@@ -84,6 +84,8 @@ partial class Program
                 result = await InstallSkillCommand(); break;
             case "azure-devops":
                 result = await AzureDevOpsCommand(args.Skip(1).ToArray()); break;
+            case "diff":
+                result = await DiffCommand(args.Skip(1).ToArray()); break;
             default:
                 AnsiConsole.MarkupLine($"[red]❌ Unknown command:[/] {Markup.Escape(args[0])}\n");
                 ShowHelp();
@@ -123,6 +125,7 @@ partial class Program
         commandsTable.AddRow("pr", "Generate a pull request description between two branches");
         commandsTable.AddRow("checkout", "Interactive branch checkout");
         commandsTable.AddRow("azure-devops", "Manage Azure DevOps resources");
+        commandsTable.AddRow("diff", "Show working-tree or branch-to-branch diff (supports --stat, --hunks, --files, --json)");
         commandsTable.AddRow("skill", "Install the yp skill for your AI agent (Claude Code, Cursor, Gemini CLI...)");
 
         AnsiConsole.Write(commandsTable);
@@ -163,6 +166,22 @@ partial class Program
         prTable.AddRow("--save", "Save PR description to a markdown file");
 
         AnsiConsole.Write(prTable);
+
+        AnsiConsole.MarkupLine("\n[bold cyan]diff[/] options:");
+        var diffTable = new Table()
+            .Border(TableBorder.Rounded)
+            .BorderColor(Color.Grey)
+            .AddColumn(new TableColumn("[bold]Flag[/]").NoWrap())
+            .AddColumn(new TableColumn("[bold]Description[/]"));
+
+        diffTable.AddRow("--files", "Show only the list of changed files (a colorful `git diff --stat`)");
+        diffTable.AddRow("--hunks", "Show only the changed lines, no context (`git diff -U0`)");
+        diffTable.AddRow("--stat", "Alias of `--files` (kept for parity with `git diff --stat`)");
+        diffTable.AddRow("--json", "Emit `{ files: [{ path, additions, deletions, hunks: [...] }] }` on stdout (no ANSI)");
+        diffTable.AddRow("--no-color", "Disable Spectre coloring (also auto-applied when stdout is redirected)");
+        diffTable.AddRow("<refA> <refB>", "Diff branch/tag/commit to another (`git diff <refA>..<refB>`)");
+
+        AnsiConsole.Write(diffTable);
 
         AnsiConsole.MarkupLine("\n[bold cyan]azure-devops[/] subcommands:");
         var azTable = new Table()
@@ -206,6 +225,10 @@ partial class Program
         AnsiConsole.MarkupLine("  yp pr                                           [dim]# Generate PR description[/]");
         AnsiConsole.MarkupLine("  yp pr --detailed -l french                      [dim]# Detailed PR description in French[/]");
         AnsiConsole.MarkupLine("  yp checkout                                     [dim]# Switch branch interactively[/]");
+        AnsiConsole.MarkupLine("  yp diff                                         [dim]# Working-tree diff with syntax coloring[/]");
+        AnsiConsole.MarkupLine("  yp diff --files                                 [dim]# Just the file list with +N -M per file[/]");
+        AnsiConsole.MarkupLine("  yp diff feature/abc main --stat                 [dim]# Branch-to-branch stat[/]");
+        AnsiConsole.MarkupLine("  yp diff --json | jq '.files[0].hunks[0].afterLine' [dim]# Pipe the diff to another tool[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu task                         [dim]# Create tasks interactively[/]");
         AnsiConsole.MarkupLine("  yp azure-devops hu show MyOrg 12345             [dim]# Show HU details[/]");
         AnsiConsole.MarkupLine("  yp azure-devops task show MyOrg 67890           [dim]# Show Task details[/]");
