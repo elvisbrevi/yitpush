@@ -9,6 +9,7 @@ partial class Program
     {
         bool detailed = args.Contains("--detailed");
         bool save = args.Contains("--save");
+        bool noSpinner = args.Contains("--no-spinner");
         string language = ParseLanguage(args);
 
         if (!await IsGitRepository())
@@ -18,7 +19,7 @@ partial class Program
             return 1;
         }
 
-        return await GeneratePrDescription(detailed, language, save);
+        return await GeneratePrDescription(detailed, language, save, noSpinner);
     }
 
     private static async Task<string> GeneratePrDescriptionContent(string diff, bool detailed, string language)
@@ -82,7 +83,7 @@ Generate the pull request description in Markdown:";
         return await CallAiApi(prompt);
     }
 
-    private static async Task<int> GeneratePrDescription(bool detailed, string language, bool save)
+    private static async Task<int> GeneratePrDescription(bool detailed, string language, bool save, bool noSpinner = false)
     {
 
         // Get AI provider info
@@ -166,7 +167,10 @@ Generate the pull request description in Markdown:";
 
         // Generate PR description
         AnsiConsole.MarkupLine($"🤖 Generating PR description with {aiProviderName} ({aiModel})...{(detailed ? " (detailed mode)" : "")}");
-        var description = await GeneratePrDescriptionContent(diff, detailed, language);
+        var description = await Ui.RunWithStatus(
+            "Generating PR description…",
+            _ => GeneratePrDescriptionContent(diff, detailed, language),
+            noSpinner: noSpinner);
 
         if (string.IsNullOrWhiteSpace(description))
         {

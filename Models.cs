@@ -67,6 +67,9 @@ public class CommitArgs
     public string? TemplatePath { get; init; }
     // Effective commit format resolved from config + flags. "plain" means default AI free-form.
     public string? Format { get; init; }
+    // When true, skip the AnsiConsole.Status() spinner wrapper for the long ops
+    // in this command (push, AI gen). Equivalent to the YITPUSH_NO_SPINNER env var.
+    public bool NoSpinner { get; init; }
 }
 
 class VersionCheckCache

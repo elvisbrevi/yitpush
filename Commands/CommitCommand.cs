@@ -85,7 +85,10 @@ partial class Program
                     : Array.Empty<string>();
 
                 Console.WriteLine($"🤖 Generating commit message with {aiProviderName} ({aiModel})...{(commitArgs.Detailed ? " (detailed mode)" : "")}{(commitArgs.Conventional ? " (conventional commits)" : "")}{(commitArgs.DetectBreaking ? " (breaking-change detection)" : "")}");
-                var rawAi = await GenerateCommitMessage(diff, commitArgs);
+                var rawAi = await Ui.RunWithStatus(
+                    "Generating commit message…",
+                    _ => GenerateCommitMessage(diff, commitArgs),
+                    noSpinner: commitArgs.NoSpinner);
                 if (string.IsNullOrWhiteSpace(rawAi))
                 {
                     Console.ForegroundColor = ConsoleColor.Red;
@@ -215,7 +218,10 @@ partial class Program
                 }
             }
 
-            if (!await ExecuteGitPush(commitArgs.RequireConfirmation))
+            if (!await Ui.RunWithStatus(
+                    "Pushing to origin…",
+                    _ => ExecuteGitPush(commitArgs.RequireConfirmation),
+                    noSpinner: commitArgs.NoSpinner))
                 return 1;
 
             Console.ForegroundColor = ConsoleColor.Green;
@@ -483,6 +489,7 @@ partial class Program
         string? type = null;
         string? scope = null;
         string? templatePath = null;
+        bool noSpinner = false;
 
         for (int i = 0; i < args.Length; i++)
         {
@@ -516,6 +523,9 @@ partial class Program
                 case "--template":
                     if (i + 1 < args.Length) { templatePath = args[++i]; }
                     break;
+                case "--no-spinner":
+                    noSpinner = true;
+                    break;
                 default:
                     if (a.StartsWith("--type=", StringComparison.Ordinal))
                         type = a.Substring("--type=".Length).ToLowerInvariant();
@@ -548,6 +558,7 @@ partial class Program
             Amend = amend,
             TemplatePath = templatePath,
             Format = format,
+            NoSpinner = noSpinner,
         };
     }
 
